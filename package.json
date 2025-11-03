@@ -10,7 +10,13 @@
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "db:push": "psql $DATABASE_URL -f db/sql/001_schema.sql",
+    "db:push:math": "psql $DATABASE_URL -f db/sql/003_math_schema.sql",
+    "seed:concepts": "tsx scripts/seed_concepts.ts",
+    "seed:concepts:simple": "tsx scripts/seed_concepts_simple.ts",
+    "import:math": "tsx scripts/import_math_data.ts",
+    "verify:solve": "tsx scripts/ping-solve.ts"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.0.4",
@@ -19,17 +25,23 @@
     "@radix-ui/react-label": "^2.0.2",
     "@radix-ui/react-separator": "^1.0.3",
     "@radix-ui/react-tabs": "^1.0.4",
-    "@supabase/supabase-js": "^2.38.4",
+    "@supabase/auth-helpers-nextjs": "^0.10.0",
+    "@supabase/ssr": "^0.7.0",
+    "@supabase/supabase-js": "^2.75.1",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
     "framer-motion": "^10.16.5",
     "lucide-react": "^0.316.0",
     "next": "14.1.0",
     "next-themes": "^0.2.1",
+    "openai": "^4.104.0",
+    "pg": "^8.16.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "tailwind-merge": "^2.2.0",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "tsx": "^4.20.6",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@types/node": "^20.10.5",

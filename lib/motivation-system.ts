@@ -97,6 +97,7 @@ class MotivationSystem {
       
       // Trigger visual celebration
       this.showCelebration({
+        id: Date.now().toString(),
         type: 'visual',
         intensity: 'moderate',
         duration: 1000,

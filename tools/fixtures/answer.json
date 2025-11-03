@@ -1,0 +1,6 @@
+{
+  "correct": false,
+  "expected": "B",
+  "concept_id": "cpt_abc",
+  "rationale": "考點提示：先分段處理絕對值，避免遺漏臨界點。"
+}

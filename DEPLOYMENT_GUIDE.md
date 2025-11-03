@@ -98,7 +98,7 @@ vercel
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-GEMINI_API_KEY=your_gemini_api_key
+OPENAI_API_KEY=your_openai_api_key
 ```
 
 #### 4. 重新部署
@@ -138,7 +138,7 @@ netlify deploy --prod --dir=out
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- `GEMINI_API_KEY`
+- `OPENAI_API_KEY`
 
 ---
 
@@ -157,7 +157,7 @@ nano .env.local
 - [ ] Supabase 項目已建立
 - [ ] 資料庫 schema 已執行
 - [ ] API 金鑰已設定
-- [ ] Gemini API 金鑰已獲取
+- [ ] OpenAI API 金鑰已獲取
 - [ ] 環境變數已配置
 - [ ] 域名已設定 (可選)
 

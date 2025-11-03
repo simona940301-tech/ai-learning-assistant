@@ -16,6 +16,35 @@ export interface ScholarSupplement {
   title?: string
 }
 
+// Quiz 組件（獨立處理 useState）
+function QuizComponent({ content }: { content: any }) {
+  const [showAnswer, setShowAnswer] = useState(false)
+  
+  return (
+    <div className="rounded border border-blue-500/30 bg-blue-500/5 p-3">
+      <div className="text-[13px] font-medium">{content.question}</div>
+      <button
+        onClick={() => setShowAnswer(!showAnswer)}
+        className="mt-2 text-[11px] text-blue-600 hover:text-blue-700"
+      >
+        {showAnswer ? '隱藏' : '顯示'}答案
+      </button>
+      <AnimatePresence>
+        {showAnswer && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="mt-2 text-[13px] text-[#8A8A8A]"
+          >
+            {content.answer}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 // A. 標籤/徽章（最低干擾）
 export function ScholarBadge({ content }: { content: string }) {
   return (
@@ -178,30 +207,7 @@ export function ScholarContent({ type, content }: { type: ScholarContentType; co
       )
 
     case 'quiz':
-      const [showAnswer, setShowAnswer] = useState(false)
-      return (
-        <div className="rounded border border-blue-500/30 bg-blue-500/5 p-3">
-          <div className="text-[13px] font-medium">{(content as any).question}</div>
-          <button
-            onClick={() => setShowAnswer(!showAnswer)}
-            className="mt-2 text-[11px] text-blue-600 hover:text-blue-700"
-          >
-            {showAnswer ? '隱藏' : '顯示'}答案
-          </button>
-          <AnimatePresence>
-            {showAnswer && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="mt-2 text-[13px] text-[#8A8A8A]"
-              >
-                {(content as any).answer}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      )
+      return <QuizComponent content={content} />
 
     default:
       return <div className="text-[13px]">{content}</div>
@@ -223,7 +229,7 @@ export function renderScholarSupplement(supplement: ScholarSupplement) {
       const [main, supp] = (content as string).split('||')
       return <ScholarComparison main={main} supplement={supp} />
     case 'card':
-      return <ScholarCard items={content as string[]} />
+      return <ScholarCard items={Array.isArray(content) ? (content as unknown as string[]) : [content as string]} />
     default:
       return <ScholarContent type={contentType} content={content} />
   }

@@ -1,0 +1,10 @@
+[
+  {"src_id":"grammar_participle_clause","dst_id":"grammar_relative_clause","relation":"confusable","weight":0.7},
+  {"src_id":"grammar_participle_clause","dst_id":"grammar_tense_consistency","relation":"nearby","weight":0.4},
+  {"src_id":"grammar_relative_clause","dst_id":"grammar_gerund_infinitive","relation":"nearby","weight":0.3},
+  {"src_id":"grammar_tense_consistency","dst_id":"grammar_subjunctive","relation":"prereq","weight":0.6},
+  {"src_id":"grammar_conjunctions","dst_id":"grammar_prepositions","relation":"confusable","weight":0.5},
+  {"src_id":"grammar_prepositions","dst_id":"grammar_phrasal_verbs","relation":"confusable","weight":0.6},
+  {"src_id":"grammar_word_form","dst_id":"grammar_conjunctions","relation":"nearby","weight":0.3},
+  {"src_id":"grammar_passive_voice","dst_id":"grammar_tense_consistency","relation":"nearby","weight":0.5}
+]

@@ -25,7 +25,7 @@
 ### Layer 2: 12-Week Goals
 
 #### Phase 1: Foundation (Weeks 1-4) ✅ **COMPLETED**
-- ✅ **Core AI Functionality**: Gemini 2.0 Flash 集成，穩定可靠的 AI 處理
+- ✅ **Core AI Functionality**: OpenAI GPT-5 Flow 集成，穩定可靠的 AI 處理
 - ✅ **Zero-Friction Workflow**: Backpack → Ask 無縫流程
 - ✅ **Structured Output**: 五段式重點整理和六種解題模板
 - ✅ **Citation System**: 強制引用和驗證系統

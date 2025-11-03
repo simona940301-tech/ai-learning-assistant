@@ -1,131 +1,130 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { z } from 'zod'
+import { saveBackpackNote } from '@/lib/supabase'
+import { trackAPICall, trackError } from '@/lib/heartbeat'
+import type { ContractV2Response } from '@/lib/contract-v2'
 
-// 使用 Service Role Key 繞過 RLS
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Schema for saving from Contract v2 response
+const SaveFromContractSchema = z.object({
+  user_id: z.string().min(1),
+  contract_response: z.object({
+    phase: z.string(),
+    subject: z.string(),
+    keypoint: z.object({
+      id: z.string(),
+      code: z.string(),
+      name: z.string(),
+      category: z.string().optional(),
+    }).optional(),
+    question: z.object({
+      stem: z.string(),
+    }).optional(),
+    explanation: z.object({
+      summary: z.string(),
+      steps: z.array(z.string()),
+      checks: z.array(z.string()),
+      error_hints: z.array(z.string()),
+      extensions: z.array(z.string()),
+    }).optional(),
+  }),
+})
 
-interface SaveRequest {
-  subject: string
-  title: string
-  tags: string[]
-  content: string
-  mode: 'save' | 'overwrite'
-  originalId?: string
-}
+// Legacy schema for backward compatibility
+const SaveLegacySchema = z.object({
+  user_id: z.string().min(1),
+  question: z.string().min(1),
+  canonical_skill: z.string().min(1),
+  note_md: z.string().min(1),
+})
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now()
+
   try {
-    const { subject, title, tags, content, mode, originalId }: SaveRequest = await request.json()
+    const body = await request.json()
 
-    if (!subject || !title || !content) {
-      return NextResponse.json(
-        { error: '缺少必要欄位' },
-        { status: 400 }
-      )
-    }
+    // Try Contract v2 format first
+    const contractParse = SaveFromContractSchema.safeParse(body)
+    if (contractParse.success) {
+      const { user_id, contract_response } = contractParse.data
 
-    // 使用原生 SQL 直接插入，繞過所有約束
-    const query = `
-      INSERT INTO backpack_items (
-        id,
+      // Extract data from Contract v2 response
+      const question = contract_response.question?.stem || 'No question provided'
+      const canonical_skill = contract_response.keypoint?.name || contract_response.subject
+
+      // Build markdown note from explanation
+      let note_md = `# ${canonical_skill}\n\n`
+
+      if (contract_response.explanation) {
+        const { summary, steps, checks, error_hints } = contract_response.explanation
+
+        note_md += `## 概念總結\n${summary}\n\n`
+
+        if (steps.length > 0) {
+          note_md += `## 解題步驟\n${steps.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n\n`
+        }
+
+        if (checks.length > 0) {
+          note_md += `## 檢查清單\n${checks.map(c => `- ${c}`).join('\n')}\n\n`
+        }
+
+        if (error_hints.length > 0) {
+          note_md += `## 常見錯誤\n${error_hints.map(e => `- ${e}`).join('\n')}\n\n`
+        }
+      }
+
+      const data = await saveBackpackNote({
         user_id,
-        subject,
-        type,
-        title,
-        content,
-        derived_from,
-        version_history,
-        created_at,
-        updated_at
-      ) VALUES (
-        gen_random_uuid(),
-        '00000000-0000-0000-0000-000000000001'::uuid,
-        $1,
-        'text',
-        $2,
-        $3,
-        $4,
-        $5,
-        NOW(),
-        NOW()
-      )
-      RETURNING *
-    `
-
-    const { data, error } = await supabaseAdmin.rpc('execute_sql', {
-      query,
-      params: [subject, title, content, [], []]
-    })
-
-    if (error) {
-      // 如果 RPC 失敗，使用簡化的方法
-      console.log('RPC failed, trying direct insert...')
-      
-      // 直接使用 INSERT，忽略外鍵約束錯誤
-      const { data: directData, error: directError } = await supabaseAdmin
-        .from('backpack_items')
-        .insert({
-          user_id: '00000000-0000-0000-0000-000000000001',
-          subject,
-          type: 'text',
-          title,
-          content,
-          derived_from: [],
-          version_history: []
-        })
-        .select()
-
-      if (directError) {
-        // 如果還是失敗，返回模擬成功回應
-        console.log('Direct insert also failed, returning mock response')
-        return NextResponse.json({
-          message: '已儲存至 Backpack (模擬)',
-          data: {
-            id: Date.now().toString(),
-            user_id: '00000000-0000-0000-0000-000000000001',
-            subject,
-            type: 'text',
-            title,
-            content,
-            derived_from: [],
-            version_history: [],
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-        })
-      }
-
-      return NextResponse.json({
-        message: '已儲存至 Backpack',
-        data: directData[0]
+        question,
+        canonical_skill,
+        note_md,
       })
+
+      const latency = Date.now() - startTime
+      trackAPICall('/api/backpack/save', latency, true)
+
+      return NextResponse.json({ data, saved: true })
     }
 
-    return NextResponse.json({
-      message: '已儲存至 Backpack',
-      data: data[0]
-    })
+    // Fallback to legacy format
+    const legacyParse = SaveLegacySchema.safeParse(body)
+    if (legacyParse.success) {
+      const { user_id, question, canonical_skill, note_md } = legacyParse.data
+
+      const data = await saveBackpackNote({
+        user_id,
+        question,
+        canonical_skill,
+        note_md,
+      })
+
+      const latency = Date.now() - startTime
+      trackAPICall('/api/backpack/save', latency, true)
+
+      return NextResponse.json({ data, saved: true })
+    }
+
+    // If neither format matches, return validation error
+    trackError('Invalid save request format')
+    return NextResponse.json(
+      {
+        error: 'invalid_format',
+        message: 'Request must match either Contract v2 or legacy format',
+      },
+      { status: 400 }
+    )
+
   } catch (error) {
-    console.error('Save to Backpack Error:', error)
-    
-    // 返回模擬成功回應，確保前端不會卡住
-    return NextResponse.json({
-      message: '已儲存至 Backpack (模擬)',
-      data: {
-        id: Date.now().toString(),
-        user_id: '00000000-0000-0000-0000-000000000001',
-        subject: 'math',
-        type: 'text',
-        title: '測試檔案',
-        content: '測試內容',
-        derived_from: [],
-        version_history: [],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
-    })
+    const latency = Date.now() - startTime
+    trackAPICall('/api/backpack/save', latency, false)
+
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    trackError(`Backpack save error: ${errorMessage}`)
+    console.error('Backpack save error', error)
+
+    return NextResponse.json(
+      { error: errorMessage },
+      { status: 500 }
+    )
   }
 }

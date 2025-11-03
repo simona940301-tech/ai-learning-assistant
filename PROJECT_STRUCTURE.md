@@ -20,7 +20,7 @@ edu-app/
 │   │
 │   ├── api/
 │   │   └── ai/
-│   │       └── route.ts                # Gemini AI Proxy API
+│   │       └── route.ts                # OpenAI AI Proxy API
 │   │
 │   ├── layout.tsx                      # Root layout
 │   ├── page.tsx                        # Home redirect
@@ -75,7 +75,7 @@ edu-app/
 
 | 端點 | 檔案 | 功能 |
 |------|------|------|
-| `POST /api/ai` | `app/api/ai/route.ts` | Gemini AI 代理 |
+| `POST /api/ai` | `app/api/ai/route.ts` | OpenAI AI 代理 |
 
 ## 🧩 核心元件
 

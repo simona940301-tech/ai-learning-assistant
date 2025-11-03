@@ -1,10 +1,41 @@
-# ✅ ASK & BACKPACK 完整實作摘要
+# 🚧 ASK & BACKPACK 進度摘要
 
-## 🎯 實作完成度：**95%**（核心功能全部完成，可立即測試）
+> ⚠️ **現況聲明（2025-03）**  
+> 先前版本標示「95% 完成」，但目前程式碼仍以 demo/mock 為主，尚未串接真實資料庫與 OpenAI。  
+> 以下整理為「已完成（含 demo）」與「待完成」的最新狀態，舊版詳細功能清單則保留在文末作為參考。
+
+## 🎯 實作完成度：**約 40%**（UI/流程 demo 就緒，後端串接與資料仍未落地）
 
 ---
 
-## ✅ 已完成功能清單
+## ✅ 已完成（含 demo / mock）
+
+- Backpack → Ask 介面流程可操作（含上下文傳遞、頁籤切換、Context API）
+- Ask 頁基礎 UI 與互動（檔案上傳、模式切換、結果卡片展示）
+- Tutor Flow hook（`useTutorFlow`）已提供 demo 流程，串 mock API
+- Warmup / Solve demo API (`/api/warmup/keypoint-mcq-simple`, `/api/solve-simple`) 可回傳假資料
+- AI 提示詞與模板庫（`lib/prompts.ts`）完整定義，尚未與真實模型串接
+
+---
+
+## ⏳ 待完成 / 真實串接
+
+- Supabase schema/migration 佈署與資料播種，提供 keypoints/questions/backpack_notes 等資料
+- `/api/warmup`, `/api/solve`, `/api/tutor/*` 串接真實 DB 與推論流程（目前為 mock）
+- OpenAI / Gemini API 金鑰配置、錯誤處理與速率控管
+- Backpack 答案儲存流程（`saveBackpackNote`）的權限驗證與測試
+- 單元測試 / 端點整合測試、React component smoke tests
+- 文件同步（README、架構圖）需反映真實進度與部署需求
+
+---
+
+## 📚 原提案細節（保留參考）
+
+以下為 2024-12 版本的完整功能清單，描述了目標狀態。請參照上方進度摘要判斷哪些項目尚未落地。
+
+---
+
+## ✅ 已完成功能清單（原草案）
 
 ### 1. **Backpack → Ask 零摩擦流程**
 
@@ -238,7 +269,7 @@
 - **Database**: Supabase (PostgreSQL)
 - **Storage**: Supabase Storage
 - **Auth**: Supabase Auth
-- **AI**: Gemini API (server-side proxy)
+- **AI**: OpenAI API (server-side proxy)
 
 ### 核心檔案結構
 ```
@@ -304,7 +335,7 @@ npm install
 # 設定環境變數（.env.local）
 NEXT_PUBLIC_SUPABASE_URL=your-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-key
-GEMINI_API_KEY=your-gemini-key
+OPENAI_API_KEY=your-openai-key
 
 # 啟動開發伺服器
 npm run dev

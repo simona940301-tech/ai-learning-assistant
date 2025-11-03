@@ -63,7 +63,7 @@ Ethics baseline → Student First · Transparency · Trust · Delight.
 ## 3️⃣ Agent Definitions
 
 Each agent block contains its **prompt, meta-tags, and I-A-M (Intent / Action / Measure)**.
-All prompts are in English for direct use in Gemini or Cursor.
+All prompts are in English for direct use in OpenAI or Cursor.
 
 ---
 
@@ -273,7 +273,7 @@ Add RICE score + Kill Rule (2 weeks no lift → rollback).
 
 ```
 • File Path: /docs/AGENTS.md  
-• Primary Imports: used by Cursor and Gemini during planning phase.  
+• Primary Imports: used by Cursor and OpenAI during planning phase.  
 • Meta Orchestrator should load this file to map context → agent prompts.  
 • Each agent block is stand-alone and can be called via:
    `invoke(agent="Cognitive Psychologist", context={event:"low_confidence"})`

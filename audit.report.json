@@ -1,0 +1,159 @@
+{
+  "meta": {
+    "generated_at": "2025-10-05T10:45:00+08:00",
+    "tools": {
+      "ts-prune": "unavailable-offline",
+      "depcheck": "unavailable-offline"
+    }
+  },
+  "endpoints": [
+    {
+      "path": "/api/tutor/detect",
+      "method": ["POST"],
+      "status": "merge",
+      "reasons": ["no-frontend-callers", "lives-under-legacy-prefix"],
+      "callers": [],
+      "tests": [],
+      "notes": "New subject classifier lives under the legacy tutor namespace; no fetch('/api/tutor/detect') usages located. Consider moving to /api/detect and wiring UI."
+    },
+    {
+      "path": "/api/tutor/explain",
+      "method": ["POST"],
+      "status": "deprecated_410",
+      "reasons": ["returns-410", "legacy-payload-removed"],
+      "callers": [{"file": "docs/TUTOR_EXPLAIN_API.md", "line": 290}],
+      "tests": [],
+      "notes": "Route now returns 410 Gone with X-Deprecated header for 14-day observation window before deletion."
+    },
+    {
+      "path": "/api/tutor/options",
+      "method": ["POST"],
+      "status": "deprecated_410",
+      "reasons": ["returns-410", "concept-db-only"],
+      "callers": [],
+      "tests": [],
+      "notes": "Embedding RPC + concept_edges usage; route is now a 410 shell pending removal."
+    },
+    {
+      "path": "/api/tutor/save-to-backpack",
+      "method": ["POST"],
+      "status": "deprecated_410",
+      "reasons": ["returns-410", "doc-only-usage", "legacy-payload"],
+      "callers": [{"file": "docs/TUTOR_EXPLAIN_API.md", "line": 304}],
+      "tests": [],
+      "notes": "Now returns 410 Gone; legacy TutorExplainResult stored under legacy/types-deprecated.ts."
+    },
+    {
+      "path": "/api/tutor/markdown",
+      "method": ["POST"],
+      "status": "deprecated_410",
+      "reasons": ["returns-410", "requires-gemini-api"],
+      "callers": [],
+      "tests": [],
+      "notes": "Standalone Gemini formatter with no entry points; now hard 410 for observation window."
+    },
+    {
+      "path": "/api/tutor/simplify",
+      "method": ["POST"],
+      "status": "deprecated_410",
+      "reasons": ["returns-410", "overlaps-new-solve"],
+      "callers": [],
+      "tests": [],
+      "notes": "OpenAI-based content simplifier; returns 410 with X-Deprecated header."
+    },
+    {
+      "path": "/api/tutor/answer",
+      "method": ["POST"],
+      "status": "keep",
+      "reasons": ["answer-checker", "concept-id-enabled"],
+      "callers": [],
+      "tests": ["tools/fixtures/answer.json"],
+      "notes": "Answer verifier now accepts optional concept_id/keypoint_id, resolves mappings, and always returns concept_id in the payload."
+    }
+  ],
+  "types": [
+    {
+      "name": "TutorExplainResult",
+      "file": "legacy/types-deprecated.ts",
+      "status": "deprecated_410",
+      "references": [],
+      "notes": "Deprecated type re-exported from lib/tutor-types.ts; scheduled for deletion after grace period."
+    },
+    {
+      "name": "TutorBackpackItem",
+      "file": "legacy/types-deprecated.ts",
+      "status": "deprecated_410",
+      "references": [],
+      "notes": "Supporting type for legacy backpack saver; re-exported for compatibility only."
+    },
+    {
+      "name": "generateTutorPrompt",
+      "file": "legacy/types-deprecated.ts",
+      "status": "deprecated_410",
+      "references": [],
+      "notes": "Prompt builder moved to legacy/types-deprecated.ts and re-exported; remove after observation window."
+    },
+    {
+      "name": "detectSubjectAndType",
+      "file": "legacy/types-deprecated.ts",
+      "status": "deprecated_410",
+      "references": [],
+      "notes": "Regex/heuristic subject detector moved to legacy/types-deprecated.ts; superseded by lib/subject-classifier."
+    },
+    {
+      "name": "findSimilarConcepts",
+      "file": "lib/tutor-utils.ts:42",
+      "status": "candidate_remove",
+      "references": ["app/api/tutor/options/route.ts:31"],
+      "notes": "RPC wrapper only used by legacy concept option generator."
+    },
+    {
+      "name": "getConfusableConcepts",
+      "file": "lib/tutor-utils.ts:62",
+      "status": "candidate_remove",
+      "references": ["app/api/tutor/options/route.ts:40"],
+      "notes": "Dependent on concept_edges; unused after removing /api/tutor/options."
+    }
+  ],
+  "db": [
+    {
+      "entity": "tables.concepts",
+      "file": "db/sql/001_schema.sql:5",
+      "status": "archived_pending_drop",
+      "queries": [],
+      "callers": [],
+      "notes": "Renamed into legacy schema via migration 20251018_archive_legacy_tutor.sql; scheduled for drop after 14-day window."
+    },
+    {
+      "entity": "tables.concept_edges",
+      "file": "db/sql/001_schema.sql:33",
+      "status": "archived_pending_drop",
+      "queries": [],
+      "callers": [],
+      "notes": "Archived to legacy schema; only legacy tutor options relied on it."
+    },
+    {
+      "entity": "functions.match_concepts",
+      "file": "db/sql/002_functions.sql:1",
+      "status": "archived_pending_drop",
+      "queries": [],
+      "callers": [],
+      "notes": "Function relocated with legacy tables; retain until drop proposal executed."
+    },
+    {
+      "entity": "tables.solve_explanations",
+      "file": "db/sql/001_schema.sql:61",
+      "status": "archived_pending_drop",
+      "queries": [],
+      "callers": [],
+      "notes": "Archived to legacy schema awaiting deletion."
+    }
+  ],
+  "notes": [
+    "ripgrep searches covered app/api/**/*, docs, and components for tutor/concept usages.",
+    "No frontend fetch/axios calls reference the tutor endpoints; only documentation snippets mention them.",
+    "ts-prune and depcheck could not be executed because the sandbox has no network access to install those tools.",
+    "410 responses for legacy tutor endpoints verified via tools/scripts/curl-verify.sh with fixtures stored under tools/fixtures/.",
+    "Supabase migrations 20251018_* archive legacy tables and add concept_id column; drop proposal recorded in proposals/2025xx_drop_legacy_tutor.sql."
+  ]
+}

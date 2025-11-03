@@ -1,985 +1,528 @@
-'use client'
+'use client';
 
-import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Button } from '@/components/ui/button'
-import { Send, Plus, AlertTriangle, BookOpen, Calculator, Save, Square, Sparkles, X, RefreshCw } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { useAsk } from '@/lib/ask-context'
-import { useAnalytics } from '@/lib/analytics'
-import { useMotivation } from '@/lib/motivation-system'
-import { useExperiments } from '@/lib/experiment-framework'
-import { useEthicalGuardian } from '@/lib/ethical-guardian'
-import { SaveDialog, SaveData } from '@/components/ask/save-dialog'
-import { AskResult, AttachedFile, TaskType } from '@/lib/types'
-import { useTheme } from 'next-themes'
-import { analytics } from '@/lib/analytics'
+import { useCallback, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import ModeTabs from '@/components/ask/ModeTabs';
+import InputDock from '@/components/ask/InputDock';
+import QuestionBubble from '@/components/ask/messages/QuestionBubble';
+import ConceptChips from '@/components/ask/ConceptChips';
+import ExplanationCard from '@/components/ask/ExplanationCard';
+import BatchList from '@/components/ask/messages/BatchList';
+import BatchActions from '@/components/ask/messages/BatchActions';
+import BatchOverview from '@/components/ask/messages/BatchOverview';
+import SummaryCard from '@/components/ask/SummaryCard';
+import { detectMode, parseQuestions, parseSingleQuestion } from '@/lib/question-detector';
+import { useTutorFlow } from '@/lib/use-tutor-flow';
+import type {
+  AskState,
+  Question,
+  ConceptChip,
+  Explanation,
+  QuickAnswer,
+  GrammarTableRow,
+} from '@/lib/tutor-types';
+
+// 模擬 API 回應的考點 chips（實際應從 /api/ai/concept 取得）
+const MOCK_CONCEPTS: ConceptChip[] = [
+  { id: 'c1', label: '關係子句' },
+  { id: 'c2', label: '分詞構句' },
+  { id: 'c3', label: '倒裝句' },
+  { id: 'c4', label: '同位語從句' },
+];
+
+// 模擬詳解資料（實際應從 /api/ai/solve 取得）
+const MOCK_EXPLANATION: Explanation = {
+  summary: '本題考「關係子句—非限定用法」：逗號 + which 補充說明先行詞。',
+  steps: [
+    '先辨識句子主結構：The book is fascinating（主詞 + 動詞 + 補語）。',
+    '找出關鍵逗號：逗號後接關係子句，代表非限定用法（補充說明）。',
+    '檢查先行詞：先行詞是 the book（物），因此使用 which。',
+    '確認子句完整性:which I bought yesterday 完整無缺。',
+  ],
+  grammarTable: [
+    { category: '定義', description: '關係子句用來修飾名詞，分限定與非限定兩種。', example: 'The book which I read...' },
+    { category: '種類', description: '限定：不可省略；非限定：可省略，需逗號隔開。', example: 'My car, which is red, ...' },
+    { category: '非限定用法', description: '逗號 + which/who，補充說明先行詞。', example: 'Tom, who is a doctor, ...' },
+    { category: '限定用法', description: '無逗號，直接修飾先行詞。', example: 'The man who called you...' },
+    { category: '常見錯誤', description: '混用 who/which，或忘記逗號。', example: '錯誤：The book who I read.' },
+  ],
+  encouragement: '句型抓得很穩，再多練幾題你會更熟悉！',
+};
+
+const ENCOURAGEMENTS = [
+  '句型抓得很穩，再多練幾題你會更熟悉！',
+  '邏輯方向正確,只差一個逗號的觀察。',
+  '關係子句你已經掌握節奏，繼續保持這個速度。',
+  '節奏很好，保持這種拆題速度就能越來越扎實。',
+];
 
 export default function AskPage() {
-  const router = useRouter()
-  const { theme } = useTheme()
-  const { attachedFiles, addFiles, removeFile, taskType, setTaskType } = useAsk()
-  const analytics = useAnalytics()
-  const motivation = useMotivation()
-  const experiments = useExperiments()
-  const ethicalGuardian = useEthicalGuardian()
+  const [activeTab, setActiveTab] = useState<'solve' | 'summary'>('solve');
+  const [inputValue, setInputValue] = useState('');
+  const [ocrStatus, setOcrStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  const [input, setInput] = useState('')
-  const [result, setResult] = useState<AskResult | null>(null)
-  const [lastUserInput, setLastUserInput] = useState('')
-  const [isEditingCard, setIsEditingCard] = useState(false)
-  const [editCardContent, setEditCardContent] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [toast, setToast] = useState<{ type: 'success' | 'error' | 'info', message: string } | null>(null)
-  const [showSaveDialog, setShowSaveDialog] = useState(false)
-  const [saveMode, setSaveMode] = useState<'save' | 'overwrite'>('save')
-  const [scholarMode, setScholarMode] = useState(false)
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
-  const [showUnsavedWarning, setShowUnsavedWarning] = useState(false)
-  const [pendingTaskType, setPendingTaskType] = useState<TaskType | null>(null)
-  const [evidenceOpen, setEvidenceOpen] = useState(false)
+  // New tutor flow integration
+  const { 
+    isLoading: tutorLoading, 
+    error: tutorError, 
+    currentSession,
+    detectAndWarmup, 
+    answerWarmup, 
+    getSolveStrategy, 
+    reset 
+  } = useTutorFlow();
 
-  const inputRef = useRef<HTMLTextAreaElement>(null)
-  const resultRef = useRef<HTMLDivElement>(null)
-  const abortRef = useRef<AbortController | null>(null)
+  const [state, setState] = useState<AskState>({
+    mode: 'single',
+    singlePhase: 'question',
+    currentQuestion: null,
+    concepts: [],
+    explanation: null,
+    batchPhase: 'list',
+    questions: [],
+    selectedIds: [],
+    currentIndex: 0,
+    totalQuestions: 0,
+    quickAnswers: [],
+    isLoading: false,
+    error: null,
+  });
 
-  // English Tutor states (Module 1 + Module 2)
-  const [simplifyData, setSimplifyData] = useState<{
-    oneLine: string
-    visualization: string
-    contextBridge: string
-    difficulty: string
-  } | null>(null)
-  const [options, setOptions] = useState<string[] | null>(null)
-  const [selectedOption, setSelectedOption] = useState<string | null>(null)
-  const [explainData, setExplainData] = useState<{
-    correct: boolean
-    feedback: string
-    block: {
-      title: string
-      patternFormula: string
-      keyPoint: string
-      examples: string[]
-      commonMistakes: string[]
-      relatedPastExams: string[]
-    }
-  } | null>(null)
+  // New state for tutor flow
+  const [tutorPhase, setTutorPhase] = useState<'detect' | 'warmup' | 'answer' | 'solve'>('detect');
+  const [warmupData, setWarmupData] = useState<any>(null);
+  const [answerResult, setAnswerResult] = useState<any>(null);
+  const [solveData, setSolveData] = useState<any>(null);
 
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.style.height = 'auto'
-      const newHeight = Math.min(inputRef.current.scrollHeight, 120) // max 5 lines ~24px each
-      inputRef.current.style.height = `${newHeight}px`
-    }
-  }, [input])
+  // ========================================
+  // 輸入處理：使用新的 tutor flow
+  // ========================================
+  const handleSubmit = useCallback(async (value: string) => {
+    if (!value.trim()) return;
 
-  const showToast = (type: 'success' | 'error' | 'info', message: string) => {
-    setToast({ type, message })
-    setTimeout(() => setToast(null), 2000)
-  }
+    const mode = detectMode(value);
+    
+    if (mode === 'single') {
+      // Use new tutor flow for single questions
+      try {
+        setTutorPhase('detect');
+        const warmupResponse = await detectAndWarmup(value);
+        setWarmupData(warmupResponse);
+        setTutorPhase('warmup');
 
-  const handleTaskTypeSwitch = (newType: TaskType) => {
-    if (hasUnsavedChanges) {
-      setPendingTaskType(newType)
-      setShowUnsavedWarning(true)
+        // Also update the legacy state for UI compatibility
+        const question = parseSingleQuestion(value);
+
+        // Convert warmup options to concept chips
+        const conceptChips: ConceptChip[] = warmupResponse.options.map((opt: any) => ({
+          id: opt.option_id,
+          label: opt.label
+        }));
+
+        setState((prev) => ({
+          ...prev,
+          mode: 'single',
+          singlePhase: 'concept', // Set to 'concept' to show options
+          currentQuestion: question,
+          concepts: conceptChips, // Populate with warmup options
+          explanation: null,
+          isLoading: false,
+        }));
+      } catch (error) {
+        console.error('Tutor flow error:', error);
+        // Fallback to legacy flow
+        const question = parseSingleQuestion(value);
+        setState((prev) => ({
+          ...prev,
+          mode: 'single',
+          singlePhase: 'question',
+          currentQuestion: question,
+          concepts: MOCK_CONCEPTS,
+          explanation: null,
+          isLoading: false,
+        }));
+      }
     } else {
-      setTaskType(newType)
-    }
-  }
-
-  // Remember last segmented selection
-  useEffect(() => {
-    const stored = (typeof window !== 'undefined' && localStorage.getItem('ask_last_task_type')) as TaskType | null
-    if (stored) setTaskType(stored)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('ask_last_task_type', taskType)
-    }
-  }, [taskType])
-
-  const handleSaveAll = () => {
-    setShowSaveDialog(true)
-    setSaveMode('save')
-    setShowUnsavedWarning(false)
-    if (pendingTaskType) {
-      setTaskType(pendingTaskType)
-      setPendingTaskType(null)
-    }
-  }
-
-  const handleDiscardChanges = () => {
-    setHasUnsavedChanges(false)
-    setShowUnsavedWarning(false)
-    if (pendingTaskType) {
-      setTaskType(pendingTaskType)
-      setPendingTaskType(null)
-    }
-  }
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || [])
-    const converted: AttachedFile[] = files.map((file, idx) => ({
-      id: `file-${Date.now()}-${idx}`,
-      name: file.name,
-      type: file.name.endsWith('.pdf') ? 'pdf' : file.type.startsWith('image/') ? 'image' : 'text',
-      size: file.size,
-      preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
-    }))
-    addFiles(converted)
-    showToast('info', '已載入附件')
-  }
-
-  const handleGenerate = async () => {
-    if (!input.trim() && attachedFiles.length === 0 && !scholarMode) {
-      showToast('info', '請加入附件或貼上文字，或開啟「學霸補充」')
-      analytics.trackError(new Error('Empty input validation failed'), 'ask_generate')
-      return
+      // Legacy batch mode
+      const questions = parseQuestions(value);
+      setState((prev) => ({
+        ...prev,
+        mode: 'batch',
+        batchPhase: 'list',
+        questions,
+        selectedIds: [],
+        currentIndex: 0,
+        totalQuestions: questions.length,
+        isLoading: false,
+      }));
     }
 
-    setIsLoading(true)
-    setLastUserInput(input)
+    setInputValue('');
+  }, [detectAndWarmup]);
 
-    // 追蹤 AI 互動開始
-    analytics.trackAIInteraction(taskType, undefined, false)
+  // ========================================
+  // SINGLE 模式：選擇考點 → 顯示詳解
+  // ========================================
+  const handleConceptSelect = useCallback(async (concept: ConceptChip) => {
+    // For new tutor flow, handle warmup option selection
+    if (tutorPhase === 'warmup' && warmupData && currentSession) {
+      try {
+        setTutorPhase('answer');
+        const answerResponse = await answerWarmup(concept.id);
+        setAnswerResult(answerResponse);
 
-    const controller = new AbortController()
-    abortRef.current = controller
+        // Get solve strategy
+        const solveResponse = await getSolveStrategy('step');
+        setSolveData(solveResponse);
+        setTutorPhase('solve');
 
-    try {
-      if (taskType === 'solve') {
-        // Tutor flow: Module 1 + Module 2 in parallel
-        setSimplifyData(null)
-        setOptions(null)
-        setExplainData(null)
-        setSelectedOption(null)
+        // Update legacy state for UI
+        const randomEncouragement = ENCOURAGEMENTS[Math.floor(Math.random() * ENCOURAGEMENTS.length)];
 
-        const [sRes, oRes] = await Promise.all([
-          fetch('/api/tutor/simplify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              prompt: input,
-              attachments: attachedFiles,
-              sourceMode: scholarMode ? 'backpack_academic' : 'backpack',
-              moreBasic: false,
-            }),
-            signal: controller.signal,
-          }),
-          fetch('/api/tutor/options', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: input, attachments: attachedFiles }),
-            signal: controller.signal,
-          }),
-        ])
-
-        const sData = await sRes.json()
-        const oData = await oRes.json()
-        if (!sRes.ok) throw new Error(sData.error || '簡化失敗')
-        if (!oRes.ok) throw new Error(oData.error || '選項生成失敗')
-        setSimplifyData(sData)
-        setOptions(oData.options)
-        setHasUnsavedChanges(false)
-        showToast('success', '✓ 已產生')
-
-        analytics.trackAIInteraction(taskType, 'english_grammar', true)
-      } else {
-        const response = await fetch('/api/ai', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: taskType,
-            prompt: input,
-            attachments: attachedFiles,
-            sourceMode: scholarMode ? 'backpack_academic' : 'backpack',
-            scholarMode,
-          }),
-          signal: controller.signal,
-        })
-
-        const data = await response.json()
-        if (!response.ok) throw new Error(data.error || '處理失敗')
-        setResult(data)
-        setHasUnsavedChanges(false)
-        showToast('success', '✓ 已產生')
-
-        // 倫理監控 - 檢查 AI 回應是否有偏見
-        const biasCheck = ethicalGuardian.monitorAIInteraction(input, data.content, 'demo_user')
-        if (biasCheck.biasDetected) {
-          console.warn('AI Bias detected:', biasCheck.biasType, biasCheck.recommendations)
-          // 在實際應用中，這裡會顯示偏見警告或採取修正措施
+        // Guard against undefined solveResponse
+        if (solveResponse) {
+          setState((prev) => ({
+            ...prev,
+            singlePhase: 'explain',
+            explanation: {
+              summary: solveResponse.summary || '解題說明',
+              steps: solveResponse.steps || [],
+              grammarTable: [
+                { category: '檢查項目', description: solveResponse.checks?.join(', ') || '', example: '' },
+                { category: '常見錯誤', description: solveResponse.error_hints?.join(', ') || '', example: '' },
+                { category: '相關概念', description: solveResponse.extensions?.join(', ') || '', example: '' }
+              ],
+              encouragement: randomEncouragement
+            },
+            isLoading: false,
+          }));
+        } else {
+          throw new Error('Solve response is undefined');
         }
-        analytics.trackAIInteraction(taskType, data.solveType, true)
-        
-        // 觸發動機獎勵
-        motivation.rewardAIInteraction(taskType, true)
-        
-        // 檢查里程碑
-        const newMilestones = motivation.checkMilestones()
-        if (newMilestones.length > 0) {
-          showToast('success', `🏆 達成新成就: ${newMilestones[0].title}`)
-        }
-
-        // 追蹤實驗結果
-        const userId = 'demo_user' // 在實際應用中從認證系統獲取
-        experiments.trackResult(userId, 'ai_response_format', {
-          user_satisfaction: 4.5, // 模擬滿意度評分
-          completion_rate: 1.0, // 100% 完成率
-          time_to_read: 30000, // 模擬閱讀時間 (30秒)
-        })
-
-        setTimeout(() => {
-          if (resultRef.current) {
-            const firstSection = resultRef.current.querySelector('[data-section-id="section-0"]')
-            firstSection?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-          }
-        }, 150)
+      } catch (error) {
+        console.error('Answer/Solve error:', error);
+        // Fallback to mock
+        const randomEncouragement = ENCOURAGEMENTS[Math.floor(Math.random() * ENCOURAGEMENTS.length)];
+        setState((prev) => ({
+          ...prev,
+          singlePhase: 'explain',
+          explanation: { ...MOCK_EXPLANATION, encouragement: randomEncouragement },
+          isLoading: false,
+        }));
       }
-    } catch (err: any) {
-      // 追蹤錯誤
-      analytics.trackError(err, 'ai_generation')
-      
-      // 觸發動機系統的情緒安全檢查
-      const safetyCheck = motivation.performEmotionalSafetyCheck()
-      if (!safetyCheck.safe) {
-        console.warn('Emotional safety concerns:', safetyCheck.concerns)
-      }
-      
-      if (err?.name === 'AbortError') {
-        showToast('info', '已取消')
-      } else {
-        showToast('error', err.message || '發生錯誤')
-      }
-    } finally {
-      setIsLoading(false)
-      abortRef.current = null
-    }
-  }
-
-  const handleCardEditToggle = () => {
-    if (!result) return
-    if (!isEditingCard) {
-      setEditCardContent(result.content)
-      setIsEditingCard(true)
     } else {
-      setIsEditingCard(false)
-      setEditCardContent('')
+      // Legacy flow
+      setState((prev) => ({ ...prev, isLoading: true }));
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      const randomEncouragement = ENCOURAGEMENTS[Math.floor(Math.random() * ENCOURAGEMENTS.length)];
+      setState((prev) => ({
+        ...prev,
+        singlePhase: 'explain',
+        explanation: { ...MOCK_EXPLANATION, encouragement: randomEncouragement },
+        isLoading: false,
+      }));
     }
-  }
+  }, [tutorPhase, warmupData, currentSession, answerWarmup, getSolveStrategy]);
 
-  const handleConfirmEditCard = () => {
-    if (!result) return
-    setResult({ ...result, content: editCardContent, isEditing: false })
-    setIsEditingCard(false)
-    setHasUnsavedChanges(true)
-    showToast('success', '✓ 已保存到暫存')
-  }
+  const handleSaveToBackpack = useCallback(async () => {
+    setState((prev) => ({ ...prev, isLoading: true }));
+    // 模擬儲存
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    setState((prev) => ({ ...prev, isLoading: false }));
+    alert('已存入書包！');
+  }, []);
 
-  const handleSave = async (saveData: SaveData) => {
-    try {
-      // Prefer structured explanation content if available
-      let contentToSave = result?.content || ''
-      if (explainData) {
-        const b = explainData.block
-        const lines = [
-          `## 考點`,
-          `• ${b.title}`,
-          `\n## 核心要素`,
-          `• Formula: ${b.patternFormula}`,
-          `• Key: ${b.keyPoint}`,
-          `\n## 應用步驟`,
-          ...b.examples.slice(0, 3).map(e => `• ${e}`),
-          `\n## 混淆與自檢`,
-          ...b.commonMistakes.slice(0, 2).map(m => `• ${m}`),
-          `• 自我檢查：可否前置介系詞？` ,
-          `\n## 快閃卡`,
-          `Q: What is the pattern?`,
-          `A: ${b.patternFormula}`,
-          `Q: When to use whom?`,
-          `A: When a preposition precedes.`,
-          `Q: One example`,
-          `A: ${b.examples[0] || ''}`,
-        ]
-        contentToSave = lines.join('\n')
-      }
-      const response = await fetch('/api/backpack/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...saveData,
-          content: contentToSave,
-        }),
-      })
+  const handleRetry = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      singlePhase: 'question',
+      currentQuestion: null,
+      concepts: [],
+      explanation: null,
+    }));
+  }, []);
 
-      const data = await response.json()
+  // ========================================
+  // BATCH 模式：勾選 → 逐步解析 / 快速解答
+  // ========================================
+  const handleToggleBatch = useCallback((id: string) => {
+    setState((prev) => {
+      const isSelected = prev.selectedIds.includes(id);
+      return {
+        ...prev,
+        selectedIds: isSelected
+          ? prev.selectedIds.filter((sid) => sid !== id)
+          : [...prev.selectedIds, id],
+      };
+    });
+  }, []);
 
-      if (!response.ok) {
-        throw new Error(data.error || '儲存失敗')
-      }
+  const handleStepByStep = useCallback(async () => {
+    const selectedQuestions = state.questions.filter((q) => state.selectedIds.includes(q.id));
+    if (selectedQuestions.length === 0) return;
 
-      setHasUnsavedChanges(false)
-      showToast('success', saveData.mode === 'overwrite' ? '✓ 編輯完成' : '✓ 已存至書包')
+    setState((prev) => ({
+      ...prev,
+      batchPhase: 'step-by-step',
+      currentIndex: 0,
+      isLoading: true,
+    }));
 
-      // Visible save: update local list and navigate with highlight
-      const saved = data.data || data.file || data
-      if (saved?.id) {
-        try {
-          const raw = localStorage.getItem('backpack_items')
-          const list = raw ? JSON.parse(raw) : []
-          const newItem = {
-            id: saved.id,
-            user_id: 'local-user',
-            subject: saveData.subject,
-            type: 'text',
-            title: saveData.title,
-            content: result?.content || '',
-            file_url: null,
-            derived_from: result?.attachments?.map(a => a.name) || [],
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          }
-          const updated = [newItem, ...list]
-          localStorage.setItem('backpack_items', JSON.stringify(updated))
-        } catch {}
-        router.push(`/backpack?highlight=${saved.id}`)
-      }
-    } catch (error: any) {
-      showToast('error', '保存失敗，已保留草稿')
-      throw error
+    // 模擬取得第一題的詳解
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    const randomEncouragement = ENCOURAGEMENTS[Math.floor(Math.random() * ENCOURAGEMENTS.length)];
+    setState((prev) => ({
+      ...prev,
+      currentQuestion: selectedQuestions[0],
+      explanation: { ...MOCK_EXPLANATION, encouragement: randomEncouragement },
+      isLoading: false,
+    }));
+  }, [state.questions, state.selectedIds]);
+
+  const handleBatchNext = useCallback(async () => {
+    const selectedQuestions = state.questions.filter((q) => state.selectedIds.includes(q.id));
+    const nextIndex = state.currentIndex + 1;
+
+    if (nextIndex >= selectedQuestions.length) {
+      // 完成所有題目
+      setState((prev) => ({
+        ...prev,
+        batchPhase: 'list',
+        currentIndex: 0,
+        explanation: null,
+      }));
+      return;
     }
-  }
 
-  const toggleScholarMode = () => {
-    const newMode = !scholarMode
-    setScholarMode(newMode)
-    if (newMode) {
-      showToast('info', '已補充學霸筆記')
-    }
-  }
+    setState((prev) => ({ ...prev, isLoading: true, currentIndex: nextIndex }));
 
-  return (
-    <div className="flex h-screen flex-col bg-background">
-      {/* Top Segment Switcher (Centered Pills) */}
-      <header className="border-b" style={{ borderColor: '#C8C8C8' }}>
-        <div className="flex h-14 items-center justify-center">
-          <div className="inline-flex rounded-full bg-muted p-1">
-            <button
-              onClick={() => handleTaskTypeSwitch('summary')}
-              className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-[16px] transition-all duration-150 ${
-                taskType === 'summary'
-                  ? 'bg-background shadow-sm'
-                  : 'text-[#8A8A8A]'
-              }`}
-            >
-              <BookOpen className="h-4 w-4" />
-              整理
-            </button>
-            <button
-              onClick={() => handleTaskTypeSwitch('solve')}
-              className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-[16px] transition-all duration-150 ${
-                taskType === 'solve'
-                  ? 'bg-background shadow-sm'
-                  : 'text-[#8A8A8A]'
-              }`}
-            >
-              <Calculator className="h-4 w-4" />
-              解題
-            </button>
-          </div>
+    // 淡出淡入動畫 + 模擬 API
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    const randomEncouragement = ENCOURAGEMENTS[Math.floor(Math.random() * ENCOURAGEMENTS.length)];
+    setState((prev) => ({
+      ...prev,
+      currentQuestion: selectedQuestions[nextIndex],
+      explanation: { ...MOCK_EXPLANATION, encouragement: randomEncouragement },
+      isLoading: false,
+    }));
+  }, [state.questions, state.selectedIds, state.currentIndex]);
+
+  const handleQuickAnswer = useCallback(async () => {
+    const selectedQuestions = state.questions.filter((q) => state.selectedIds.includes(q.id));
+    if (selectedQuestions.length === 0) return;
+
+    setState((prev) => ({ ...prev, isLoading: true, batchPhase: 'quick' }));
+
+    // 模擬批次取得快速解答
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+
+    const quickAnswers: QuickAnswer[] = selectedQuestions.map((q) => ({
+      questionId: q.id,
+      suggestedAnswer: 'B',
+      oneLiner: '本題考關係子句非限定用法，逗號後接 which。',
+    }));
+
+    setState((prev) => ({
+      ...prev,
+      quickAnswers,
+      isLoading: false,
+    }));
+  }, [state.questions, state.selectedIds]);
+
+  const handleBackToList = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      batchPhase: 'list',
+      currentIndex: 0,
+      quickAnswers: [],
+      explanation: null,
+    }));
+  }, []);
+
+  // ========================================
+  // 渲染邏輯
+  // ========================================
+  const renderContent = () => {
+    if (activeTab === 'summary') {
+      return (
+        <div className="mx-auto max-w-3xl px-4 py-6">
+          <SummaryCard title="重點統整" bullets={['這裡可以顯示學習重點統整內容']} />
         </div>
+      );
+    }
 
-        {/* Unsaved Warning Bar */}
-        <AnimatePresence>
-          {showUnsavedWarning && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="overflow-hidden bg-yellow-500/10"
-            >
-              <div className="flex items-center justify-between px-4 py-2">
-                <div className="flex items-center gap-2 text-[13px] text-yellow-600 dark:text-yellow-500">
-                  <AlertTriangle className="h-4 w-4" />
-                  有未保存的更動
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={handleSaveAll}
-                    className="h-7 text-[13px]"
-                  >
-                    保存全部
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={handleDiscardChanges}
-                    className="h-7 text-[13px] text-[#8A8A8A]"
-                  >
-                    放棄
-                  </Button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </header>
-
-      {/* Thread (Scrollable) */}
-      <div className="flex-1 overflow-y-auto pb-4" ref={resultRef}>
-        <div className="mx-auto max-w-2xl px-4 pt-4 space-y-4">
-          {!result && !isLoading && (
-            <div className="flex h-[40vh] items-center justify-center text-center">
-              <div className="max-w-sm space-y-2">
-                <p className="text-[16px] text-muted-foreground" style={{ lineHeight: 1.75 }}>
-                  開始提問，或加入附件
-                </p>
-                <p className="text-[13px] text-[#8A8A8A]">底部輸入框支援最多 5 行</p>
-              </div>
-            </div>
-          )}
-
-          {(lastUserInput || attachedFiles.length > 0) && (isLoading || result || simplifyData || options) && (
-            <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15 }}>
-              <div className="flex items-start gap-3">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src="" />
-                  <AvatarFallback>U</AvatarFallback>
-                </Avatar>
-                <div className="max-w-[85%] rounded-2xl border p-3" style={{ borderColor: '#C8C8C8' }}>
-                  {lastUserInput && (
-                    <p className="text-[16px]" style={{ lineHeight: 1.75 }}>{lastUserInput}</p>
-                  )}
-                  {attachedFiles.length > 0 && (
-                    <div className="mt-2 flex gap-2">
-                      {attachedFiles.map((file) => (
-                        <div key={file.id} className="h-8 w-8 overflow-hidden rounded bg-muted">
-                          {file.preview ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={file.preview} alt={file.name} className="h-full w-full object-cover" />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center text-[#8A8A8A]">
-                              <span className="text-[10px] font-medium">
-                                {file.name.split('.').pop()?.toUpperCase()}
-                              </span>
-                            </div>
-                          )}
-                        </div>
+    // 解題模式
+    if (state.mode === 'single') {
+  return (
+        <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
+          <AnimatePresence mode="wait">
+            {state.singlePhase === 'question' && state.currentQuestion && (
+              <QuestionBubble key="question" question={state.currentQuestion} />
+            )}
+            {state.singlePhase === 'concept' && state.currentQuestion && (
+              <>
+                <QuestionBubble key="question-with-concepts" question={state.currentQuestion} />
+                {tutorPhase === 'warmup' && warmupData ? (
+                  <div key="warmup-options" className="space-y-4">
+                    <div className="text-lg font-medium text-white mb-4">
+                      {warmupData.stem}
+                    </div>
+                    <div className="grid gap-3">
+                      {warmupData.options.map((option: any, index: number) => (
+                        <motion.button
+                          key={option.option_id}
+                          className="p-4 bg-gray-800 rounded-lg border border-gray-700 hover:border-blue-400 transition-colors text-left"
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => handleConceptSelect({ id: option.option_id, label: option.label })}
+                        >
+                          <span className="text-blue-400 font-medium mr-3">{String.fromCharCode(65 + index)}</span>
+                          <span className="text-white">{option.label}</span>
+                        </motion.button>
                       ))}
                     </div>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <ConceptChips
+                    key="concepts"
+                    concepts={state.concepts}
+                    selectedId={null}
+                    onSelect={handleConceptSelect}
+                  />
+                )}
+              </>
+            )}
+            {state.singlePhase === 'explain' && state.currentQuestion && state.explanation && (
+              <ExplanationCard
+                key="explanation"
+                question={state.currentQuestion.text}
+                conceptLabel="關係子句"
+                summary={state.explanation.summary}
+                steps={state.explanation.steps}
+                grammarRows={state.explanation.grammarTable}
+                encouragement={state.explanation.encouragement}
+                onSave={handleSaveToBackpack}
+                onRetry={handleRetry}
+                isSaving={state.isLoading}
+                isRetrying={false}
+                savedStatus="idle"
+              />
+            )}
+          </AnimatePresence>
+        </div>
+      );
+    }
+
+    // BATCH 模式
+    return (
+      <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
+        <AnimatePresence mode="wait">
+          {state.batchPhase === 'list' && (
+            <>
+              <BatchList
+                key="batch-list"
+                questions={state.questions}
+                selectedIds={state.selectedIds}
+                onToggle={handleToggleBatch}
+              />
+              <BatchActions
+                key="batch-actions"
+                selectedCount={state.selectedIds.length}
+                onStepByStep={handleStepByStep}
+                onQuickAnswer={handleQuickAnswer}
+              />
+            </>
+          )}
+
+          {state.batchPhase === 'step-by-step' && state.currentQuestion && state.explanation && (
+            <motion.div
+              key={`step-${state.currentIndex}`}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -16 }}
+              transition={{ duration: 0.3 }}
+            >
+              <div className="mb-3 text-center text-xs uppercase tracking-[0.25em] text-white/40">
+                {state.currentIndex + 1} / {state.selectedIds.length}
               </div>
+              <ExplanationCard
+                question={state.currentQuestion.text}
+                conceptLabel="關係子句"
+                summary={state.explanation.summary}
+                steps={state.explanation.steps}
+                grammarRows={state.explanation.grammarTable}
+                encouragement={state.explanation.encouragement}
+                onSave={handleSaveToBackpack}
+                onRetry={handleBackToList}
+                onNext={handleBatchNext}
+                isSaving={state.isLoading}
+                isRetrying={false}
+                isNextLoading={state.isLoading}
+                savedStatus="idle"
+                isLastStep={state.currentIndex === state.selectedIds.length - 1}
+              />
             </motion.div>
           )}
 
-          {isLoading && (
-            <div className="pl-11 text-[13px]">
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#8A8A8A] to-foreground">
-                {taskType === 'summary' ? '整理中' : '解題中'}
-              </span>
-              <span className="inline-flex w-5 justify-between pl-1 align-baseline">
-                <span className="animate-bounce [animation-delay:-0.2s]">·</span>
-                <span className="animate-bounce [animation-delay:-0.1s]">·</span>
-                <span className="animate-bounce">·</span>
-              </span>
-            </div>
-          )}
-
-          {(result || simplifyData || options) && !isLoading && (
-            <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15 }}>
-              <div className="relative rounded-2xl border p-4" style={{ borderColor: '#C8C8C8' }}>
-                <div className="mb-2 flex items-center justify-between">
-                  <h2 className="text-[18px] font-semibold">回答</h2>
-                  <div className="flex items-center gap-2">
-                    {!isEditingCard ? (
-                      <>
-                        <button
-                          onClick={handleCardEditToggle}
-                          className="text-[13px] text-[#8A8A8A] hover:text-foreground transition-colors"
-                          aria-label="編輯"
-                        >
-                          ✏︎ 編輯
-                        </button>
-                        <button
-                          onClick={() => setEvidenceOpen(!evidenceOpen)}
-                          className="text-[13px] text-[#8A8A8A] hover:text-foreground transition-colors flex items-center"
-                          aria-label="來源"
-                        >
-                          <Square className="mr-1 h-3 w-3" /> 來源
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        onClick={handleCardEditToggle}
-                        className="text-[13px] text-[#8A8A8A] hover:text-foreground transition-colors flex items-center"
-                        aria-label="取消編輯"
-                      >
-                        <X className="mr-1 h-3 w-3" /> 取消
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {result && result.unverified.length > 0 && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.15 }}
-                    className="mb-2 rounded bg-yellow-500/10 px-3 py-1 text-[13px] text-yellow-600 dark:text-yellow-500"
-                  >
-                    偵測未標注來源的敘述
-                  </motion.div>
-                )}
-
-                {!isEditingCard ? (
-                  taskType === 'solve' && (simplifyData || options) ? (
-                    <TutorModules
-                      simplify={simplifyData}
-                      options={options}
-                      selected={selectedOption}
-                      explain={explainData}
-                      onSimplifyFurther={handleSimplifyFurther}
-                      onSelectOption={handleSelectOption}
-                      onAddToBackpack={() => {
-                        setSaveMode('save')
-                        setShowSaveDialog(true)
-                      }}
-                    />
-                  ) : (
-                    <AssistantSections content={result.content} />
-                  )
-                ) : (
-                  <div>
-                    <textarea
-                      value={editCardContent}
-                      onChange={(e) => setEditCardContent(e.target.value)}
-                      className="w-full min-h-[200px] resize-y rounded border bg-background px-3 py-2 text-[16px] focus:ring-1 focus:ring-ring"
-                      style={{ lineHeight: 1.75 }}
-                    />
-                    <div className="mt-3 flex justify-center">
-                      <Button onClick={handleConfirmEditCard} className="px-6">確認</Button>
-                    </div>
-                  </div>
-                )}
-
-                <AnimatePresence>
-                  {evidenceOpen && result && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.15 }}
-                      className="mt-3 overflow-hidden rounded-lg border bg-muted/30 p-4"
-                    >
-                      <EvidenceDrawer result={result} />
-                    </motion.div>
+          {state.batchPhase === 'quick' && (
+            <BatchOverview
+              key="batch-quick"
+              quickAnswers={state.quickAnswers}
+              onBack={handleBackToList}
+            />
                   )}
                 </AnimatePresence>
-
-                <div className="mt-3 flex items-center justify-end gap-2 border-t pt-2" style={{ borderColor: '#C8C8C8' }}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleGenerate()}
-                    className="h-7 text-[13px]"
-                  >
-                    <RotateCcw className="mr-1 h-3 w-3" /> 重新產生
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setSaveMode('save')
-                      setShowSaveDialog(true)
-                    }}
-                    className="h-7 text-[13px]"
-                  >
-                    <Save className="mr-1 h-3 w-3" /> 另存
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setSaveMode('overwrite')
-                      setShowSaveDialog(true)
-                    }}
-                    className="h-7 text-[13px]"
-                  >
-                    編輯完成
-                  </Button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </div>
       </div>
+    );
+  };
 
-      {/* Bottom Composer */}
+  return (
+    <div className="relative flex min-h-screen flex-col bg-[#0E1116] text-[#F1F5F9]">
+      {/* 頂部分頁 */}
       <motion.div
-        initial={{ y: 100 }}
-        animate={{ y: 0 }}
-        transition={{ duration: 0.15, ease: 'easeOut' }}
-        className="border-t bg-background"
-        style={{ borderColor: '#C8C8C8' }}
+        className="fixed inset-x-0 top-0 z-20 flex justify-center border-b border-white/5 bg-[#0E1116]/95 px-4 py-4 backdrop-blur"
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
       >
-        {/* Attachments Bar (40×40 thumbnails) */}
-        <AnimatePresence>
-          {attachedFiles.length > 0 && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.1 }}
-              className="overflow-x-auto border-b px-4 py-2"
-              style={{ borderColor: '#C8C8C8' }}
-            >
-              <div className="flex gap-2">
-                {attachedFiles.map((file) => (
-                  <motion.div
-                    key={file.id}
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.8, opacity: 0 }}
-                    transition={{ duration: 0.1 }}
-                    className="relative shrink-0"
-                  >
-                    <div className="h-10 w-10 overflow-hidden rounded bg-muted">
-                      {file.preview ? (
-                        <img
-                          src={file.preview}
-                          alt={file.name}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-[#8A8A8A]">
-                          <span className="text-[10px] font-medium">
-                            {file.name.split('.').pop()?.toUpperCase()}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => removeFile(file.id)}
-                      className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white shadow-sm transition-transform hover:scale-110"
-                    >
-                      <Plus className="h-3 w-3 rotate-45" />
-                    </button>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Input Row with Paper Plane */}
-        <div className="flex items-end gap-2 p-3">
-          <label className="cursor-pointer">
-            <input
-              type="file"
-              multiple
-              accept=".pdf,.png,.jpg,.jpeg,.txt,.doc,.docx"
-              className="hidden"
-              onChange={handleFileSelect}
-            />
-            <motion.div
-              whileTap={{ scale: 0.95 }}
-              className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted hover:bg-muted/80 transition-colors"
-            >
-              <Plus className="h-5 w-5" />
-            </motion.div>
-          </label>
-
-          <div className="relative flex-1">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="貼上文字或描述..."
-              className="w-full min-h-[36px] resize-none rounded-lg border bg-background px-3 py-2 pr-24 text-[16px] outline-none focus:ring-1 focus:ring-ring transition-all"
-              style={{ lineHeight: 1.5, maxHeight: '120px' }}
-              rows={1}
-            />
-
-            {/* Scholar toggle + Cancel */}
-            <div className="absolute bottom-2 right-2 flex items-center gap-2">
-              {isLoading && (
-                <button
-                  onClick={() => abortRef.current?.abort()}
-                  className="text-[13px] text-[#8A8A8A] hover:text-foreground"
-                >
-                  取消
-                </button>
-              )}
-              <button
-                onClick={toggleScholarMode}
-                title={`學霸補充：${scholarMode ? '開' : '關'}`}
-                aria-label="學霸補充切換"
-                className={`flex h-7 w-7 items-center justify-center rounded ${
-                  scholarMode ? 'bg-primary text-primary-foreground' : 'border text-[#8A8A8A]'
-                }`}
-              >
-                <Sparkles className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-
-          <Button
-            onClick={handleGenerate}
-            disabled={isLoading}
-            className="h-9 w-9 p-0 transition-all duration-150"
-            style={{
-              opacity: isLoading || (!input.trim() && attachedFiles.length === 0 && !scholarMode) ? 0.4 : 1,
-            }}
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
+        <ModeTabs active={activeTab} onChange={setActiveTab} />
       </motion.div>
 
-      {/* Toast */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.12 }}
-            className="fixed bottom-32 left-1/2 z-50 -translate-x-1/2"
-          >
-            <div
-              className={`rounded-full px-4 py-2 text-[13px] font-medium shadow-lg ${
-                toast.type === 'success'
-                  ? 'bg-[#28C281] text-white'
-                  : toast.type === 'error'
-                  ? 'bg-[#FF4D4F] text-white'
-                  : 'bg-[#3A8DFF] text-white'
-              }`}
-            >
-              {toast.message}
+      {/* 主內容區（留出頂部和底部空間） */}
+      <div className="flex-1 overflow-y-auto pt-20 pb-40">
+        {renderContent()}
+        {(state.isLoading || tutorLoading) && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-gray-800 p-6 rounded-lg flex items-center space-x-3">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400"></div>
+              <span className="text-white">處理中...</span>
             </div>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
-
-      {/* Save Dialog */}
-      {result && (
-        <SaveDialog
-          open={showSaveDialog}
-          onOpenChange={setShowSaveDialog}
-          result={result}
-          mode={saveMode}
-          onSave={handleSave}
-        />
-      )}
-    </div>
-  )
-}
-
-// Section Cards Component
-function AssistantSections({ content }: { content: string }) {
-  const sections = parseSections(content)
-  return (
-    <div className="space-y-3">
-      {sections.map((section, idx) => (
-        <div key={idx} data-section-id={`section-${idx}`} className="rounded-xl">
-          <h2 className="mb-1 text-[18px] font-semibold">{section.title}</h2>
-          <div className="space-y-2">
-            {section.body.map((line, i) => (
-              <div key={i} className="text-[16px]" style={{ lineHeight: 1.75 }}>
-                {formatLine(line)}
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// Tutor modules renderer
-function TutorModules({
-  simplify,
-  options,
-  selected,
-  explain,
-  onSimplifyFurther,
-  onSelectOption,
-  onAddToBackpack,
-}: {
-  simplify: { oneLine: string; visualization: string; contextBridge: string; difficulty: string } | null
-  options: string[] | null
-  selected: string | null
-  explain: { correct: boolean; feedback: string; block: { title: string; patternFormula: string; keyPoint: string; examples: string[]; commonMistakes: string[]; relatedPastExams: string[] } } | null
-  onSimplifyFurther: () => void
-  onSelectOption: (opt: string) => void
-  onAddToBackpack: () => void
-}) {
-  return (
-    <div className="space-y-4">
-      {/* Module 1 — Simplify & Visualize */}
-      {simplify && (
-        <div className="rounded-lg border p-3" style={{ borderColor: '#C8C8C8' }}>
-          <h3 className="mb-2 text-[16px] font-semibold">簡化與視覺化</h3>
-          <div className="space-y-2">
-            <div className="text-[16px]" style={{ lineHeight: 1.75 }}>{simplify.oneLine}</div>
-            <pre className="whitespace-pre-wrap rounded bg-muted/50 p-2 text-[13px]" style={{ lineHeight: 1.6 }}>{simplify.visualization}</pre>
-            <div className="text-[13px] text-[#8A8A8A]" style={{ lineHeight: 1.75 }}>{simplify.contextBridge}</div>
-          </div>
-          <div className="mt-2 flex items-center justify-between text-[13px]">
-            <span className="text-[#8A8A8A]">難度：{simplify.difficulty}</span>
-            <button onClick={onSimplifyFurther} className="text-[13px] text-blue-600 hover:underline">Simplify further 🔁</button>
-          </div>
-        </div>
-      )}
-
-      {/* Module 2 — Multi-Path Tutor */}
-      {options && (
-        <div className="rounded-lg border p-3" style={{ borderColor: '#C8C8C8' }}>
-          <h3 className="mb-2 text-[16px] font-semibold">This question is most likely testing:</h3>
-          <div className="space-y-1">
-            {options.map((opt, idx) => (
-              <button
-                key={idx}
-                onClick={() => onSelectOption(opt)}
-                className={`w-full rounded px-3 py-2 text-left text-[16px] transition-colors ${selected === opt ? 'bg-accent' : 'hover:bg-muted'}`}
-                style={{ lineHeight: 1.75 }}
+        {tutorError && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-red-800 p-6 rounded-lg flex items-center space-x-3">
+              <span className="text-white">錯誤: {tutorError}</span>
+              <button 
+                onClick={reset}
+                className="ml-4 px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
               >
-                ({idx + 1}) {opt}
+                重試
               </button>
-            ))}
-          </div>
-
-          {explain && (
-            <div className="mt-3 rounded border p-3" style={{ borderColor: '#C8C8C8' }}>
-              <div className={`mb-2 text-[13px] ${explain.correct ? 'text-green-600' : 'text-[#8A8A8A]'}`}>{explain.feedback}</div>
-              <div className="space-y-2">
-                <div className="text-[16px] font-semibold">{explain.block.title}</div>
-                <div className="text-[16px]" style={{ lineHeight: 1.75 }}>Formula: {explain.block.patternFormula}</div>
-                <div className="text-[16px]" style={{ lineHeight: 1.75 }}>Key: {explain.block.keyPoint}</div>
-                {explain.block.examples.length > 0 && (
-                  <div>
-                    <div className="text-[13px] font-medium text-[#8A8A8A]">Examples</div>
-                    <div className="mt-1 space-y-1">
-                      {explain.block.examples.slice(0, 3).map((e, i) => (
-                        <div key={i} className="text-[16px]" style={{ lineHeight: 1.75 }}>• {e}</div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {explain.block.commonMistakes.length > 0 && (
-                  <div>
-                    <div className="text-[13px] font-medium text-[#8A8A8A]">Common Mistakes</div>
-                    <div className="mt-1 space-y-1">
-                      {explain.block.commonMistakes.slice(0, 2).map((m, i) => (
-                        <div key={i} className="text-[16px]" style={{ lineHeight: 1.75 }}>• {m}</div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {explain.block.relatedPastExams.length > 0 && (
-                  <div>
-                    <div className="text-[13px] font-medium text-[#8A8A8A]">Related Past Exams</div>
-                    <div className="mt-1 space-y-1">
-                      {explain.block.relatedPastExams.slice(0, 3).map((r, i) => (
-                        <div key={i} className="text-[16px]" style={{ lineHeight: 1.75 }}>• {r}</div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-3 text-right">
-                <button onClick={onAddToBackpack} className="text-[13px] text-blue-600 hover:underline">📎 Add to Backpack</button>
-              </div>
             </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Evidence Drawer Component
-function EvidenceDrawer({ result }: { result: AskResult }) {
-  const backpackRefs = result.references.filter((r) => r.type === 'backpack')
-  const scholarRefs = result.sourceMode === 'backpack_academic'
-    ? result.references.filter((r) => r.type === 'academic')
-    : []
-
-  return (
-    <div className="space-y-4">
-      {/* Your Attachments */}
-      {backpackRefs.length > 0 && (
-        <div>
-          <h3 className="mb-2 text-[13px] font-semibold text-[#8A8A8A]">你的附件</h3>
-          <div className="space-y-1">
-            {backpackRefs.map((ref) => (
-              <div key={ref.id} className="text-[13px]" style={{ lineHeight: 1.6 }}>
-                • {ref.filename} {ref.page && `— p.${ref.page}`}
-                {ref.paragraph && ` ${ref.paragraph}`}
-              </div>
-            ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Scholar Supplements */}
-      {scholarRefs.length > 0 && (
-        <div>
-          <h3 className="mb-2 text-[13px] font-semibold text-[#8A8A8A]">學霸補充</h3>
-          <div className="space-y-2">
-            {scholarRefs.map((ref) => (
-              <div key={ref.id} className="rounded bg-blue-500/10 p-2 text-[13px]" style={{ lineHeight: 1.6 }}>
-                <div className="font-medium">{ref.title}</div>
-                <div className="text-[#8A8A8A]">
-                  {ref.authors} ({ref.year}) {ref.doi && `• DOI: ${ref.doi}`}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {backpackRefs.length === 0 && scholarRefs.length === 0 && (
-        <div className="text-center text-[13px] text-[#8A8A8A]">待補</div>
-      )}
+      {/* 底部輸入 Dock */}
+      <InputDock
+        mode={state.mode}
+        value={inputValue}
+        isBusy={state.isLoading}
+        ocrStatus={ocrStatus}
+        onChange={setInputValue}
+        onSubmit={handleSubmit}
+        onOcrComplete={setOcrStatus}
+      />
     </div>
-  )
-}
-
-// Helper Functions
-function parseSections(content: string): { title: string; body: string[] }[] {
-  const lines = content.split('\n').filter((l) => l.trim())
-  const sections: { title: string; body: string[] }[] = []
-  let currentSection: { title: string; body: string[] } | null = null
-
-  lines.forEach((line) => {
-    if (line.startsWith('## ')) {
-      if (currentSection) sections.push(currentSection)
-      currentSection = { title: line.replace('## ', ''), body: [] }
-    } else if (currentSection && line.trim()) {
-      currentSection.body.push(line)
-    }
-  })
-
-  if (currentSection) sections.push(currentSection)
-  return sections
-}
-
-function formatLine(text: string): React.ReactNode {
-  // Remove citation codes - don't show them inline
-  let formatted = text.replace(/\[([AB]\d+)\]/g, '')
-  // Remove unverified markers
-  formatted = formatted.replace(/（未證實）/g, '')
-  // Clean up bullet points
-  formatted = formatted.replace(/^[•\-\*]\s*/, '• ')
-  return formatted
+  );
 }

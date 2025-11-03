@@ -1,72 +1,68 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+let supabaseBrowserInstance: SupabaseClient | null = null
+let serviceClient: SupabaseClient | null = null
 
-// Database Types (Placeholder)
-export type Database = {
-  public: {
-    Tables: {
-      profiles: {
-        Row: {
-          id: string
-          username: string
-          avatar_url: string | null
-          bio: string | null
-          xp: number
-          coins: number
-          streak: number
-          created_at: string
-        }
-      }
-      posts: {
-        Row: {
-          id: string
-          user_id: string
-          content: string
-          images: string[]
-          likes: number
-          created_at: string
-        }
-      }
-      tasks: {
-        Row: {
-          id: string
-          subject: string
-          title: string
-          xp_reward: number
-          coin_reward: number
-          completed: boolean
-          created_at: string
-        }
-      }
-      backpack_items: {
-        Row: {
-          id: string
-          user_id: string
-          subject: string
-          type: 'text' | 'pdf' | 'image'
-          title: string
-          content: string
-          file_url: string | null
-          created_at: string
-        }
-      }
-      store_items: {
-        Row: {
-          id: string
-          subject: string
-          title: string
-          description: string
-          cover_url: string
-          provider: string
-          price: number
-          is_free: boolean
-          created_at: string
-        }
-      }
-    }
+function ensureBrowserClient(): SupabaseClient {
+  if (supabaseBrowserInstance) return supabaseBrowserInstance
+  if (!supabaseUrl || !supabaseAnonKey) {
+    const message =
+      'Supabase browser client is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.'
+    console.warn(message)
+    throw new Error(message)
   }
+  supabaseBrowserInstance = createClient(supabaseUrl, supabaseAnonKey)
+  return supabaseBrowserInstance
+}
+
+function ensureServiceClient(): SupabaseClient {
+  if (serviceClient) return serviceClient
+  if (!supabaseUrl || !supabaseServiceKey) {
+    const message = 'Supabase service client is not configured. Set SUPABASE_SERVICE_ROLE_KEY (and URL if missing).'
+    console.warn(message)
+    throw new Error(message)
+  }
+  serviceClient = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { persistSession: false },
+  })
+  return serviceClient
+}
+
+export const supabaseBrowserClient = new Proxy(
+  {},
+  {
+    get: (_target, property) => {
+      const client = ensureBrowserClient()
+      // @ts-expect-error - dynamic property access passthrough
+      return client[property]
+    },
+  },
+) as SupabaseClient
+
+export const supabaseBrowser = supabaseBrowserClient
+
+export function getServiceSupabaseClient(): SupabaseClient {
+  return ensureServiceClient()
+}
+
+export interface BackpackNoteInsert {
+  user_id: string
+  question: string
+  canonical_skill: string
+  note_md: string
+  created_at?: string
+}
+
+export async function saveBackpackNote(note: BackpackNoteInsert) {
+  const client = ensureServiceClient()
+  const payload = { ...note, created_at: note.created_at ?? new Date().toISOString() }
+  const { data, error } = await client.from('backpack_notes').insert(payload).select().single()
+  if (error) {
+    throw new Error(`Failed to save backpack note: ${error.message}`)
+  }
+  return data
 }

@@ -110,6 +110,16 @@ CREATE TABLE IF NOT EXISTS ai_interactions (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Backpack notes table (AI-generated notes)
+CREATE TABLE IF NOT EXISTS backpack_notes (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  question TEXT NOT NULL,
+  canonical_skill TEXT NOT NULL,
+  note_md TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Following relationships
 CREATE TABLE IF NOT EXISTS follows (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
@@ -127,6 +137,8 @@ CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_completed ON tasks(completed);
 CREATE INDEX IF NOT EXISTS idx_backpack_user_id ON backpack_items(user_id);
 CREATE INDEX IF NOT EXISTS idx_backpack_subject ON backpack_items(subject);
+CREATE INDEX IF NOT EXISTS idx_backpack_notes_user_id ON backpack_notes(user_id);
+CREATE INDEX IF NOT EXISTS idx_backpack_notes_created_at ON backpack_notes(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_follows_follower ON follows(follower_id);
 CREATE INDEX IF NOT EXISTS idx_follows_following ON follows(following_id);
 
@@ -213,6 +225,25 @@ CREATE POLICY "Users can view own AI interactions"
 CREATE POLICY "Users can create own AI interactions"
   ON ai_interactions FOR INSERT
   WITH CHECK (auth.uid() = user_id);
+
+-- Backpack notes
+ALTER TABLE backpack_notes ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own backpack notes"
+  ON backpack_notes FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can create own backpack notes"
+  ON backpack_notes FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own backpack notes"
+  ON backpack_notes FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own backpack notes"
+  ON backpack_notes FOR DELETE
+  USING (auth.uid() = user_id);
 
 -- Functions
 CREATE OR REPLACE FUNCTION handle_new_user()

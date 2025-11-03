@@ -1,13 +1,14 @@
 # 🚀 AI 學習輔助系統
 
-> **基於 PLMS Agent System 的完美學習平台**
+> **基於 PLMS Agent System 的完美學習平台（目標願景）**
 > 
-> 讓每個學生都能通過 AI 輔助的零摩擦工作流程，從被動學習轉變為主動掌握，讓每個學生都感覺自己是天才。
+> ⚠️ 現況：專案仍在整合階段，目前僅提供 demo/mock 流程，尚未接上真實 Supabase/OpenAI 後端。  
+> 若在本機跑 `npm run dev`，請預期僅能操作 UI，實際資料/推論功能需待後續實作。
 
 ## ✨ 核心功能
 
 ### 🧠 智能 AI 輔助
-- **Gemini 2.0 Flash 集成** - 最新 AI 模型，穩定可靠
+- **OpenAI GPT-5 Flow 集成** - 最新多代理模型，穩定可靠
 - **五段式重點整理** - 結構化知識呈現
 - **六種解題模板** - 英文、數學、理化完整覆蓋
 - **強制引用系統** - 每個聲明都可追溯來源
@@ -59,7 +60,7 @@ npm run dev
 
 ### 後端技術棧
 - **Supabase** - 完整的後端即服務
-- **Gemini 2.0 Flash** - Google 最新 AI 模型
+- **OpenAI GPT-5** - 多代理推理與生成
 - **Row Level Security** - 細粒度數據安全
 - **實時訂閱** - 即時數據同步
 
@@ -81,6 +82,8 @@ npm run dev
 - **Vision Architect** - 清晰願景，可測量里程碑
 
 ### 📈 關鍵指標達成
+
+> 以下數值為願景目標，尚未在目前代碼中驗證。
 - ✅ **API 響應時間**: < 3 秒
 - ✅ **學習速度提升**: 減少 50% 的學習到掌握時間
 - ✅ **用戶滿意度**: > 4.5/5
@@ -98,8 +101,8 @@ NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
-# Gemini API
-GEMINI_API_KEY=your_gemini_api_key
+# OpenAI API
+OPENAI_API_KEY=your_openai_api_key
 ```
 
 ### Supabase 設定
@@ -146,7 +149,7 @@ vercel
 vercel env add NEXT_PUBLIC_SUPABASE_URL
 vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY
 vercel env add SUPABASE_SERVICE_ROLE_KEY
-vercel env add GEMINI_API_KEY
+vercel env add OPENAI_API_KEY
 ```
 
 ### 其他平台
@@ -155,6 +158,37 @@ vercel env add GEMINI_API_KEY
 - **DigitalOcean**: 支援 Docker 容器
 
 ## 📚 使用指南
+
+### 本地測試步驟
+
+#### 1. 啟動開發服務器
+```bash
+# 確保環境變數已設定 (.env.local)
+npm run dev
+```
+
+#### 2. 訪問應用
+- 打開瀏覽器：`http://localhost:3000`
+- Ask 頁面：`http://localhost:3000/ask`
+- Backpack：`http://localhost:3000/backpack`
+
+#### 3. 測試解題流程
+```bash
+# 在輸入框貼上題目，例如：
+三角形 ABC，已知 a=5, b=7, C=60°，求 c=?
+
+# 或使用 API 驗證腳本
+npm run verify:solve
+```
+
+#### 4. 驗證 API 端點
+```bash
+# 測試 /api/solve 端點
+npm run verify:solve
+
+# 查看服務器日誌
+# 會顯示詳細的 [solve][stage=X] 日誌
+```
 
 ### 基本使用流程
 1. **上傳檔案** - 在 Backpack 中管理學習材料
@@ -206,7 +240,7 @@ MIT License - 詳見 [LICENSE](LICENSE) 文件
 
 ## 🙏 致謝
 
-- **Google Gemini** - 提供強大的 AI 能力
+- **OpenAI** - 提供強大的 AI 能力
 - **Supabase** - 提供完整的後端服務
 - **Next.js Team** - 提供優秀的 React 框架
 - **Shadcn/ui** - 提供精美的 UI 組件
