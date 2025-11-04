@@ -30,11 +30,10 @@ export default function AnySubjectSolver() {
   })
   const [currentQuestionText, setCurrentQuestionText] = useState('')
   const [explainMode, setExplainMode] = useState<ExplainMode>('fast')
-  const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
   const [ocrStatus, setOcrStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
-  // Note: ExplainCardV2 handles its own loading state internally
+  // Note: ExplainCardV2 handles its own loading state and API calls internally
 
   useEffect(() => {
     console.log(`✅ Any-Subject Solver ready on /ask ${new Date().toLocaleTimeString()}`)
@@ -66,14 +65,7 @@ export default function AnySubjectSolver() {
     async (text: string) => {
       if (!text.trim()) return
 
-      // Prevent double submission
-      if (isLoading) {
-        console.warn('[AnySubjectSolver] Already loading, ignoring duplicate submit')
-        return
-      }
-
-      // Note: ExplainCardV2 handles its own request lifecycle
-
+      // Note: ExplainCardV2 handles its own request lifecycle and loading states
       console.log('[AnySubjectSolver] request.start', { question: text.substring(0, 50) + '...' })
 
       // Reset state
@@ -100,7 +92,7 @@ export default function AnySubjectSolver() {
         setCurrentQuestionText('')
       }
     },
-    [isLoading]
+    []
   )
 
   const handleDockSubmit = useCallback(
@@ -145,7 +137,7 @@ export default function AnySubjectSolver() {
       {/* 🚫 Removed ViewChips from card area - only page-level tabs should exist */}
 
       <div className="max-w-2xl mx-auto px-4">
-        {!currentQuestionText && !state.similarResult && !isLoading && renderEmpty}
+        {!currentQuestionText && !state.similarResult && renderEmpty}
 
         <AnimatePresence mode="wait">
           {currentQuestionText && (
@@ -171,7 +163,7 @@ export default function AnySubjectSolver() {
       <InputDock
         mode="single"
         value={inputValue}
-        isBusy={isLoading}
+        isBusy={!!currentQuestionText}
         ocrStatus={ocrStatus}
         onChange={setInputValue}
         onSubmit={handleDockSubmit}
