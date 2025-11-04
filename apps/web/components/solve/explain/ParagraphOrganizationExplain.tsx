@@ -23,6 +23,10 @@ export function ParagraphOrganizationExplain({
   const [expanded, setExpanded] = useState(false)
   const [highlightedBlank, setHighlightedBlank] = useState<number | null>(null)
 
+  // Detect fallback mode: when parser.skip === true or missing data
+  const meta = view.meta as any
+  const isFallback = meta?.parser?.skip === true || !view.blanks || view.blanks.length === 0
+
   const handleEvidenceClick = (
     blankIndex: number,
     anchorId?: string,
@@ -86,11 +90,71 @@ export function ParagraphOrganizationExplain({
 
   // Parse article with blanks marked
   const article = view.article?.en || ''
-  const meta = view.meta as any
   const normalizedPassage = meta?.normalizedPassage || article
 
   // Split into paragraphs
   const paragraphs = article.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean)
+
+  // Fallback UI: When parser.skip === true, show minimal presentation
+  if (isFallback) {
+    return (
+      <div className="space-y-3">
+        <Card>
+          <CardContent className="pt-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-medium">篇章結構（選句）</h3>
+              <span className="text-xs text-muted-foreground">基礎版</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              解析守門略過，改用基礎版呈現（不影響作答與對照）。
+            </p>
+
+            {/* Article */}
+            {article && (
+              <div className="space-y-2">
+                <div className="text-sm font-medium">文章</div>
+                <div
+                  className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground max-h-[400px] overflow-y-auto rounded-md bg-muted/30 p-3"
+                  dangerouslySetInnerHTML={{
+                    __html: article.replace(/\(\s*(\d+)\s*\)/g, '<mark class="bg-primary/10 rounded px-1">【($1)】</mark>')
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Options */}
+            {view.options && view.options.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-sm font-medium">選項</div>
+                <div className="space-y-1">
+                  {view.options.map((option, i) => (
+                    <div
+                      key={i}
+                      className={`rounded-md border p-3 text-sm ${
+                        option.correct
+                          ? 'bg-green-50/80 dark:bg-green-900/20 border-green-200/50 dark:border-green-800/30 font-medium'
+                          : ''
+                      }`}
+                    >
+                      <div className="flex items-start gap-2">
+                        <span className="font-semibold">{option.label}.</span>
+                        <span className="flex-1">{option.text}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Basic hint */}
+            <div className="text-xs text-muted-foreground border-t pt-3">
+              <strong>提示：</strong>先找定義句（總說）→ 範圍舉例 → 轉折/對比 → 人為壓力（交易/獵捕/破壞）→ 警示/收束。
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-3">

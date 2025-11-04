@@ -12,6 +12,8 @@ function normalizeInput(raw: string): string {
     .replace(/\u00A0|\u200B|\uFEFF/g, "")        // NBSP/ZWSP/BOM 移除
     .replace(/[（）]/g, (m) => (m === "（" ? "(" : ")")) // 中文括號 -> 半形
     .replace(/[０-９]/g, (m) => String.fromCharCode(m.charCodeAt(0) - 65248)) // 全形數字 -> 半形
+    .replace(/[Ａ-Ｚ]/g, (m) => String.fromCharCode(m.charCodeAt(0) - 0xFEE0)) // 全形大寫字母 -> 半形
+    .replace(/[ａ-ｚ]/g, (m) => String.fromCharCode(m.charCodeAt(0) - 0xFEE0)) // 全形小寫字母 -> 半形
     .replace(/\s{2,}/g, " ")                     // 多空白折成單空白
     .replace(/\)\(/g, ") (")                     // )( -> ) (
     .trim()
@@ -44,10 +46,9 @@ function detectChoiceShape(arr: string[]): 'sentences' | 'words/phrases' | 'mixe
 }
 
 /**
- * Rule-based English Type Classification
- * Returns type, confidence, and signals for downstream template selection
- * 
- * CRITICAL PRIORITY ORDER: E1 → E6 → E7 → E4 (strict priority)
+ * Legacy router - DEPRECATED
+ * Replaced by TARS+KCE engine at /api/explain
+ * This function is kept for backward compatibility only
  */
 export async function classifyEnglishType(input: EnglishQuestionInput): Promise<EnglishRoute> {
   const { stem, options } = input
@@ -87,17 +88,17 @@ export async function classifyEnglishType(input: EnglishQuestionInput): Promise<
       normalized = normalized.replace(new RegExp(circle, 'g'), `(${num})`)
     })
     
-    // Match all numbered blank patterns: (1), (2), etc.
-    const blankMatches = Array.from(normalized.matchAll(/\(\d+\)/g)).map(m => m[0])
-    
+    // Match all numbered blank patterns: (1), (2), ( 1 ), etc. (tolerant of inner spaces)
+    const blankMatches = Array.from(normalized.matchAll(/\(\s*\d+\s*\)/g)).map(m => m[0])
+
     return { normalized, blankMatches }
   }
-  
+
   // ====== Step 2: Normalize numbered blanks (after initial normalization) ======
   const { normalized: normalizedAfterBlanks, blankMatches: normalizedBlankMatches } = normalizeBlanks(normalizedStem)
-  
-  // Extract numbered blanks: support arbitrary starting numbers (e.g., (24)(25)(26))
-  const blankMatches = Array.from(normalizedAfterBlanks.matchAll(/\((\d+)\)/g))
+
+  // Extract numbered blanks: support arbitrary starting numbers (e.g., (24)(25)(26)), tolerant of inner spaces
+  const blankMatches = Array.from(normalizedAfterBlanks.matchAll(/\(\s*(\d+)\s*\)/g))
   const blankNumbers = blankMatches.map(m => parseInt(m[1], 10))
   const numberedBlankCount = blankNumbers.length
   

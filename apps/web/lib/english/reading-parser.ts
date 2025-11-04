@@ -37,10 +37,11 @@ const SPLIT_Q = new RegExp(
   'gmi'
 )
 
-// Option pattern: supports (A), （A）, (a), etc.
-const OPT = /(?:\(|（)([A-Da-d])(?:\)|）)\s*/g
+// Option pattern: supports (A), （A）, (a), etc. - now supports A-E (五選)
+// Includes fullwidth letters as fallback (normalization should handle most cases)
+const OPT = /(?:\(|（)\s*([A-Ea-eＡ-Ｅａ-ｅ])\s*(?:\)|）)\s*/g
 
-const ANSWER_REGEX = /(?:答案|正確答案|Answer)\s*[：:]\s*([A-D])/i
+const ANSWER_REGEX = /(?:答案|正確答案|Answer)\s*[：:]\s*([A-E])/i
 const QUESTION_HEADER_CAPTURE = /^ *(?:\(\s*\))? *(?:\( *(\d+) *\)|Q *(\d+) *\.?|第 *(\d+) *題)/i
 const EMPTY_PREFIX_REGEX = /^ *\(\s*\)\s*(?:\( *\d+ *\)|Q *\d+\.?|第 *\d+ *題)/i
 
@@ -415,7 +416,8 @@ export function parseReading(raw: string): ParsedReading {
   // Guard 1: Skip if has numbered blanks (should be E6/E7)
   // Exclude 4-digit years (19xx, 20xx) and 3+ digit numbers (100+)
   // Cloze blanks typically range from (1) to (99)
-  const numberedBlankPattern = /\((?!19\d{2}|20\d{2}|[1-9]\d{2,})\d+\)/
+  // Tolerant of inner spaces: ( 1 ), ( 2 )
+  const numberedBlankPattern = /\(\s*(?!19\d{2}|20\d{2}|[1-9]\d{2,})\d+\s*\)/
   if (numberedBlankPattern.test(normalized)) {
     console.log('[reading-parser]', JSON.stringify({
       skip: true,

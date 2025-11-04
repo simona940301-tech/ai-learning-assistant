@@ -198,3 +198,41 @@ export interface ScienceSolveOutput {
   checklist: string[]
   references: Reference[]
 }
+
+// ====== TARS+KCE Engine Types ======
+
+export type ExplainMode = 'fast' | 'deep'
+
+export type ExplainKind =
+  | 'vocab'
+  | 'fill-in-cloze'
+  | 'sentence-completion'
+  | 'discourse'
+  | 'reading'
+  | 'translation'
+  | 'essay'
+  | 'hybrid'
+
+export interface ExplainRequest {
+  mode: ExplainMode
+  input: {
+    text?: string // OCR result or plain text
+    imageUrl?: string // when provided, OCR handled upstream
+  }
+}
+
+export interface ExplainViewModel {
+  kind: ExplainKind
+  mode: ExplainMode
+  difficultyTag?: 'easy' | 'medium' | 'hard'
+  answer: string
+  briefReason: string // <=25 Chinese chars
+  // Deep-only fields
+  cnTranslation?: string
+  fullExplanation?: string // markdown-ready
+  distractorNotes?: Array<{ option: string; note: string }>
+  grammarHighlights?: string[] // **核心語法點**
+  evidenceBlocks?: string[] // reading: ≤3 sentences
+  discourseRole?: string // discourse: 轉承/例證/結論
+  mixAnswerExtra?: string // hybrid: non-MC complement
+}
