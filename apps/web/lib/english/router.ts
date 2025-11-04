@@ -2,6 +2,48 @@ import type { EnglishRoute, EnglishQuestionInput } from '@/lib/contracts/explain
 import { parseReading } from './reading-parser'
 
 /**
+ * Unicode normalization & text cleaning (first step)
+ * Normalizes fullwidth chars, special spaces, brackets before pattern matching
+ */
+function normalizeInput(raw: string): string {
+  return raw
+    .normalize("NFKC")                           // Unicode 正規化
+    .replace(/\u3000/g, " ")                     // 全形空白 -> 半形空白
+    .replace(/\u00A0|\u200B|\uFEFF/g, "")        // NBSP/ZWSP/BOM 移除
+    .replace(/[（）]/g, (m) => (m === "（" ? "(" : ")")) // 中文括號 -> 半形
+    .replace(/[０-９]/g, (m) => String.fromCharCode(m.charCodeAt(0) - 65248)) // 全形數字 -> 半形
+    .replace(/\s{2,}/g, " ")                     // 多空白折成單空白
+    .replace(/\)\(/g, ") (")                     // )( -> ) (
+    .trim()
+}
+
+/**
+ * Detect choice shape: sentences | words/phrases | mixed | none
+ * Sentences: starts with capital & ends with punctuation (.?!), tokens >= 6
+ * Words/phrases: no ending punctuation & tokens <= 5
+ * Mixed: neither reaches 60% threshold
+ */
+function detectChoiceShape(arr: string[]): 'sentences' | 'words/phrases' | 'mixed' | 'none' {
+  if (!arr || arr.length === 0) return 'none'
+  
+  const sentenceLike = arr.filter((t) => {
+    const s = t.trim()
+    const tokens = s.split(/\s+/).length
+    return /^[A-Z]/.test(s) && /[.?!]$/.test(s) && tokens >= 6
+  }).length
+  
+  const wordLike = arr.filter((t) => {
+    const s = t.trim()
+    const tokens = s.split(/\s+/).length
+    return !/[.?!]$/.test(s) && tokens <= 5
+  }).length
+  
+  if (sentenceLike / arr.length >= 0.6) return 'sentences'
+  if (wordLike / arr.length >= 0.6) return 'words/phrases'
+  return 'mixed'
+}
+
+/**
  * Rule-based English Type Classification
  * Returns type, confidence, and signals for downstream template selection
  * 
@@ -11,10 +53,13 @@ export async function classifyEnglishType(input: EnglishQuestionInput): Promise<
   const { stem, options } = input
   const signals: string[] = []
   
+  // ====== Step 1: Normalize input (Unicode, spaces, brackets) ======
+  const normalizedStem = normalizeInput(stem)
+  
   // Normalize text for pattern matching
-  const stemLower = stem.toLowerCase().trim()
+  const stemLower = normalizedStem.toLowerCase().trim()
   const optionTexts = options.map((o) => o.text.toLowerCase().trim())
-  const stemCompact = stem.replace(/\s+/g, ' ')
+  const stemCompact = normalizedStem.replace(/\s+/g, ' ')
   const passageLength = stemCompact.length
   
   // ====== Normalize numbered blanks (support multiple formats) ======
@@ -40,52 +85,38 @@ export async function classifyEnglishType(input: EnglishQuestionInput): Promise<
     return { normalized, blankMatches }
   }
   
-  // ====== Debug Metrics (準備輸出) ======
-  const { normalized: normalizedStem, blankMatches: normalizedBlankMatches } = normalizeBlanks(stem)
-  const uniqueNumberedBlanks = new Set(normalizedBlankMatches.map((token) => token.replace(/\D/g, ''))).size
-  const hasNumberedBlanks = uniqueNumberedBlanks >= 2 || normalizedBlankMatches.length >= 2
+  // ====== Step 2: Normalize numbered blanks (after initial normalization) ======
+  const { normalized: normalizedAfterBlanks, blankMatches: normalizedBlankMatches } = normalizeBlanks(normalizedStem)
+  
+  // Extract numbered blanks: support arbitrary starting numbers (e.g., (24)(25)(26))
+  const blankMatches = Array.from(normalizedAfterBlanks.matchAll(/\((\d+)\)/g))
+  const blankNumbers = blankMatches.map(m => parseInt(m[1], 10))
+  const numberedBlankCount = blankNumbers.length
+  
+  // Likely paragraph/cloze if 2+ numbered blanks (allow non-sequential, OCR tolerance)
+  const likelyParagraphOrCloze = numberedBlankCount >= 2
+  const hasNumberedBlanks = likelyParagraphOrCloze
+  
+  // Extract options for choice shape detection
+  const optionTextsArray = options.map(o => o.text.trim())
+  const choicesShape = detectChoiceShape(optionTextsArray)
+  const optionsCount = options.length
+  const passageChars = normalizedAfterBlanks.replace(/\([A-D]\)/g, "").length
   
   // Detect parens blank for E1: ( ) or （ ）
-  const hasParensBlankSingleLine = /\([A-D]\)|\([\)（]/.test(stem) || stemLower.includes('( )') || stemLower.includes('（ ）')
+  const hasParensBlankSingleLine = /\([A-D]\)|\([\)（]/.test(normalizedAfterBlanks) || stemLower.includes('( )') || stemLower.includes('（ ）')
   
-  // Detect choices shape
-  let choicesShape: 'words' | 'phrases' | 'sentences' | 'unknown' = 'unknown'
+  // Legacy compatibility: map choicesShape to old format
   const allSingleWords = optionTexts.every((t) => t.split(/\s+/).length === 1)
-
-  // Enhanced sentence detection for E6/E7 routing
-  // A sentence is: long text (8+ words) with more complex structure
-  // Phrases: ≤5 words, connectors like "so that", gerunds, simple vocab
-  const choicesAreFullSentences = optionTexts.some((text) => {
-    const wordCount = text.split(/\s+/).length
-    const hasPunctuation = /[.!?。！？]$/.test(text.trim())
-
-    // E7 phrase patterns (exclude from sentence detection)
-    const isPhrasePattern = /^(so that|try hard|in order to|as well as|such as|due to|instead of|according to|\w+ing$|\w+ed$)$/i.test(text.trim())
-    if (isPhrasePattern && wordCount <= 3) return false
-
-    // E6 sentence patterns: has verb (auxiliary OR main verb) AND 8+ words
-    const hasVerb = /\b(am|is|are|was|were|have|has|had|will|would|should|could|may|might|must|do|does|did|can|offer|aim|prevent|address|feel|require)\b/i.test(text)
-    const hasSubjectVerbStructure = hasVerb && wordCount >= 8
-
-    // E6 sentences: typically 8+ words with verb, may not end with punctuation
-    // E7 phrases: typically ≤5 words, gerunds, connectors, simple words
-    return hasSubjectVerbStructure || (hasPunctuation && wordCount >= 8)
-  })
-
-  const choicesAreWordsOrPhrases = optionTexts.every((text) => {
-    const wordCount = text.split(/\s+/).length
-    return wordCount <= 5
-  })
-
-  if (allSingleWords) {
-    choicesShape = 'words'
-  } else if (choicesAreWordsOrPhrases && !choicesAreFullSentences) {
-    choicesShape = 'phrases'
-  } else if (choicesAreFullSentences) {
-    choicesShape = 'sentences'
-  }
+  let legacyChoicesShape: 'words' | 'phrases' | 'sentences' | 'unknown' = 'unknown'
   
-  const optionsCount = options.length
+  if (choicesShape === 'sentences') {
+    legacyChoicesShape = 'sentences'
+  } else if (choicesShape === 'words/phrases') {
+    legacyChoicesShape = allSingleWords ? 'words' : 'phrases'
+  } else {
+    legacyChoicesShape = 'unknown'
+  }
   
   // Check for forced kind flags
   const forcedKindFlag = (process.env.FORCE_KIND as any) || null
@@ -119,124 +150,136 @@ export async function classifyEnglishType(input: EnglishQuestionInput): Promise<
   if (isE2Grammar()) {
     const finalKind = 'E2'
     logDebug({
-      hasNumberedBlanks,
-      hasParensBlankSingleLine,
+      blankNumbers,
+      numberedBlankCount,
+      likelyParagraphOrCloze,
       choicesShape,
       optionsCount,
-      passageChars: passageLength,
-      forcedKindFlag,
+      passageChars,
+      confidence: 0.85,
       finalKind,
-      reason: 'E2: 文法結構（單句＋語法形式選項）',
     })
     signals.push('grammar_pattern')
     return finalize(finalKind, 0.85, '文法結構（單句＋語法形式選項）')
   }
 
-  // E1: Vocabulary (單字題) - SECOND PRIORITY
-  // Support multi-question splitting
+  // ====== Core Classification Logic (with confidence scoring) ======
+  let kind: EnglishRoute['type'] | 'unknown' = 'unknown'
+  let confidence = 0
+  
+  // E6/E7: Paragraph Organization or Contextual Completion
+  if (likelyParagraphOrCloze) {
+    if (choicesShape === 'sentences') {
+      kind = 'E6'
+      confidence = 1
+    } else if (choicesShape === 'words/phrases') {
+      kind = 'E7'
+      confidence = 1
+    } else {
+      // Mixed: use ratio to decide
+      const sentenceRatio = optionTextsArray.filter((t) => {
+        const s = t.trim()
+        const tokens = s.split(/\s+/).length
+        return /^[A-Z]/.test(s) && /[.?!]$/.test(s) && tokens >= 6
+      }).length / optionsCount
+      
+      kind = sentenceRatio >= 0.6 ? 'E6' : 'E7'
+      confidence = 0.8
+    }
+  } else {
+    // E1 or E4: Check for single parens blank
+    const hasSingleParensBlank = /\(\s*\)/.test(normalizedAfterBlanks)
+    
+    if (hasSingleParensBlank && choicesShape === 'words/phrases' && optionsCount === 4 && passageChars < 300) {
+      kind = 'E1'
+      confidence = 1
+    } else {
+      // Fallback to E4 (will be guarded by reading-parser)
+      kind = 'E4'
+      confidence = 0.7
+    }
+  }
+  
+  // Minimum confidence threshold
+  if (confidence < 0.7) kind = 'unknown'
+  
+  // E1: Vocabulary (單字題) - Apply new logic
+  if (kind === 'E1' && confidence >= 0.9) {
+    const finalKind = 'E1'
+    logDebug({
+      blankNumbers,
+      numberedBlankCount,
+      likelyParagraphOrCloze,
+      choicesShape,
+      optionsCount,
+      passageChars,
+      confidence,
+      finalKind,
+    })
+    signals.push('vocabulary_pattern', 'multi_question_supported')
+    return finalize(finalKind, confidence, '單字題（單行題幹＋括號空格＋四選項）')
+  }
+  
+  // Legacy E1 detection (fallback)
   const isE1SingleChoice = (): boolean => {
-    // Check for E1 patterns: single line with parens blank + 4 word/phrase options
     if (!hasParensBlankSingleLine) return false
     if (optionsCount !== 4) return false
-    if (choicesShape !== 'words' && choicesShape !== 'phrases') return false
-
-    // Exclude if has numbered blanks (E6/E7 pattern)
+    if (choicesShape !== 'words/phrases') return false
     if (hasNumberedBlanks) return false
-
-    // Relaxed length threshold: E1 can be multi-sentence (up to 300 chars)
     if (passageLength > 300) return false
-
-    // E1 detection: has ( ) blank with word/phrase options, sentence count ≤ 3
-    const sentenceCount = stem.split(/[.!?]+/).filter(Boolean).length
-    if (sentenceCount > 3) return false // Too many sentences → likely E4
-
+    const sentenceCount = normalizedAfterBlanks.split(/[.!?]+/).filter(Boolean).length
+    if (sentenceCount > 3) return false
     return true
   }
   
-  if (isE1SingleChoice()) {
+  if (isE1SingleChoice() && kind !== 'E1') {
     const finalKind = 'E1'
     logDebug({
-      hasNumberedBlanks,
-      hasParensBlankSingleLine,
+      blankNumbers,
+      numberedBlankCount,
+      likelyParagraphOrCloze,
       choicesShape,
       optionsCount,
-      passageChars: passageLength,
-      forcedKindFlag,
+      passageChars,
+      confidence: 0.9,
       finalKind,
-      reason: 'E1: 單行題幹＋括號空格＋詞/片語選項',
     })
     signals.push('vocabulary_pattern', 'multi_question_supported')
     return finalize(finalKind, 0.9, '單字題（單行題幹＋括號空格＋四選項）')
   }
   
-  // E6: Paragraph Organization (篇章結構) - SECOND PRIORITY
-  const isE6ParagraphOrg = (): boolean => {
-    if (!hasNumberedBlanks) return false
-    if (passageLength < 200) return false // Must be long article
-    if (choicesShape !== 'sentences') return false
-    if (optionsCount < 4 || optionsCount > 6) return false
-
-    // Enhanced sentence detection: count options that are sentences (8+ words with verb OR 8+ words with punctuation)
-    const sentenceCount = optionTexts.filter((text) => {
-      const wordCount = text.split(/\s+/).length
-      const hasPunctuation = /[.!?。！？]$/.test(text.trim())
-
-      // E7 phrase patterns (exclude from sentence count)
-      const isPhrasePattern = /^(so that|try hard|in order to|as well as|such as|due to|instead of|according to|\w+ing$|\w+ed$)$/i.test(text.trim())
-      if (isPhrasePattern && wordCount <= 3) return false
-
-      // E6 sentence patterns: has verb (auxiliary OR main verb) AND 8+ words
-      const hasVerb = /\b(am|is|are|was|were|have|has|had|will|would|should|could|may|might|must|do|does|did|can|offer|aim|prevent|address|feel|require)\b/i.test(text)
-      const hasSubjectVerbStructure = hasVerb && wordCount >= 8
-
-      // E6 options: typically 8+ words with verb structure, may or may not end with punctuation
-      return hasSubjectVerbStructure || (hasPunctuation && wordCount >= 8)
-    }).length
-
-    const sentenceRatio = sentenceCount / optionsCount
-    if (sentenceRatio < 0.5) return false // Less than 50% are sentences
-
-    return true
-  }
-  
-  if (isE6ParagraphOrg()) {
+  // E6: Paragraph Organization (篇章結構) - Apply new logic
+  if (kind === 'E6' && confidence >= 0.8 && passageLength >= 200 && optionsCount >= 4 && optionsCount <= 6) {
     const finalKind = 'E6'
     logDebug({
-      hasNumberedBlanks,
-      hasParensBlankSingleLine,
+      blankNumbers,
+      numberedBlankCount,
+      likelyParagraphOrCloze,
       choicesShape,
       optionsCount,
-      passageChars: passageLength,
-      forcedKindFlag,
+      passageChars,
+      confidence,
       finalKind,
-      reason: 'E6: 文章含編號空格＋完整句子選項',
     })
     signals.push('paragraph_organization_pattern')
-    return finalize(finalKind, 0.9, '篇章結構（編號空格＋完整句子選項）')
+    return finalize(finalKind, confidence, '篇章結構（編號空格＋完整句子選項）')
   }
   
-  // E7: Contextual Completion (文意選填) - THIRD PRIORITY
-  const isE7ContextualCompletion = (): boolean => {
-    if (!hasNumberedBlanks) return false
-    // Must be words or phrases, not sentences
-    if (choicesShape === 'sentences' || choicesShape === 'unknown') return false
-    return choicesShape === 'words' || choicesShape === 'phrases'
-  }
-  
-  if (isE7ContextualCompletion()) {
+  // E7: Contextual Completion (文意選填) - Apply new logic
+  if (kind === 'E7' && confidence >= 0.8) {
     const finalKind = 'E7'
     logDebug({
-      hasNumberedBlanks,
-      hasParensBlankSingleLine,
+      blankNumbers,
+      numberedBlankCount,
+      likelyParagraphOrCloze,
       choicesShape,
       optionsCount,
-      passageChars: passageLength,
-      forcedKindFlag,
+      passageChars,
+      confidence,
       finalKind,
-      reason: 'E7: 文章含編號空格＋詞/片語選項',
     })
     signals.push('contextual_completion_pattern')
-    return finalize(finalKind, 0.9, '文意選填（編號空格＋詞/片語選項）')
+    return finalize(finalKind, confidence, '文意選填（編號空格＋詞/片語選項）')
   }
   
   // E5: Dialog & Pragmatics
@@ -307,7 +350,7 @@ export async function classifyEnglishType(input: EnglishQuestionInput): Promise<
   // E4: Reading - 使用 parser 偵測 passage + 多題
   // CRITICAL: Only parse if passage is long AND no numbered blanks
   if (passageLength > 100 && !hasNumberedBlanks && (hasMultipleQuestionMarkers || sentenceCount > 2)) {
-    const parsed = parseReading(normalizedStem)
+    const parsed = parseReading(normalizedAfterBlanks)
     if (parsed && parsed.passage && parsed.passage.length > 50 && parsed.questions.length >= 1) {
       const groupId = parsed.groupId || ''
       const finalKind = 'E4'
@@ -399,18 +442,20 @@ export async function classifyEnglishType(input: EnglishQuestionInput): Promise<
   return finalize(finalKind, 0.5, '無法明確分類，使用保底模板')
   
   function logDebug(metrics: {
-    hasNumberedBlanks: boolean
-    hasParensBlankSingleLine: boolean
-    choicesShape: string
-    optionsCount: number
-    passageChars: number
-    forcedKindFlag: string | null
-    finalKind: string
-    reason: string
+    blankNumbers?: number[]
+    numberedBlankCount?: number
+    likelyParagraphOrCloze?: boolean
+    choicesShape?: string
+    optionsCount?: number
+    passageChars?: number
+    confidence?: number
+    finalKind?: string
+    hasNumberedBlanks?: boolean
+    hasParensBlankSingleLine?: boolean
+    forcedKindFlag?: string | null
+    reason?: string
   }) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[router.kdebug]', JSON.stringify(metrics))
-    }
+    console.log('[router.kdebug]', JSON.stringify(metrics))
   }
 
   function finalize(type: EnglishRoute['type'], confidence: number, reason: string): EnglishRoute {

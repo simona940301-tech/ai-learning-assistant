@@ -121,42 +121,59 @@ export function ContextualCompletionExplain({
         </Card>
       )}
 
-      {/* 詞表卡 — 該題的選項表（每個選項含 POS＋中文），正解高亮 */}
+      {/* 詞表卡 — 表格列出選項詞性＋中文，正解直接高亮 */}
       {view.options && view.options.length > 0 && (
         <Card>
-          <CardContent className="space-y-1.5 pt-6">
-            {view.options.map((option) => {
-              const isCorrect = option.correct
-              const parts: string[] = []
-              if (option.label) parts.push(`${option.label}.`)
-              if (option.text) parts.push(option.text)
-              if (option.pos) parts.push(`(${option.pos})`)
-              if (option.zh) parts.push(option.zh)
-
-              return (
-                <div
-                  key={`${option.label}-${option.text}`}
-                  className={`rounded-lg px-3 py-2 text-sm leading-relaxed ${
-                    isCorrect
-                      ? 'bg-green-50 font-semibold text-green-700 dark:bg-green-900/20 dark:text-green-200'
-                      : 'text-foreground'
-                  }`}
-                >
-                  {parts.join(' ')}
-                </div>
-              )
-            })}
+          <CardContent className="pt-6">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-2 px-3 text-muted-foreground font-medium">選項</th>
+                    <th className="text-left py-2 px-3 text-muted-foreground font-medium">詞性</th>
+                    <th className="text-left py-2 px-3 text-muted-foreground font-medium">中文</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {view.options.map((option) => {
+                    const isCorrect = option.correct
+                    return (
+                      <tr
+                        key={`${option.label}-${option.text}`}
+                        className={`border-b border-border/50 transition-colors ${
+                          isCorrect
+                            ? 'bg-green-50/80 dark:bg-green-900/20 border-green-200/50 dark:border-green-800/30'
+                            : 'hover:bg-muted/30'
+                        }`}
+                      >
+                        <td className={`py-2.5 px-3 ${isCorrect ? 'font-medium text-green-700 dark:text-green-300' : 'text-foreground'}`}>
+                          {option.label}. {option.text}
+                        </td>
+                        <td className="py-2.5 px-3 text-muted-foreground">
+                          {option.pos || '—'}
+                        </td>
+                        <td className="py-2.5 px-3 text-muted-foreground">
+                          {option.zh || '—'}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </CardContent>
         </Card>
       )}
 
-      {/* 詳解卡（單題） */}
+      {/* 詳解卡（單題）— 合併語意、搭配與語法規則，≤ 2 行 */}
       {currentQuestion && (
         <Card>
           <CardContent className="space-y-3 pt-6">
-            {/* 解題段（單段合併：理由＋依據） */}
+            {/* 解題段（單段合併：理由＋依據，≤ 2 行） */}
             <div className="text-sm leading-relaxed">
-              <p className="text-foreground">{truncateReason(currentQuestion.explanation.reason, 120)}</p>
+              <p className="text-foreground line-clamp-2">
+                {truncateReason(currentQuestion.explanation.reason, 120)}
+              </p>
 
               {/* Evidence 片段（可點按） */}
               {currentQuestion.explanation.evidence && (
@@ -169,18 +186,18 @@ export function ContextualCompletionExplain({
                   }
                   className="group text-left w-full mt-2"
                 >
-                  <div className="text-zinc-400 italic text-xs leading-relaxed font-light transition-colors group-hover:text-zinc-300">
+                  <div className="text-xs text-muted-foreground italic leading-relaxed transition-colors group-hover:text-foreground/70">
                     &ldquo;{currentQuestion.explanation.evidence.text}&rdquo;
                   </div>
                 </button>
               )}
 
-              {/* 片語補充（可選） */}
+              {/* 片語補充（可選，1–3 組） */}
               {currentQuestion.explanation.phrases && currentQuestion.explanation.phrases.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-zinc-800/30">
+                <div className="mt-3 pt-3 border-t border-border/30">
                   <div className="text-xs text-muted-foreground mb-1.5">常見搭配：</div>
                   <div className="flex flex-wrap gap-1.5">
-                    {currentQuestion.explanation.phrases.map((phrase, idx) => (
+                    {currentQuestion.explanation.phrases.slice(0, 3).map((phrase, idx) => (
                       <span
                         key={idx}
                         className="rounded border border-border bg-background px-2 py-0.5 text-xs text-muted-foreground"
@@ -205,30 +222,42 @@ export function ContextualCompletionExplain({
                 setTranslationExpanded((prev) => !prev)
                 track('section.toggle', { action: translationExpanded ? 'collapse' : 'expand', type: 'translation' })
               }}
-              className="w-full text-left text-sm font-medium text-foreground mb-2"
+              className="w-full text-left text-sm font-medium text-foreground mb-2 flex items-center gap-2"
             >
-              {translationExpanded ? '▼' : '▶'} 全文譯文與關鍵詞
+              <span className="transition-transform">{translationExpanded ? '▼' : '▶'}</span>
+              <span>全文譯文與關鍵詞</span>
             </button>
 
             {translationExpanded && (
-              <div className="space-y-3 mt-3">
-                {/* 標準譯文 */}
+              <div className="space-y-4 mt-3">
+                {/* 標準譯文（難字/主句構粗體） */}
                 <div className="text-sm leading-relaxed text-muted-foreground">
-                  {view.translation.full}
+                  {/* 簡單的粗體處理：將關鍵詞加粗 */}
+                  {view.translation.full.split(' ').map((word, idx) => {
+                    const isKeyword = view.translation?.keywords?.some(k => 
+                      word.toLowerCase().includes(k.term.toLowerCase())
+                    )
+                    return (
+                      <span key={idx}>
+                        {isKeyword ? <strong className="text-foreground font-semibold">{word}</strong> : word}
+                        {idx < view.translation.full.split(' ').length - 1 ? ' ' : ''}
+                      </span>
+                    )
+                  })}
                 </div>
 
-                {/* 關鍵詞彙表 */}
+                {/* 關鍵詞彙表（不與詞表卡重複） */}
                 {view.translation.keywords && view.translation.keywords.length > 0 && (
-                  <div className="pt-3 border-t border-zinc-800/30">
-                    <div className="text-xs text-muted-foreground mb-1.5">關鍵詞彙：</div>
-                    <div className="flex flex-wrap gap-1.5">
+                  <div className="pt-3 border-t border-border/30">
+                    <div className="text-xs text-muted-foreground mb-2 font-medium">關鍵詞彙：</div>
+                    <div className="flex flex-wrap gap-2">
                       {view.translation.keywords.map((keyword, idx) => (
                         <span
                           key={idx}
-                          className="rounded border border-border bg-background px-2 py-0.5 text-xs"
+                          className="rounded border border-border bg-background px-2.5 py-1 text-xs"
                         >
                           <span className="font-semibold text-foreground">{keyword.term}</span>
-                          <span className="text-muted-foreground ml-1">{keyword.zh}</span>
+                          <span className="text-muted-foreground ml-1.5">{keyword.zh}</span>
                         </span>
                       ))}
                     </div>

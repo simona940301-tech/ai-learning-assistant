@@ -9,29 +9,25 @@ interface VocabularyExplainProps {
 }
 
 function truncateReason(reason: string, maxLength = 30): string {
+  if (!reason) return ''
   if (reason.length <= maxLength) return reason
-  return `${reason.slice(0, maxLength).trim()}…`
+  const trimmed = reason.slice(0, maxLength).trim()
+  return trimmed.endsWith('。') || trimmed.endsWith('！') || trimmed.endsWith('？') ? trimmed : `${trimmed}…`
 }
 
 export function VocabularyExplain({ view }: VocabularyExplainProps) {
   return (
     <div className="space-y-3">
-      {/* 題幹 */}
-      <Card>
-        <CardContent className="space-y-2 pt-6">
-          <p className="text-sm leading-relaxed text-foreground">{view.stem.en}</p>
-          {view.stem.zh && <p className="text-sm leading-relaxed text-muted-foreground">{view.stem.zh}</p>}
-        </CardContent>
-      </Card>
-
       {/* 選項分析 — 固定格式：代號｜詞性｜中文｜一句理由，正解高亮 */}
+      {/* 不使用題幹卡，直接顯示選項 */}
       {view.options && view.options.length > 0 && (
         <Card>
-          <CardContent className="space-y-1.5 pt-6">
+          <CardContent className="space-y-1 pt-6">
             {view.options.map((option) => {
-              // 構建固定格式：代號｜詞性｜中文｜一句理由
+              // 構建固定格式：(A) word｜POS｜中文｜一句理由
               const parts: string[] = []
               if (option.label) parts.push(`(${option.label})`)
+              if (option.text) parts.push(option.text.trim())
               if (option.pos) parts.push(option.pos)
               if (option.zh) parts.push(option.zh)
               if (option.reason) parts.push(truncateReason(option.reason, 30))
@@ -42,10 +38,10 @@ export function VocabularyExplain({ view }: VocabularyExplainProps) {
               return (
                 <div
                   key={`${option.label}-${option.text}`}
-                  className={`rounded-lg px-3 py-2 text-sm leading-relaxed ${
+                  className={`rounded-lg px-3 py-2.5 text-sm leading-relaxed transition-colors ${
                     isCorrect
-                      ? 'bg-green-50 font-semibold text-green-700 dark:bg-green-900/20 dark:text-green-200'
-                      : 'text-foreground'
+                      ? 'bg-green-50/80 dark:bg-green-900/20 border border-green-200/50 dark:border-green-800/30 font-medium text-green-700 dark:text-green-300'
+                      : 'text-foreground/80 hover:bg-muted/30'
                   }`}
                 >
                   {line}
@@ -56,8 +52,10 @@ export function VocabularyExplain({ view }: VocabularyExplainProps) {
         </Card>
       )}
 
-      {/* 延伸字彙（可選） */}
-      {view.vocab && view.vocab.length > 0 && <ExtendedVocab items={view.vocab} />}
+      {/* 延伸字彙（可選，3–6 組） */}
+      {view.vocab && view.vocab.length > 0 && (
+        <ExtendedVocab items={view.vocab.slice(0, 6)} />
+      )}
     </div>
   )
 }

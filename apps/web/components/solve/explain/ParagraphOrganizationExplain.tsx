@@ -145,10 +145,10 @@ export function ParagraphOrganizationExplain({
         </Card>
       )}
 
-      {/* 選項列表 — 每個選項含中文翻譯，正解高亮 */}
+      {/* 選項列表 — 每個選項含中文翻譯，正解高亮（不列「答案：」） */}
       {view.options && view.options.length > 0 && (
         <Card>
-          <CardContent className="space-y-1.5 pt-6">
+          <CardContent className="space-y-1 pt-6">
             {view.options.map((option) => {
               const isCorrect = option.correct
               const blank = view.blanks.find((b) => b.selectedAnswer.label === option.label)
@@ -156,15 +156,20 @@ export function ParagraphOrganizationExplain({
               return (
                 <div
                   key={`${option.label}-${option.text}`}
-                  className={`rounded-lg px-3 py-2 text-sm leading-relaxed ${
+                  className={`rounded-lg px-3 py-2.5 text-sm leading-relaxed transition-colors ${
                     isCorrect
-                      ? 'bg-green-50 font-semibold text-green-700 dark:bg-green-900/20 dark:text-green-200'
-                      : 'text-foreground'
+                      ? 'bg-green-50/80 dark:bg-green-900/20 border border-green-200/50 dark:border-green-800/30 font-medium text-green-700 dark:text-green-300'
+                      : 'text-foreground/80 hover:bg-muted/30'
                   }`}
                 >
-                  {option.label}. {option.text}
+                  <div className="flex items-start gap-2">
+                    <span className="font-medium">{option.label}.</span>
+                    <span className="flex-1">{option.text}</span>
+                  </div>
                   {blank?.selectedAnswer.zh && (
-                    <span className="ml-2 text-muted-foreground">（{blank.selectedAnswer.zh}）</span>
+                    <div className="mt-1 ml-5 text-xs text-muted-foreground">
+                      {blank.selectedAnswer.zh}
+                    </div>
                   )}
                 </div>
               )
@@ -182,23 +187,29 @@ export function ParagraphOrganizationExplain({
         return (
           <Card key={blankIndex}>
             <CardContent className="space-y-3 pt-6">
-              {/* 第 1 行：✅ 已選答案 */}
-              <div className="flex items-center gap-2 text-sm">
-                <span>✅</span>
-                <span className="text-muted-foreground">已選答案</span>
-              </div>
+              {/* 第 1 行：該題所有選項中文翻譯「摘要」 */}
+              {view.options && view.options.length > 0 && (
+                <div className="text-xs text-muted-foreground mb-2">
+                  <span className="font-medium">選項摘要：</span>
+                  {view.options.map((opt, idx) => {
+                    const optBlank = view.blanks.find((b) => b.selectedAnswer.label === opt.label)
+                    return optBlank?.selectedAnswer.zh ? (
+                      <span key={idx} className="ml-1.5">
+                        {opt.label}：{optBlank.selectedAnswer.zh}
+                        {idx < view.options.length - 1 ? '；' : ''}
+                      </span>
+                    ) : null
+                  })}
+                </div>
+              )}
 
-              {/* 第 2-3 行：詳解 */}
+              {/* 第 2-3 行：理由＋依據（合併一句） */}
               <div className="space-y-2 text-sm leading-relaxed">
-                {/* 篇章銜接句 */}
-                <p className="text-foreground">{blank.explanation.connection}</p>
-
-                {/* 理由＋依據（一句話） */}
-                <p className="text-muted-foreground">
-                  {truncateReason(blank.explanation.reason, 80)}
+                <p className="text-foreground">
+                  {blank.explanation.connection || blank.explanation.reason}
                 </p>
 
-                {/* Evidence 片段（可點按） */}
+                {/* Evidence 片段（可點按回捲題幹高亮） */}
                 {blank.explanation.evidence && (
                   <button
                     onClick={() =>
@@ -208,16 +219,16 @@ export function ParagraphOrganizationExplain({
                         paragraphIndex
                       )
                     }
-                    className="group text-left w-full"
+                    className="group text-left w-full mt-2"
                     aria-label={`查看證據：${blank.explanation.evidence.text.substring(0, 30)}...`}
                   >
-                    <div className="text-zinc-400 italic text-xs leading-relaxed font-light transition-colors group-hover:text-zinc-300">
+                    <div className="text-xs text-muted-foreground italic leading-relaxed transition-colors group-hover:text-foreground/70">
                       &ldquo;{blank.explanation.evidence.text}&rdquo;
                     </div>
                   </button>
                 )}
 
-                {/* 語用標籤（可選） */}
+                {/* 語用標籤（可選：轉折／發展／總結） */}
                 {blank.explanation.discourseTag && (
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     <span className="rounded border border-border bg-background px-2 py-0.5 text-xs text-muted-foreground">

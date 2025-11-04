@@ -379,13 +379,46 @@ export function parseReading(raw: string): ParsedReading {
     }
   }
 
-  // CRITICAL GUARD: Skip if has numbered blanks (should be E6/E7, not E4)
-  const numberedBlankMatches = raw.match(/\(\d+\)/g) ?? []
-  const uniqueNumberedBlanks = new Set(numberedBlankMatches.map((token) => token.replace(/\D/g, ''))).size
-  const hasNumberedBlanks = uniqueNumberedBlanks >= 2 || numberedBlankMatches.length >= 2
+  // ====== Guard: Skip non-pure reading (numbered blanks or word-level choices) ======
+  // Import normalizeInput from router (or use local version)
+  const normalizeInputForGuard = (text: string): string => {
+    return text
+      .normalize("NFKC")
+      .replace(/\u3000/g, " ")
+      .replace(/\u00A0|\u200B|\uFEFF/g, "")
+      .replace(/[（）]/g, (m) => (m === "（" ? "(" : ")"))
+      .replace(/[０-９]/g, (m) => String.fromCharCode(m.charCodeAt(0) - 65248))
+      .replace(/\s{2,}/g, " ")
+      .replace(/\)\(/g, ") (")
+      .trim()
+  }
   
-  if (hasNumberedBlanks) {
-    console.warn('[reading-parser] skip: not pure reading — has numbered blanks, likely E6/E7')
+  const detectChoiceShapeForGuard = (arr: string[]): 'sentences' | 'words/phrases' | 'mixed' | 'none' => {
+    if (!arr || arr.length === 0) return 'none'
+    const sentenceLike = arr.filter((t) => {
+      const s = t.trim()
+      const tokens = s.split(/\s+/).length
+      return /^[A-Z]/.test(s) && /[.?!]$/.test(s) && tokens >= 6
+    }).length
+    const wordLike = arr.filter((t) => {
+      const s = t.trim()
+      const tokens = s.split(/\s+/).length
+      return !/[.?!]$/.test(s) && tokens <= 5
+    }).length
+    if (sentenceLike / arr.length >= 0.6) return 'sentences'
+    if (wordLike / arr.length >= 0.6) return 'words/phrases'
+    return 'mixed'
+  }
+  
+  const normalized = normalizeInputForGuard(raw)
+  
+  // Guard 1: Skip if has numbered blanks (should be E6/E7)
+  if (/\(\d+\)/.test(normalized)) {
+    console.log('[reading-parser]', JSON.stringify({ 
+      skip: true, 
+      reason: 'numbered blanks found',
+      normalized: normalized.substring(0, 100)
+    }))
     return {
       passage: '',
       questions: [],
@@ -393,10 +426,32 @@ export function parseReading(raw: string): ParsedReading {
       warnings: ['Skipped: Has numbered blanks (likely E6/E7, not E4)'],
     }
   }
+  
+  // Guard 2: Skip if choices are word-level (extract from text)
+  const optionMatches = Array.from(normalized.matchAll(/(?:\(|（)([A-Da-d])(?:\)|）)\s*([^\n(]+)/g))
+  const extractedOptions = optionMatches.slice(0, 4).map(m => m[2]?.trim() || '').filter(Boolean)
+  
+  if (extractedOptions.length > 0) {
+    const choicesShape = detectChoiceShapeForGuard(extractedOptions)
+    if (choicesShape === 'words/phrases') {
+      console.log('[reading-parser]', JSON.stringify({ 
+        skip: true, 
+        reason: 'word-level choices',
+        choicesShape,
+        sampleOptions: extractedOptions.slice(0, 2)
+      }))
+      return {
+        passage: '',
+        questions: [],
+        groupId: '',
+        warnings: ['Skipped: Word-level choices (likely E1/E7, not E4)'],
+      }
+    }
+  }
 
   const warnings: string[] = []
-  const normalized = normalizeInput(raw, warnings)
-  const lines = normalized.split(/\n/)
+  const normalizedForParser = normalizeInput(raw, warnings)
+  const lines = normalizedForParser.split(/\n/)
 
   // Find first question line
   let firstQLine = -1
@@ -407,7 +462,7 @@ export function parseReading(raw: string): ParsedReading {
     }
   }
 
-  const optionMatches = Array.from(normalized.matchAll(OPT))
+  const optionMatches = Array.from(normalizedForParser.matchAll(OPT))
 
   let passage = ''
   let qaBlock = ''
@@ -424,7 +479,7 @@ export function parseReading(raw: string): ParsedReading {
 
     // Try to find passage boundary by looking for options
     const firstOptionIndex = optionMatches[0].index ?? 0
-    const textBeforeOptions = normalized.slice(0, firstOptionIndex)
+    const textBeforeOptions = normalizedForParser.slice(0, firstOptionIndex)
 
     // Look for last paragraph or sentence boundary before options
     const lastDoubleNewline = textBeforeOptions.lastIndexOf('\n\n')
@@ -436,14 +491,14 @@ export function parseReading(raw: string): ParsedReading {
     const boundary = Math.max(lastDoubleNewline, lastSentenceEnd)
     if (boundary > 0) {
       passage = textBeforeOptions.slice(0, boundary + 1).trim()
-      qaBlock = normalized.slice(boundary + 1).trim()
+      qaBlock = normalizedForParser.slice(boundary + 1).trim()
     } else {
       passage = ''
-      qaBlock = normalized
+      qaBlock = normalizedForParser
     }
   } else {
     // No question markers detected
-    const fallbackPassage = normalized.trim()
+    const fallbackPassage = normalizedForParser.trim()
     pushWarning(warnings, 'No question markers detected')
     const groupId = fallbackPassage ? generateGroupId(fallbackPassage) : ''
     return {
