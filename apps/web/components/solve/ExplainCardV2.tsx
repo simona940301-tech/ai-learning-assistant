@@ -3,13 +3,16 @@
 import { useEffect, useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { ExplainViewModel, ExplainMode } from '@/lib/types'
+import type { ConservativeResult } from '@/lib/ai/conservative-types'
 import { track } from '@plms/shared/analytics'
 import Typewriter from './Typewriter'
+import ConservativePresenter from './explain/ConservativePresenter'
 
 interface ExplainCardV2Props {
   inputText: string
   mode?: ExplainMode
   onModeChange?: (mode: ExplainMode) => void
+  conservative?: boolean // Enable conservative mode
 }
 
 
@@ -220,8 +223,9 @@ function ModeToggle({
 /**
  * Main ExplainCardV2 component
  */
-export default function ExplainCardV2({ inputText, mode: initialMode = 'fast', onModeChange }: ExplainCardV2Props) {
+export default function ExplainCardV2({ inputText, mode: initialMode = 'fast', onModeChange, conservative = false }: ExplainCardV2Props) {
   const [vm, setVm] = useState<ExplainViewModel | null>(null)
+  const [conservativeResult, setConservativeResult] = useState<ConservativeResult | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [loadingStep, setLoadingStep] = useState(0)
   const [mode, setMode] = useState<ExplainMode>(initialMode)
@@ -255,13 +259,13 @@ export default function ExplainCardV2({ inputText, mode: initialMode = 'fast', o
       try {
         // Track request
         track('explain.request', {
-          mode,
+          mode: conservative ? 'conservative' : mode,
           input_len: inputText.length,
         })
 
         const startTime = performance.now()
 
-        console.log('[ExplainCardV2] Requesting explanation for:', inputText.substring(0, 50) + '...')
+        console.log('[ExplainCardV2] Requesting explanation for:', inputText.substring(0, 50) + '...', conservative ? '(conservative mode)' : '')
 
         const res = await fetch('/api/explain', {
           method: 'POST',
@@ -269,6 +273,7 @@ export default function ExplainCardV2({ inputText, mode: initialMode = 'fast', o
           body: JSON.stringify({
             input: { text: inputText },
             mode,
+            conservative,
           }),
         })
 
@@ -279,20 +284,38 @@ export default function ExplainCardV2({ inputText, mode: initialMode = 'fast', o
         const data = await res.json()
         const latency = performance.now() - startTime
 
-        console.log('[ExplainCardV2] Explanation received:', {
-          kind: data.kind,
-          mode: data.mode,
-          latency_ms: Math.round(latency),
-        })
+        if (conservative && data.detected_type) {
+          // Conservative mode response
+          console.log('[ExplainCardV2] Conservative explanation received:', {
+            type: data.detected_type,
+            confidence: data.confidence,
+            latency_ms: Math.round(latency),
+          })
 
-        // Track render
-        track('explain.render', {
-          mode: data.mode,
-          kind: data.kind,
-          latency_ms: Math.round(latency),
-        })
+          track('explain.render', {
+            mode: 'conservative',
+            kind: data.detected_type,
+            latency_ms: Math.round(latency),
+          })
 
-        setVm(data as ExplainViewModel)
+          setConservativeResult(data as ConservativeResult)
+        } else {
+          // Normal TARS+KCE response
+          console.log('[ExplainCardV2] Explanation received:', {
+            kind: data.kind,
+            mode: data.mode,
+            latency_ms: Math.round(latency),
+          })
+
+          track('explain.render', {
+            mode: data.mode,
+            kind: data.kind,
+            latency_ms: Math.round(latency),
+          })
+
+          setVm(data as ExplainViewModel)
+        }
+
         setIsLoading(false)
         console.log('[ExplainCardV2] Rendering completed')
       } catch (err) {
@@ -339,7 +362,11 @@ export default function ExplainCardV2({ inputText, mode: initialMode = 'fast', o
       )}
 
       {/* Content */}
-      {vm && !isLoading && (
+      {conservativeResult && !isLoading && (
+        <ConservativePresenter result={conservativeResult} />
+      )}
+
+      {vm && !isLoading && !conservativeResult && (
         <>
           {mode === 'fast' ? (
             <FastModePresenter vm={vm} />
