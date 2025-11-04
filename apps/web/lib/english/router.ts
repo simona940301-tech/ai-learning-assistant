@@ -290,6 +290,7 @@ export async function classifyEnglishType(input: EnglishQuestionInput): Promise<
       choicesShape,
       optionsCount,
       passageChars,
+      passageLength,
       confidence,
       finalKind,
     })
@@ -307,6 +308,7 @@ export async function classifyEnglishType(input: EnglishQuestionInput): Promise<
       choicesShape,
       optionsCount,
       passageChars,
+      passageLength,
       confidence,
       finalKind,
     })
