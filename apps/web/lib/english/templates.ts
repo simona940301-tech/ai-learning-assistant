@@ -420,7 +420,8 @@ async function generateE7Template(
   const blankMatches = stem.match(/\(\d+\)/g) ?? []
   const blankCount = blankMatches.length
 
-  const prompt = `你是英文閱讀理解專家。請針對以下文意選填題提供詳解：
+  // Optimized prompt - concise and focused
+  const prompt = `文意選填題，${blankCount}個空格。請提供 JSON 陣列（僅輸出 JSON）：
 
 文章：
 ${stem}
@@ -428,24 +429,13 @@ ${stem}
 選項：
 ${options.map((o) => `(${o.key}) ${o.text}`).join('\n')}
 
-請為每個空格提供 JSON 格式回答（僅輸出 JSON，不要其他文字）：
+格式：
 [
-  {
-    "blankIndex": 1,
-    "answer": "A",
-    "reason": "空格前後語意＋搭配/語法規則＋同近義對比（合併一段，≤2行，≤30字）",
-    "evidence": "引用原文詞組（若可定位）",
-    "phrases": ["常見搭配1", "常見搭配2"] // 可選，1-3組
-  }
+  {"blankIndex": 1, "answer": "A", "reason": "語意+搭配+語法（≤30字）", "evidence": "原文詞組", "phrases": ["搭配1"]},
+  {"blankIndex": 2, "answer": "B", "reason": "語意+搭配+語法（≤30字）", "evidence": "原文詞組", "phrases": ["搭配2"]}
 ]
 
-關鍵要求：
-1. answer 欄位必須是單一字母（A-J）
-2. reason 必須合併空格前後語意、搭配/語法規則、同近義對比，≤30字
-3. evidence 必須是原文詞組或片段（若可定位）
-4. phrases 可選，列出常見搭配（1-3組，無則省略）
-
-Output JSON only:`
+要求：${blankCount}個物件；answer 為單一字母；reason 必填（≤30字）。Output JSON only:`
 
   const parsed = await chatCompletionJSON<any>(
     [{ role: 'user', content: prompt }],
