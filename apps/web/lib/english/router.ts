@@ -53,6 +53,14 @@ export async function classifyEnglishType(input: EnglishQuestionInput): Promise<
   const { stem, options } = input
   const signals: string[] = []
   
+  // ====== Initial Debug Log ======
+  console.log('[router.kdebug]', JSON.stringify({
+    phase: 'start',
+    stemLength: stem.length,
+    optionsCount: options.length,
+    options: options.map(o => ({ key: o.key, textLength: o.text.length }))
+  }))
+  
   // ====== Step 1: Normalize input (Unicode, spaces, brackets) ======
   const normalizedStem = normalizeInput(stem)
   
@@ -102,6 +110,18 @@ export async function classifyEnglishType(input: EnglishQuestionInput): Promise<
   const choicesShape = detectChoiceShape(optionTextsArray)
   const optionsCount = options.length
   const passageChars = normalizedAfterBlanks.replace(/\([A-D]\)/g, "").length
+  
+  // ====== Debug Log: After Detection ======
+  console.log('[router.kdebug]', JSON.stringify({
+    phase: 'detection',
+    blankNumbers,
+    numberedBlankCount,
+    likelyParagraphOrCloze,
+    choicesShape,
+    optionsCount,
+    passageChars,
+    passageLength,
+  }))
   
   // Detect parens blank for E1: ( ) or （ ）
   const hasParensBlankSingleLine = /\([A-D]\)|\([\)（]/.test(normalizedAfterBlanks) || stemLower.includes('( )') || stemLower.includes('（ ）')
@@ -202,6 +222,18 @@ export async function classifyEnglishType(input: EnglishQuestionInput): Promise<
   
   // Minimum confidence threshold
   if (confidence < 0.7) kind = 'unknown'
+  
+  // ====== Debug Log: After Core Classification ======
+  console.log('[router.kdebug]', JSON.stringify({
+    phase: 'core_classification',
+    kind,
+    confidence,
+    likelyParagraphOrCloze,
+    choicesShape,
+    optionsCount,
+    passageChars,
+    passageLength,
+  }))
   
   // E1: Vocabulary (單字題) - Apply new logic
   if (kind === 'E1' && confidence >= 0.9) {
