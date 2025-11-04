@@ -29,7 +29,7 @@ function detectChoiceShape(arr: string[]): 'sentences' | 'words/phrases' | 'mixe
   const sentenceLike = arr.filter((t) => {
     const s = t.trim()
     const tokens = s.split(/\s+/).length
-    return /^[A-Z]/.test(s) && /[.?!]$/.test(s) && tokens >= 6
+    return /^[A-Z]/.test(s) && /[.?!]$/.test(s) && tokens >= 4
   }).length
   
   const wordLike = arr.filter((t) => {
@@ -207,8 +207,8 @@ export async function classifyEnglishType(input: EnglishQuestionInput): Promise<
       confidence = 0.8
     }
   } else {
-    // E1 or E4: Check for single parens blank
-    const hasSingleParensBlank = /\(\s*\)/.test(normalizedAfterBlanks)
+    // E1 or E4: Check for single parens blank (with or without space)
+    const hasSingleParensBlank = /\(\s*\)/.test(normalizedAfterBlanks) || /\(\)/.test(normalizedAfterBlanks)
     
     if (hasSingleParensBlank && choicesShape === 'words/phrases' && optionsCount === 4 && passageChars < 300) {
       kind = 'E1'

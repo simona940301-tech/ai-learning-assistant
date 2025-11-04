@@ -413,10 +413,13 @@ export function parseReading(raw: string): ParsedReading {
   const normalized = normalizeInputForGuard(raw)
   
   // Guard 1: Skip if has numbered blanks (should be E6/E7)
-  if (/\(\d+\)/.test(normalized)) {
-    console.log('[reading-parser]', JSON.stringify({ 
-      skip: true, 
-      reason: 'numbered blanks found',
+  // Exclude 4-digit years (19xx, 20xx) and 3+ digit numbers (100+)
+  // Cloze blanks typically range from (1) to (99)
+  const numberedBlankPattern = /\((?!19\d{2}|20\d{2}|[1-9]\d{2,})\d+\)/
+  if (numberedBlankPattern.test(normalized)) {
+    console.log('[reading-parser]', JSON.stringify({
+      skip: true,
+      reason: 'numbered blanks found (refined)',
       normalized: normalized.substring(0, 100)
     }))
     return {

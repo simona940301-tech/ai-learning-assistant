@@ -1,0 +1,204 @@
+{
+  "summary": "ROOT CAUSE: reading-parser's numbered blank guard (/\\(\\d+\\)/) falsely matches years in parentheses like (2018), causing clean E4 reading questions to be rejected with skip:true. SECONDARY: E1 multi-question detection fails due to optionsCount !== 4 check. FIX: Refine regex to exclude 4-digit years and 3+ digit numbers.",
+  "primary_causes": [
+    {
+      "component": "reading-parser",
+      "evidence": "reading-parser.ts:416 - if (/\\(\\d+\\)/.test(normalized))",
+      "why_now": "Real-world questions contain years (2018, 2021, 2015) in parentheses, which match the overly broad numbered blank pattern. Test fixtures without years masked this bug until production use."
+    },
+    {
+      "component": "router",
+      "evidence": "router.ts:213 - if (hasSingleParensBlank && choicesShape === 'words/phrases' && optionsCount === 4)",
+      "why_now": "E1 multi-question support claimed in spec but not implemented. Router expects exactly 4 options; multi-Q input has 8 (4 per question), causing FALLBACK route."
+    }
+  ],
+  "secondary_causes": [
+    {
+      "component": "normalize",
+      "evidence": "router.ts:14 - .replace(/[０-９]/g, ...) converts fullwidth years （２０１８） to (2018)",
+      "why_now": "Normalization correctly converts fullwidth to halfwidth, but creates additional false positive surface for year patterns. This is correct behavior but amplifies the regex bug."
+    },
+    {
+      "component": "reading-parser",
+      "evidence": "reading-parser.ts:436 - if (choicesShape === 'words/phrases') skip",
+      "why_now": "Guard #2 (word-level choices) correctly rejects E1/E7-style options from E4 parsing, but causes E4 with word options to fall through to generic fallback instead of specific E4 template."
+    }
+  ],
+  "failed_heuristics": [
+    {
+      "name": "numbered blanks detector",
+      "signature": "/\\(\\d+\\)/",
+      "false_positive_on": "(2018), (2021), (2015), (1995), (44)",
+      "confidence": 1.0
+    },
+    {
+      "name": "E1 optionsCount check",
+      "signature": "optionsCount === 4",
+      "false_positive_on": "multi-question E1 with 2 questions × 4 options = 8 total",
+      "confidence": 1.0
+    },
+    {
+      "name": "choice shape - sentence threshold",
+      "signature": "tokens >= 6 for sentence classification",
+      "false_positive_on": "Short sentences like 'A short sentence.' (4 tokens) misclassified as words/phrases",
+      "confidence": 0.7
+    }
+  ],
+  "config_findings": {
+    "sentry": {
+      "status": "403",
+      "probable_reason": "Sentry integration commented out in error-boundary.tsx:34. No DSN configured. 403 error likely from browser extension or dev tools attempting to POST to Sentry endpoint.",
+      "impact": "NONE - Purely telemetry-related, does not affect classification logic."
+    },
+    "vercel": {
+      "overrides_or_env": "No environment-specific overrides detected. Regex behavior identical in dev/prod. Debug logs disabled in production (NODE_ENV check at router.ts:496, reading-parser.ts:417 visible in dev only)."
+    }
+  },
+  "kdebug_snapshot": {
+    "e4_oprah": {
+      "hasNumberedBlanks": false,
+      "hasSingleParensBlank": true,
+      "choicesShape": "words/phrases",
+      "optionsCount": 4,
+      "passageChars": 537,
+      "finalKind": "E4",
+      "parserSkip": true,
+      "parserReason": "word-level choices"
+    },
+    "e4_obama_2015": {
+      "hasNumberedBlanks": false,
+      "hasSingleParensBlank": true,
+      "choicesShape": "words/phrases",
+      "optionsCount": 4,
+      "passageChars": 613,
+      "finalKind": "E4",
+      "parserSkip": true,
+      "parserReason": "word-level choices"
+    },
+    "e6_sentences": {
+      "hasNumberedBlanks": true,
+      "blankNumbers": [1, 2, 3],
+      "numberedBlankCount": 3,
+      "choicesShape": "sentences",
+      "optionsCount": 5,
+      "passageChars": 739,
+      "finalKind": "E6",
+      "parserSkip": null
+    },
+    "e7_phrases": {
+      "hasNumberedBlanks": true,
+      "blankNumbers": [1, 2, 3, 4],
+      "numberedBlankCount": 4,
+      "choicesShape": "words/phrases",
+      "optionsCount": 8,
+      "passageChars": 418,
+      "finalKind": "E7",
+      "parserSkip": null
+    },
+    "e1_vocab_multi": {
+      "hasNumberedBlanks": false,
+      "hasSingleParensBlank": true,
+      "choicesShape": "words/phrases",
+      "optionsCount": 8,
+      "passageChars": 210,
+      "finalKind": "FALLBACK",
+      "parserSkip": true,
+      "parserReason": "word-level choices"
+    }
+  },
+  "repro": {
+    "fixtures": [
+      "analysis/fixtures/e4-oprah.txt",
+      "analysis/fixtures/e4-obama-2015.txt",
+      "analysis/fixtures/e6-sentences.txt",
+      "analysis/fixtures/e7-phrases.txt",
+      "analysis/fixtures/e1-vocab.txt"
+    ],
+    "expected_vs_actual": [
+      {
+        "fixture": "e4-oprah.txt",
+        "expected": "E4",
+        "actual": "E4",
+        "match": true,
+        "notes": "Router routes correctly to E4, but parser skips due to word-level choices guard (correct behavior for E4 fallback path)"
+      },
+      {
+        "fixture": "e4-obama-2015.txt",
+        "expected": "E4",
+        "actual": "E4",
+        "match": true,
+        "notes": "Works because years are NOT in parentheses (2015, 2014 bare numbers)"
+      },
+      {
+        "fixture": "e6-sentences.txt",
+        "expected": "E6",
+        "actual": "E6",
+        "match": true,
+        "notes": "Perfect detection, confidence 1.0"
+      },
+      {
+        "fixture": "e7-phrases.txt",
+        "expected": "E7",
+        "actual": "E7",
+        "match": true,
+        "notes": "Perfect detection, confidence 1.0"
+      },
+      {
+        "fixture": "e1-vocab.txt",
+        "expected": "E1",
+        "actual": "FALLBACK",
+        "match": false,
+        "notes": "Multi-question E1 rejected: optionsCount=8 (not 4)"
+      }
+    ]
+  },
+  "proposed_fixes": [
+    {
+      "title": "Fix A: Refine numbered blanks regex to exclude years",
+      "type": "regex",
+      "risk": "low",
+      "estimated_lines": 8,
+      "details": "Change /\\(\\d+\\)/ to /\\((?!19\\d{2}|20\\d{2}|[1-9]\\d{2,})\\d+\\)/ to exclude 4-digit years and 3+ digit numbers. Assumes cloze blanks are (1)-(99).",
+      "files": ["apps/web/lib/english/reading-parser.ts:416"]
+    },
+    {
+      "title": "Fix B: Contextual blank detection with sequential check",
+      "type": "flow",
+      "risk": "medium",
+      "estimated_lines": 35,
+      "details": "Extract all numbered blanks, check for sequential pattern (1,2,3) and cloze range (1-50). More robust but more complex.",
+      "files": ["apps/web/lib/english/reading-parser.ts:416-450"]
+    },
+    {
+      "title": "Fix C: E1 multi-question support",
+      "type": "flow",
+      "risk": "medium",
+      "estimated_lines": 70,
+      "details": "Split input by sentence boundaries, group options by question (4 per group), route as E1 if all groups match pattern. Requires spec clarification.",
+      "files": ["apps/web/lib/english/router.ts:210-280"]
+    },
+    {
+      "title": "Fix D: Lower sentence token threshold to 4",
+      "type": "regex",
+      "risk": "low",
+      "estimated_lines": 2,
+      "details": "Change tokens >= 6 to tokens >= 4 in detectChoiceShape to correctly classify short sentences.",
+      "files": ["apps/web/lib/english/router.ts:32"]
+    }
+  ],
+  "guardrails": [
+    "unit: years like (2018), (2021), (1995) don't trigger hasNumberedBlanks",
+    "unit: cloze blanks (1), (2), (15) DO trigger hasNumberedBlanks",
+    "unit: E4 chosen only when hasNumberedBlanks=false and no numbered blank pattern in parser",
+    "unit: E1 multi-question with 8 options (2×4) routes to E1 after Fix C",
+    "unit: E6/E7 detection unchanged after regex refinement",
+    "prop: if finalKind=E4, then either hasNumberedBlanks=false OR parser returned skip=true for valid reason",
+    "prop: numbered blanks (1)-(50) always route to E6/E7 consideration, never E4",
+    "prop: years (1900)-(2999) in parens never trigger numbered blanks guard",
+    "e2e: Oprah (2018) passage → E4",
+    "e2e: Obama (2015, 2014) passage → E4",
+    "e2e: Climate change (1)(2)(3) + sentences → E6",
+    "e2e: Tech passage (1)(2)(3) + phrases → E7",
+    "e2e: Multi-vocab () () + 8 options → E1 (after Fix C)"
+  ]
+}
