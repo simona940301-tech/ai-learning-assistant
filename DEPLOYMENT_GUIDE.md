@@ -1,4 +1,281 @@
-# 🚀 部署指南
+# 🚀 Vercel 自動部署指南
+
+## ✅ 目前狀態
+
+**已設置完成！** 你的專案現在已經連結到：
+- **GitHub Repo:** https://github.com/simona940301-tech/ai-learning-assistant
+- **當前分支:** `chore/cleanup-tutor-safe`
+- **Vercel Dashboard:** https://vercel.com/dashboard
+
+---
+
+## 🔄 自動部署原理
+
+### Vercel 自動部署流程
+
+```
+你做更改 → Git Commit → Git Push → GitHub → Vercel 自動偵測 → 自動部署
+```
+
+**每次你推送到 GitHub，Vercel 會自動：**
+1. 偵測到新的 commit
+2. 自動觸發建置 (build)
+3. 自動部署到預覽環境
+4. 提供預覽連結
+
+---
+
+## 📝 使用方式
+
+### 方法 1：快速部署腳本 ⚡ (推薦)
+
+```bash
+./scripts/quick-deploy.sh
+```
+
+**功能：**
+- ✅ 一鍵部署，無提示
+- ✅ 自動添加所有更改
+- ✅ 自動提交並推送
+
+**適用於：**
+- 快速修復 bug
+- UI 微調
+- 文案更新
+
+---
+
+### 方法 2：完整部署腳本 📋
+
+```bash
+./scripts/deploy-to-vercel.sh "你的提交訊息"
+```
+
+**功能：**
+- ✅ 顯示詳細部署進度
+- ✅ 檢查 Git 狀態
+- ✅ 自動添加、提交、推送
+- ✅ 顯示部署資訊和連結
+
+**範例：**
+```bash
+./scripts/deploy-to-vercel.sh "Fix: E6/E7 detection improvements"
+```
+
+---
+
+### 方法 3：手動部署 🛠️
+
+```bash
+# 1. 添加更改
+git add .
+
+# 2. 提交
+git commit -m "你的提交訊息
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+
+# 3. 推送 (觸發 Vercel 部署)
+git push origin chore/cleanup-tutor-safe
+```
+
+---
+
+## 📊 查看部署狀態
+
+### 1. Vercel Dashboard
+
+前往：https://vercel.com/dashboard
+
+你會看到：
+- 🟢 **Building** - 正在建置
+- 🟢 **Ready** - 部署完成
+- 🔴 **Error** - 建置失敗
+
+### 2. GitHub Actions (如果有設置)
+
+前往：https://github.com/simona940301-tech/ai-learning-assistant/actions
+
+查看建置狀態和日誌
+
+### 3. 預覽連結
+
+Vercel 會在每次部署後提供預覽連結，格式：
+```
+https://your-project-abc123.vercel.app
+```
+
+---
+
+## ⏱️ 部署時間
+
+- **預覽環境 (Preview):** 通常 2-3 分鐘
+- **生產環境 (Production):** 通常 3-5 分鐘
+
+---
+
+## 🔧 環境變數設置
+
+如果需要設置環境變數 (如 API keys)：
+
+### 方法 1：通過 Vercel Dashboard
+
+1. 前往 https://vercel.com/dashboard
+2. 選擇你的專案
+3. 點擊 **Settings** → **Environment Variables**
+4. 添加變數：
+   - `OPENAI_API_KEY`
+   - `SUPABASE_URL`
+   - `SUPABASE_ANON_KEY`
+   - 等等...
+
+### 方法 2：通過 Vercel CLI
+
+```bash
+vercel env add OPENAI_API_KEY production
+vercel env add OPENAI_API_KEY preview
+vercel env add OPENAI_API_KEY development
+```
+
+---
+
+## ❓ 常見問題
+
+### Q1: 推送後沒有自動部署？
+
+**檢查清單：**
+1. ✅ Vercel 專案是否已連結 GitHub repo？
+2. ✅ 是否推送到正確的分支？
+3. ✅ Vercel Dashboard 是否顯示建置記錄？
+
+**解決方法：**
+```bash
+# 確認遠端連結
+git remote -v
+
+# 確認當前分支
+git branch --show-current
+
+# 手動觸發部署
+vercel --prod
+```
+
+### Q2: 建置失敗怎麼辦？
+
+**查看日誌：**
+1. 前往 Vercel Dashboard
+2. 點擊失敗的部署
+3. 查看 **Build Logs**
+
+**常見錯誤：**
+- ❌ **Missing dependencies** → 檢查 `package.json`
+- ❌ **Environment variables missing** → 設置環境變數
+- ❌ **TypeScript errors** → 修復型別錯誤
+
+### Q3: 預覽連結在哪裡？
+
+**3 種方式獲取：**
+1. Vercel Dashboard → Deployments → 點擊最新部署 → Visit
+2. GitHub PR 評論中的 Vercel bot 留言
+3. Vercel CLI: `vercel ls`
+
+---
+
+## ✨ 最佳實踐
+
+### 1. 部署前測試
+
+```bash
+# 本地測試
+npm run build
+
+# 本地預覽
+npm run start
+```
+
+### 2. 使用有意義的提交訊息
+
+```bash
+# ✅ 好的提交訊息
+git commit -m "Fix: E6/E7 detection accuracy improvements"
+git commit -m "Feature: Add English grammar (E2) detection"
+git commit -m "Refactor: Simplify sentence detection logic"
+
+# ❌ 不好的提交訊息
+git commit -m "update"
+git commit -m "fix bug"
+git commit -m "wip"
+```
+
+### 3. 分支策略
+
+```
+main (生產環境)
+  ↑
+  └── chore/cleanup-tutor-safe (當前開發分支)
+       ↑
+       └── feature/new-feature (功能分支)
+```
+
+**推薦流程：**
+1. 在功能分支開發 (`feature/xxx`)
+2. 測試無誤後合併到開發分支 (`chore/cleanup-tutor-safe`)
+3. 最終合併到主分支 (`main`) → 自動部署到生產環境
+
+---
+
+## 📚 快速參考
+
+### 腳本位置
+
+```
+scripts/
+  ├── deploy-to-vercel.sh   # 完整部署腳本（有提示）
+  └── quick-deploy.sh        # 快速部署腳本（無提示）
+```
+
+### 常用指令
+
+```bash
+# 快速部署
+./scripts/quick-deploy.sh
+
+# 完整部署
+./scripts/deploy-to-vercel.sh "你的提交訊息"
+
+# 查看 Vercel 狀態
+vercel ls
+
+# 查看日誌
+vercel logs
+
+# 手動部署到生產環境
+vercel --prod
+```
+
+---
+
+## 🎯 總結
+
+✅ **已設置完成的內容：**
+- Git 連結到 GitHub
+- 自動部署腳本已創建
+- 每次推送自動觸發 Vercel 部署
+
+✅ **你現在可以：**
+- 使用 `./scripts/quick-deploy.sh` 快速部署
+- 使用 `./scripts/deploy-to-vercel.sh "訊息"` 完整部署
+- 每次推送到 GitHub 自動觸發部署
+
+🎉 **開始使用吧！**
+
+---
+
+---
+
+# 📋 原部署指南 (參考)
 
 ## 📋 預覽系統
 
