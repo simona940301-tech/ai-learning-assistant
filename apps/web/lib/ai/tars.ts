@@ -69,11 +69,14 @@ Output JSON only:`
       return { kind: 'vocab', confidence: 0.5, signals: ['invalid_kind_fallback'] }
     }
 
-    return {
+    const tarsResult = {
       kind,
       confidence: Math.max(0, Math.min(1, result.confidence || 0.7)),
       signals: Array.isArray(result.signals) ? result.signals : [],
     }
+
+    console.log(`[TARS] kind: ${kind} (${tarsResult.confidence.toFixed(2)})`)
+    return tarsResult
   } catch (error) {
     console.error('[TARS] Detection failed:', error)
     return { kind: 'vocab', confidence: 0.3, signals: ['error_fallback'] }

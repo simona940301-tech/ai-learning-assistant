@@ -14,15 +14,25 @@ interface ExplainCardV2Props {
 
 
 /**
- * Loading state with two-stage messages
+ * Loading state with 4-phase rotating messages
  */
-function LoadingState({ stage }: { stage: 'analyzing' | 'generating' }) {
-  const message = stage === 'analyzing' ? '正在分析題型…' : '正在生成詳解…'
-  
+function LoadingState({ currentStep }: { currentStep: number }) {
+  const loadingSteps = [
+    '正在分析題型…',
+    '正在檢測語意結構…',
+    '正在抽取關鍵訊息…',
+    '正在生成詳解…',
+  ]
+
+  const message = loadingSteps[currentStep] || loadingSteps[0]
+
   return (
     <motion.div
+      key={currentStep}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3 }}
       className="rounded-lg bg-zinc-900/60 border border-zinc-800/50 p-6 space-y-3"
     >
       <div className="flex items-center gap-2 text-sm text-zinc-400">
@@ -213,18 +223,34 @@ function ModeToggle({
 export default function ExplainCardV2({ inputText, mode: initialMode = 'fast', onModeChange }: ExplainCardV2Props) {
   const [vm, setVm] = useState<ExplainViewModel | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [loadingStage, setLoadingStage] = useState<'analyzing' | 'generating'>('analyzing')
+  const [loadingStep, setLoadingStep] = useState(0)
   const [mode, setMode] = useState<ExplainMode>(initialMode)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch explanation
+  // Fetch explanation with 4-phase loading
   useEffect(() => {
     if (!inputText.trim()) return
 
+    const loadingSteps = [
+      '正在分析題型…',
+      '正在檢測語意結構…',
+      '正在抽取關鍵訊息…',
+      '正在生成詳解…',
+    ]
+
     const fetchExplanation = async () => {
       setIsLoading(true)
-      setLoadingStage('analyzing')
       setError(null)
+      setLoadingStep(0)
+
+      // Phase 1-3: Rotate through loading messages (1.2s each)
+      for (let i = 0; i < loadingSteps.length - 1; i++) {
+        setLoadingStep(i)
+        await new Promise((resolve) => setTimeout(resolve, 1200))
+      }
+
+      // Phase 4: Final step before API call
+      setLoadingStep(loadingSteps.length - 1)
 
       try {
         // Track request
@@ -234,6 +260,8 @@ export default function ExplainCardV2({ inputText, mode: initialMode = 'fast', o
         })
 
         const startTime = performance.now()
+
+        console.log('[ExplainCardV2] Requesting explanation for:', inputText.substring(0, 50) + '...')
 
         const res = await fetch('/api/explain', {
           method: 'POST',
@@ -248,10 +276,14 @@ export default function ExplainCardV2({ inputText, mode: initialMode = 'fast', o
           throw new Error(`API error: ${res.status}`)
         }
 
-        setLoadingStage('generating')
         const data = await res.json()
-
         const latency = performance.now() - startTime
+
+        console.log('[ExplainCardV2] Explanation received:', {
+          kind: data.kind,
+          mode: data.mode,
+          latency_ms: Math.round(latency),
+        })
 
         // Track render
         track('explain.render', {
@@ -262,6 +294,7 @@ export default function ExplainCardV2({ inputText, mode: initialMode = 'fast', o
 
         setVm(data as ExplainViewModel)
         setIsLoading(false)
+        console.log('[ExplainCardV2] Rendering completed')
       } catch (err) {
         console.error('[ExplainCardV2] Error:', err)
         setError(err instanceof Error ? err.message : 'Unknown error')
@@ -293,9 +326,9 @@ export default function ExplainCardV2({ inputText, mode: initialMode = 'fast', o
         <ModeToggle currentMode={mode} onModeChange={handleModeChange} />
       </div>
 
-      {/* Loading State */}
+      {/* Loading State with 4-phase animation */}
       <AnimatePresence mode="wait">
-        {isLoading && <LoadingState key={loadingStage} stage={loadingStage} />}
+        {isLoading && <LoadingState key={loadingStep} currentStep={loadingStep} />}
       </AnimatePresence>
 
       {/* Error State */}

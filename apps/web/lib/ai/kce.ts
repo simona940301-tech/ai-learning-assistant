@@ -15,6 +15,8 @@ export async function runKCE(params: KCEParams): Promise<ExplainViewModel> {
   const { input, kind, mode } = params
   const text = input.text || ''
 
+  console.log(`[KCE] mode: ${mode}, kind: ${kind}`)
+
   if (mode === 'fast') {
     return generateFastExplanation(text, kind)
   } else {
