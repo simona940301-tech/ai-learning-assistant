@@ -84,3 +84,5 @@ vercel --prod
 1. Vercel Dashboard 中的 Root Directory 设置
 2. 环境变量是否正确设置
 3. `pnpm-lock.yaml` 是否最新
+
+

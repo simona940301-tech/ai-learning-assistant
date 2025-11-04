@@ -434,7 +434,7 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
       }
 
       if (imageFiles.length > 0) {
-        event.preventDefault()
+            event.preventDefault()
         
         // Limit to 1 file
         if (imageFiles.length > 1) {
@@ -453,12 +453,12 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
         }
         
         const file = imageFiles[0]
-        track('ask.input.paste.image', {
-          file_name: file.name,
-          file_size: file.size,
-          network_state: getNetworkState(),
-        })
-        handleImageFile(file, 'paste')
+            track('ask.input.paste.image', {
+              file_name: file.name,
+              file_size: file.size,
+              network_state: getNetworkState(),
+            })
+            handleImageFile(file, 'paste')
       }
     },
     [handleImageFile, onOcrComplete, t]

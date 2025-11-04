@@ -1882,22 +1882,22 @@ function prepareReadingVM(card: ExplainCard, base: ExplainBaseVM, data: ReturnTy
     } else {
       // Fallback: Generate natural reasoning (only if AI didn't provide it)
       // This should rarely happen if prompt is correct
-      if (questionType === 'vocab' && hasWhether && targetWord) {
-        const hasReplace = /replace|computer-based|assessment/i.test(evidenceLower)
-        const contextPhrase = hasReplace ? '是否更換電腦化測驗' : '抉擇'
+    if (questionType === 'vocab' && hasWhether && targetWord) {
+      const hasReplace = /replace|computer-based|assessment/i.test(evidenceLower)
+      const contextPhrase = hasReplace ? '是否更換電腦化測驗' : '抉擇'
         reasoningText = `題幹中的「${targetWord}」在文中指的是 whether 子句表達的「${contextPhrase}」。根據上下文，這個詞彙對應正確選項的語義。`
-      } else if (questionType === 'main' && hasFromTo) {
-        const nclbMatch = /nclb|standardized/i.test(evidenceLower)
-        const essaMatch = /essa|student-centered|personalized/i.test(evidenceLower)
-        const fromPhrase = nclbMatch ? 'NCLB 的標準化測驗' : '前者'
-        const toPhrase = essaMatch ? 'ESSA 的個別化評量' : '後者'
+    } else if (questionType === 'main' && hasFromTo) {
+      const nclbMatch = /nclb|standardized/i.test(evidenceLower)
+      const essaMatch = /essa|student-centered|personalized/i.test(evidenceLower)
+      const fromPhrase = nclbMatch ? 'NCLB 的標準化測驗' : '前者'
+      const toPhrase = essaMatch ? 'ESSA 的個別化評量' : '後者'
         reasoningText = `文章的核心轉變是從 ${fromPhrase} 轉向 ${toPhrase}。正確標題需同時包含轉變過程與核心焦點。`
-      } else if (questionType === 'inference') {
-        const hasCause = /because|cause|result|lead/i.test(evidenceLower)
+    } else if (questionType === 'inference') {
+      const hasCause = /because|cause|result|lead/i.test(evidenceLower)
         const cue = hasCause ? '因果' : '對比'
         reasoningText = `根據證據句中的${cue}邏輯關係，可以推論出作者的意圖。`
-      } else {
-        const keyTerm = stemWords[0] || '題意'
+    } else {
+      const keyTerm = stemWords[0] || '題意'
         reasoningText = `根據文章中的證據句，正確答案與「${keyTerm}」的語義一致。`
       }
     }

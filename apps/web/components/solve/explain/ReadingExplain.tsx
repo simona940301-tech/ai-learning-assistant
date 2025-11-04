@@ -162,14 +162,14 @@ export default function ReadingExplain({ view, onHighlightSync }: ReadingExplain
                       const isHighTrap = inlineNote?.trapRank === 2 && !isAnswer
 
                       return (
-                        <div
+                          <div
                           key={index}
                           className={`text-sm leading-relaxed px-3 py-2 rounded transition-colors ${
-                            isAnswer
+                              isAnswer
                               ? 'bg-green-500/10 border border-green-500/30 text-green-300'
                               : 'text-zinc-300 bg-zinc-900/30 border border-transparent'
-                          }`}
-                        >
+                            }`}
+                          >
                           <div className="flex items-start gap-2">
                             <span className={`font-medium ${isAnswer ? 'text-green-400' : 'text-zinc-500'}`}>
                               {letterForIndex(index)}.
@@ -235,8 +235,8 @@ export default function ReadingExplain({ view, onHighlightSync }: ReadingExplain
                             <span className="flex-1">{value}</span>
                           </div>
                         ))}
-                      </div>
-                    )}
+                  </div>
+                )}
 
                     {/* 證據句（內嵌引用，無標籤）— 如果 reasoning 中包含引用 */}
                     {question.evidenceOneLine && primaryEvidence && (

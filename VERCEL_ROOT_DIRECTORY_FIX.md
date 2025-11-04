@@ -133,3 +133,4 @@ Error: No Next.js version detected. Make sure your package.json has "next" in ei
 3. **觸發新部署**
 4. **檢查部署是否成功**
 
+

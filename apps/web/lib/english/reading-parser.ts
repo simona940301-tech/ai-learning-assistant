@@ -347,7 +347,7 @@ function parseQuestionChunk(
           }
           
           return {
-            key: slice.key,
+          key: slice.key,
             text: optionText,
           }
         })
