@@ -63,31 +63,25 @@ async function generateE1Template(
   stem: string,
   options: Array<{ key: string; text: string }>
 ): Promise<ExplainCard> {
-  const prompt = `你是英文題解專家。請針對以下語意判斷題提供結構化分析：
+  // Optimized prompt - concise and focused
+  const prompt = `語意判斷題。請提供 JSON（僅輸出 JSON）：
 
 題目：${stem}
-選項：
-${options.map((o) => `(${o.key}) ${o.text}`).join('\n')}
+選項：${options.map((o) => `(${o.key}) ${o.text}`).join(' ')}
 
-請以 JSON 格式回答（僅輸出 JSON，不要其他文字）：
+格式：
 {
   "translation": "題幹中譯",
-  "cues": ["解題線索1", "解題線索2", "解題線索3"],
+  "cues": ["線索1", "線索2", "線索3"],
   "options": [
-    {"key": "A", "text": "access", "zh": "中譯", "verdict": "unfit", "reason": "簡短理由（≤30字）"},
-    {"key": "B", "text": "supply", "zh": "中譯", "verdict": "unfit", "reason": "簡短理由（≤30字）"},
-    {"key": "C", "text": "attack", "zh": "中譯", "verdict": "fit", "reason": "簡短理由（≤30字）"},
-    {"key": "D", "text": "burden", "zh": "中譯", "verdict": "unfit", "reason": "簡短理由（≤30字）"}
+    {"key": "A", "zh": "中譯", "verdict": "unfit", "reason": "理由（≤30字）"},
+    {"key": "B", "zh": "中譯", "verdict": "fit", "reason": "理由（≤30字）"}
   ],
-  "correct": {"key": "C", "text": "attack", "reason": "為何正確"},
-  "summary": "此題考察名詞語意判斷，核心概念是..."
+  "correct": {"key": "B", "reason": "為何正確"},
+  "summary": "考點總結"
 }
 
-注意：
-- verdict 只能是 "fit" 或 "unfit"
-- 必須為每個選項提供 zh（中文翻譯）和 reason（判斷理由，≤30字）
-- correct.key 必須對應 verdict 為 "fit" 的選項
-- summary 用自然語氣總結考點，不要提及「英文」或科目名稱`
+要求：verdict 為 "fit"/"unfit"；correct.key 對應 verdict="fit" 的選項。Output JSON only:`
 
   const parsed = await chatCompletionJSON<any>(
     [{ role: 'user', content: prompt }],
