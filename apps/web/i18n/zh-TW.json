@@ -1,0 +1,64 @@
+{
+  "qr": {
+    "installAndStart": "安裝並開始練習",
+    "seeRecommendations": "看看其他推薦",
+    "installing": "安裝中...",
+    "starting": "啟動任務中...",
+    "success": "安裝成功！正在進入...",
+    "installFailed": "安裝失敗，請重試"
+  },
+  "micro": {
+    "todayLeft": "今日剩餘",
+    "questions": "題",
+    "eta": "預估 3-4 分鐘",
+    "streak": "連續天數",
+    "streakPlusOne": "+1 連續天數！",
+    "completed": "今日任務完成",
+    "start": "開始練習",
+    "continue": "繼續練習"
+  },
+  "badge": {
+    "saved": "已儲存"
+  },
+  "cta": {
+    "practiceAgain": "再練一題",
+    "practiceSimilar": "換一題類似的",
+    "practiceAnother": "再挑一題",
+    "loading": "載入中..."
+  },
+  "toast": {
+    "installFailed": "安裝失敗，請重試",
+    "missionStartFailed": "無法開始任務，請重試",
+    "networkError": "網路錯誤，請檢查連線"
+  },
+  "ask": {
+    "input": {
+      "toolbarLabel": "題目輸入工具列",
+      "placeholderSingle": "「拍題或貼文字」…",
+      "placeholderBatch": "「拍題或貼文字」…",
+      "sendLabel": "送出",
+      "action": {
+        "openMenu": "開啟上傳選單",
+        "uploadFile": "匯入檔案",
+        "uploadPhoto": "拍照或相簿"
+      },
+      "status": {
+        "hint": "Enter 送出 · Shift+Enter 換行",
+        "uploading": "正在擷取影像文字",
+        "uploadComplete": "已完成擷取",
+        "uploadCanceled": "已取消上傳",
+        "offline": "目前為離線狀態",
+        "retry": "重新嘗試",
+        "cancel": "取消"
+      },
+      "error": {
+        "fileType": "僅支援 JPG、PNG、WEBP、HEIC 圖片格式",
+        "fileSize": "圖片大小需小於 10MB",
+        "unknown": "圖片上傳失敗，請重試",
+        "timeout": "上傳逾時，請檢查網路後再試",
+        "canceled": "已取消上傳",
+        "heicFallback": "HEIC 轉換失敗，請改用 JPG 或 PNG"
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "phase": "warmup",
+  "subject": "MathA",
+  "confidence": 0.87,
+  "detected_keypoint": "ALG_ABS_VALUE",
+  "session_id": "session-mock-001",
+  "stem": "下列哪一個描述最符合「絕對值與不等式」？",
+  "options": [
+    { "option_id": "opt-1", "label": "絕對值不等式需分段處理" },
+    { "option_id": "opt-2", "label": "直接平方即可得到答案" },
+    { "option_id": "opt-3", "label": "絕對值皆可省略符號" },
+    { "option_id": "opt-4", "label": "絕對值恆為負" }
+  ]
+}

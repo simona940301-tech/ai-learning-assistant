@@ -1,83 +1,47 @@
 {
-  "name": "ai-learning-assistant",
+  "name": "plms-monorepo",
   "version": "1.0.0",
-  "description": "AI-powered learning assistant platform based on PLMS Agent System",
   "private": true,
+  "description": "PLMS - Multi-platform Learning Assistant System",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "type-check": "tsc --noEmit",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "db:push": "psql $DATABASE_URL -f db/sql/001_schema.sql",
-    "db:push:math": "psql $DATABASE_URL -f db/sql/003_math_schema.sql",
-    "seed:concepts": "tsx scripts/seed_concepts.ts",
-    "seed:concepts:simple": "tsx scripts/seed_concepts_simple.ts",
-    "import:math": "tsx scripts/import_math_data.ts",
-    "verify:solve": "tsx scripts/ping-solve.ts"
-  },
-  "dependencies": {
-    "@radix-ui/react-avatar": "^1.0.4",
-    "@radix-ui/react-dialog": "^1.0.5",
-    "@radix-ui/react-dropdown-menu": "^2.0.6",
-    "@radix-ui/react-label": "^2.0.2",
-    "@radix-ui/react-separator": "^1.0.3",
-    "@radix-ui/react-tabs": "^1.0.4",
-    "@supabase/auth-helpers-nextjs": "^0.10.0",
-    "@supabase/ssr": "^0.7.0",
-    "@supabase/supabase-js": "^2.75.1",
-    "class-variance-authority": "^0.7.0",
-    "clsx": "^2.0.0",
-    "framer-motion": "^10.16.5",
-    "lucide-react": "^0.316.0",
-    "next": "14.1.0",
-    "next-themes": "^0.2.1",
-    "openai": "^4.104.0",
-    "pg": "^8.16.3",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "tailwind-merge": "^2.2.0",
-    "tailwindcss-animate": "^1.0.7",
-    "tsx": "^4.20.6",
-    "zod": "^4.1.12"
+    "dev": "turbo run dev",
+    "dev:web": "turbo run dev --filter=web",
+    "dev:mobile": "turbo run dev --filter=mobile",
+    "dev:shared": "turbo run dev --filter=@plms/shared",
+    "build": "turbo run build",
+    "build:shared": "turbo run build --filter=@plms/shared",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,md,json}\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:subject": "vitest run -t subject",
+    "test:all": "vitest run",
+    "verify:subject": "node scripts/verify-subject-detection.mjs",
+    "verify:solve": "node scripts/verify-solve-system.mjs",
+    "verify:all": "npm run verify:subject && npm run verify:solve",
+    "verify:deployment": "node scripts/verify-deployment.mjs",
+    "clean:port": "./scripts/kill-port-3000.sh",
+    "clean:dev": "./scripts/kill-port-3000.sh --clean-next",
+    "clean:full": "./scripts/kill-port-3000.sh --full-clean",
+    "deploy": "./scripts/auto-deploy.sh"
   },
   "devDependencies": {
     "@types/node": "^20.10.5",
-    "@types/react": "^18.2.45",
-    "@types/react-dom": "^18.2.18",
-    "autoprefixer": "^10.4.16",
-    "eslint": "^8.56.0",
-    "eslint-config-next": "14.1.0",
-    "postcss": "^8.4.32",
     "prettier": "^3.1.1",
-    "tailwindcss": "^3.4.0",
-    "typescript": "^5.3.3"
+    "turbo": "^1.11.3",
+    "typescript": "^5.3.3",
+    "vitest": "^1.6.1"
   },
   "engines": {
     "node": ">=18.0.0",
-    "npm": ">=8.0.0"
+    "pnpm": ">=8.0.0"
   },
-  "keywords": [
-    "ai",
-    "education",
-    "learning",
-    "nextjs",
-    "typescript",
-    "supabase",
-    "gemini",
-    "plms",
-    "agent-system"
-  ],
-  "author": "PLMS Team",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/your-username/ai-learning-assistant.git"
-  },
-  "homepage": "https://github.com/your-username/ai-learning-assistant#readme",
-  "bugs": {
-    "url": "https://github.com/your-username/ai-learning-assistant/issues"
-  }
+  "packageManager": "pnpm@8.15.0"
 }

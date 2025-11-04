@@ -1,0 +1,23 @@
+{
+  "subject": "MathA",
+  "confidence": 0.9,
+  "detected_keypoint": "ALG_ABS_VALUE",
+  "phase": "solve",
+  "summary": "絕對值不等式先分段再解，檢查增根。",
+  "steps": [
+    "找出絕對值的臨界點並分段",
+    "於各區間去絕對值並解不等式",
+    "合併解集並檢查增根"
+  ],
+  "checks": [
+    "臨界點是否完整",
+    "平方後是否產生增根"
+  ],
+  "error_hints": [
+    "常見錯法：忽略分段，導致漏解"
+  ],
+  "extensions": [
+    "ALG_QUADRATIC_INEQUALITY",
+    "SEQ_AP"
+  ]
+}

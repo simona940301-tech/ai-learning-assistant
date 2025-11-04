@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "moduleResolution": "bundler",
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "declarationMap": true,
+    "outDir": "dist",
+    "rootDir": ".",
+    "skipLibCheck": true,
+    "stripInternal": true
+  },
+  "include": [
+    "index.ts",
+    "types/**/*",
+    "sdk/**/*",
+    "config/**/*",
+    "analytics/**/*",
+    "utils/**/*"
+  ],
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "test-sdk.ts"]
+}

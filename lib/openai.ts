@@ -50,25 +50,34 @@ export async function chatCompletion(
   return content
 }
 
-export async function chatCompletionJSON<T>(
+/**
+ * OpenAI Chat Completion with JSON response format
+ * Automatically parses and validates JSON response
+ */
+export async function chatCompletionJSON<T = unknown>(
   messages: ChatMessage[],
   options: ChatCompletionOptions = {}
 ): Promise<T> {
-  const raw = await chatCompletion(messages, { ...options, responseFormat: options.responseFormat ?? { type: 'json_object' } })
+  const raw = await chatCompletion(messages, {
+    ...options,
+    responseFormat: options.responseFormat ?? { type: 'json_object' }
+  })
+
   try {
     return JSON.parse(raw) as T
   } catch (error) {
-    throw new Error(`Failed to parse OpenAI JSON response: ${(error as Error).message}\nRaw: ${raw}`)
+    console.error('Failed to parse OpenAI JSON response:', raw)
+    throw new Error(`Failed to parse JSON response: ${(error as Error).message}\nRaw: ${raw}`)
   }
 }
 
-// 簡化的 API 調用函數，用於 tutor 端點
-export async function callOpenAIResponse({ 
-  input, 
-  maxOutputTokens = 2048 
-}: { 
+// Simplified API call for tutor endpoints
+export async function callOpenAIResponse({
+  input,
+  maxOutputTokens = 2048
+}: {
   input: string
-  maxOutputTokens?: number 
+  maxOutputTokens?: number
 }): Promise<string> {
   const messages: ChatMessage[] = [
     {
@@ -77,8 +86,8 @@ export async function callOpenAIResponse({
     }
   ]
 
-  return chatCompletion(messages, { 
-    model: 'gpt-4o-mini', 
-    maxOutputTokens 
+  return chatCompletion(messages, {
+    model: 'gpt-4o-mini',
+    maxOutputTokens
   })
 }

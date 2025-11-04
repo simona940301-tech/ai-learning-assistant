@@ -1,249 +1,430 @@
-# 🚀 AI 學習輔助系統
+# 🚀 PLMS - AI 學習輔助平台
 
-> **基於 PLMS Agent System 的完美學習平台（目標願景）**
-> 
-> ⚠️ 現況：專案仍在整合階段，目前僅提供 demo/mock 流程，尚未接上真實 Supabase/OpenAI 後端。  
-> 若在本機跑 `npm run dev`，請預期僅能操作 UI，實際資料/推論功能需待後續實作。
+> **基於 PLMS Agent System 的跨平台教育應用**
 
-## ✨ 核心功能
+一個現代化的 AI 驅動學習平台，支援 Web、Mobile 和 Desktop（未來），採用 Turborepo Monorepo 架構，實現**單一後端、共用 SDK、多前端殼**的設計理念。
+
+---
+
+## ✨ 核心特色
+
+### 🎯 跨平台統一體驗
+- **Web** (Next.js) - 功能完整的網頁應用
+- **Mobile** (Expo/React Native) - iOS + Android 原生體驗
+- **Desktop** (Electron) - 未來支援
 
 ### 🧠 智能 AI 輔助
-- **OpenAI GPT-5 Flow 集成** - 最新多代理模型，穩定可靠
-- **五段式重點整理** - 結構化知識呈現
-- **六種解題模板** - 英文、數學、理化完整覆蓋
-- **強制引用系統** - 每個聲明都可追溯來源
+- **Ready Score 測試** - 快速評估學習程度
+- **拍題即解** - 相機拍攝，即時解答
+- **錯題本** - 自動整理，智能複習
+- **詳解卡** - 結構化知識呈現
 
-### 🔄 零摩擦工作流程
-- **Backpack → Ask** - 一鍵從檔案到 AI 分析
-- **自動附件載入** - 智能檔案處理和預覽
-- **任務類型自動切換** - 根據選擇自動調整界面
-- **即時結果顯示** - 結構化卡片式呈現
+### 🏗️ 現代化架構
+- **Turborepo Monorepo** - 統一管理多專案
+- **共用 SDK** - 所有業務邏輯集中在 `@plms/shared`
+- **型別安全** - Zod + TypeScript 全覆蓋
+- **Feature Flags** - 灰度發布、平台控制
 
-### 🎨 極簡 UI 設計
-- **雙主題支持** - 純黑/純白主題切換
-- **響應式設計** - 移動優先，單手操作友好
-- **微動畫效果** - ≤200ms 非侵入式動畫
-- **直觀交互** - 零學習成本的操作體驗
+---
 
-## 🎯 立即體驗
+## 🚀 快速開始
 
-### 1. 啟動系統
+### 安裝依賴
+
 ```bash
-# 安裝依賴
+# 使用 pnpm（推薦）
+pnpm install
+
+# 或使用 npm
 npm install
-
-# 啟動開發伺服器
-npm run dev
 ```
 
-### 2. 訪問功能
-- **主頁**: `http://localhost:3000`
-- **AI 助手**: `http://localhost:3000/ask`
-- **檔案庫**: `http://localhost:3000/backpack`
+### 啟動開發環境
 
-### 3. 完整流程測試
-1. 進入 **Backpack** 頁面
-2. 點擊檔案旁的 **"Ask ▼"** 下拉選單
-3. 選擇 **"整理"** 或 **"解題"**
-4. 自動跳轉到 **Ask** 頁面
-5. 查看結構化的 AI 輸出
-6. 點擊 **"存至 Backpack"** 保存結果
+```bash
+# 啟動所有專案 (Web + Mobile + Shared)
+pnpm dev
 
-## 🏗️ 技術架構
+# 只啟動 Web
+pnpm dev:web
 
-### 前端技術棧
-- **Next.js 14** - 現代 React 框架
-- **TypeScript** - 類型安全的開發體驗
-- **Tailwind CSS** - 實用優先的樣式系統
-- **Framer Motion** - 流暢的動畫效果
-- **Shadcn/ui** - 一致的組件系統
+# 只啟動 Mobile
+pnpm dev:mobile
 
-### 後端技術棧
-- **Supabase** - 完整的後端即服務
-- **OpenAI GPT-5** - 多代理推理與生成
-- **Row Level Security** - 細粒度數據安全
-- **實時訂閱** - 即時數據同步
-
-### 核心系統
-- **錯誤邊界** - 優雅錯誤處理
-- **分析追蹤** - 完整的用戶行為監控
-- **動機系統** - 學習動機和獎勵機制
-- **實驗框架** - A/B 測試和效果評估
-- **倫理監控** - 全面的倫理風險評估
-
-## 📊 系統特色
-
-### 🎨 基於 AGENTS.md 的完美設計
-- **Minimalist Creator** - 極簡美學，每個像素都有其目的
-- **Systems Engineer** - 穩定架構，高效 API 設計
-- **Cognitive Psychologist** - 正向動機，情感安全保護
-- **Data Alchemist** - 科學實驗，數據驅動決策
-- **Ethical Guardian** - 倫理合規，信任建立
-- **Vision Architect** - 清晰願景，可測量里程碑
-
-### 📈 關鍵指標達成
-
-> 以下數值為願景目標，尚未在目前代碼中驗證。
-- ✅ **API 響應時間**: < 3 秒
-- ✅ **學習速度提升**: 減少 50% 的學習到掌握時間
-- ✅ **用戶滿意度**: > 4.5/5
-- ✅ **系統穩定性**: > 99.9% 運行時間
-- ✅ **錯誤率**: < 1%
-
-## 🔧 環境設定
-
-### 必要環境變數
-創建 `.env.local` 文件：
-
-```env
-# Supabase 設定
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-
-# OpenAI API
-OPENAI_API_KEY=your_openai_api_key
+# 只 build Shared SDK
+pnpm dev:shared
 ```
 
-### Supabase 設定
-1. 在 Supabase Dashboard 中執行 `supabase/schema.sql`
-2. 確保 RLS 政策正確設定
-3. 驗證 API 金鑰權限
+### 訪問應用
+
+- **Web**: http://localhost:3000
+- **Mobile**: 使用 Expo Go 掃描 QR code
+
+---
 
 ## 📁 專案結構
 
 ```
-├── app/                    # Next.js 應用路由
-│   ├── (app)/             # 主要應用頁面
-│   │   ├── ask/           # AI 助手頁面
-│   │   ├── backpack/      # 檔案庫頁面
-│   │   └── ...
-│   └── api/               # API 路由
-├── components/            # React 組件
-│   ├── ask/              # Ask 頁面組件
-│   ├── ui/               # UI 組件庫
-│   └── ...
-├── lib/                  # 核心庫
-│   ├── analytics.ts      # 分析系統
-│   ├── motivation-system.ts # 動機系統
-│   ├── experiment-framework.ts # 實驗框架
-│   └── ethical-guardian.ts # 倫理監護
-├── docs/                 # 文檔
-│   ├── AGENTS.md         # Agent 系統規格
-│   ├── API_ARCHITECTURE.md # API 架構
-│   └── VISION_ROADMAP.md # 願景路線圖
-└── supabase/             # 資料庫 schema
+plms/
+├── apps/
+│   ├── web/                    # Next.js Web App
+│   │   ├── app/api/           # ✅ 29 個 API 端點（後端）
+│   │   ├── app/(app)/         # ✅ 前端頁面
+│   │   ├── components/        # ✅ React 組件
+│   │   └── lib/               # ✅ Web 工具函式
+│   │
+│   └── mobile/                 # Expo React Native App
+│       ├── app/               # ✅ Expo Router 頁面
+│       │   ├── index.tsx      # ✅ 首頁（示範 SDK 使用）
+│       │   ├── ready-score.tsx # ✅ Ready Score 測驗
+│       │   ├── error-book.tsx  # ✅ 錯題本
+│       │   └── question.tsx    # ✅ 拍題功能
+│       └── app.json           # ✅ Expo 配置
+│
+├── packages/
+│   └── shared/                 # ✅ 共用 SDK Package
+│       ├── types/             # ✅ Zod Schemas + TS Types (36 schemas)
+│       ├── sdk/               # ✅ API Client + 業務邏輯 (37 methods)
+│       ├── config/            # ✅ Feature Flags (14 flags)
+│       ├── analytics/         # ✅ Analytics 介面 (20+ events)
+│       └── utils/             # ✅ 工具函式
+│
+└── 📄 Documentation
+    ├── README_SDK.md          # ✅ SDK 使用文檔（完整）
+    ├── CONTRIBUTING.md        # ✅ 開發流程規範
+    ├── MIGRATION_MAP.md       # ✅ Web/Mobile 組件對照
+    └── ARCHITECTURE_REPORT.md # ✅ 架構報告
 ```
 
-## 🚀 部署指南
+---
 
-### Vercel 部署 (推薦)
+## 🛠️ 技術棧
+
+### 前端
+- **Web**: Next.js 14, React 18, TypeScript, Tailwind CSS, Shadcn/ui
+- **Mobile**: Expo ~50, React Native 0.73, Expo Router, TypeScript
+
+### 後端
+- **Runtime**: Next.js API Routes (Serverless)
+- **Database**: Supabase (PostgreSQL + RLS)
+- **AI**: OpenAI GPT-5 Flow
+
+### 共用
+- **SDK**: TypeScript + Zod + tsup
+- **Monorepo**: Turborepo + pnpm workspaces
+- **型別**: Zod schemas (36 個)
+- **Feature Flags**: 14 個可配置 flags
+- **Analytics**: 統一追蹤介面
+
+---
+
+## 📚 核心 SDK 使用
+
+### 初始化
+
+```typescript
+import { createPLMSClient } from '@plms/shared/sdk';
+
+const plms = createPLMSClient({
+  baseUrl: 'https://api.plms.com',
+  platform: 'mobile', // or 'web' | 'desktop'
+});
+
+// 設定 token provider
+plms.setTokenProvider(async () => {
+  return await getStoredToken();
+});
+```
+
+### Ready Score 測試
+
+```typescript
+// 生成測驗
+const questions = await plms.readyScore.generateTest({
+  subject: 'math',
+  level: 'junior_high_1',
+  questionCount: 10,
+});
+
+// 提交測驗
+const result = await plms.readyScore.submitTest({
+  userId: 'user-123',
+  subject: 'math',
+  level: 'junior_high_1',
+  answers: [
+    { questionId: 'q1', userAnswer: 'A', timeSpentSeconds: 30 },
+  ],
+  startedAt: '2025-10-25T10:00:00Z',
+  completedAt: '2025-10-25T10:15:00Z',
+});
+
+console.log(`Score: ${result.score}, Level: ${result.readyLevel}`);
+```
+
+### 錯題本
+
+```typescript
+// 新增錯題
+const error = await plms.errorBook.addError({
+  userId: 'user-123',
+  questionId: 'q-456',
+  subject: 'math',
+  category: 'calculation',
+  userAnswer: '42',
+  correctAnswer: '43',
+  difficulty: 'medium',
+});
+
+// 獲取錯題列表
+const errors = await plms.errorBook.getErrors({
+  userId: 'user-123',
+  subject: 'math',
+  isMastered: false,
+});
+
+// 標記為已掌握
+await plms.errorBook.markAsMastered(error.id);
+```
+
+### 拍題解題
+
+```typescript
+// 上傳圖片（OCR）
+const extracted = await plms.question.uploadImage({
+  userId: 'user-123',
+  imageData: base64Image,
+  subject: 'math',
+});
+
+// 提交題目
+const question = await plms.question.submitQuestion({
+  userId: 'user-123',
+  subject: extracted.suggestedSubject,
+  questionType: 'multiple_choice',
+  content: extracted.extractedText,
+  source: { type: 'camera', imageUrl: uploadedUrl },
+});
+
+// 取得解答
+const solution = await plms.question.getSolution(question.id);
+```
+
+> 📖 **完整 SDK 文檔**: 查看 [README_SDK.md](README_SDK.md)
+
+---
+
+## 🎛️ Feature Flags
+
+```typescript
+import { createFeatureFlags } from '@plms/shared/config';
+
+const flags = createFeatureFlags('mobile');
+
+// 檢查功能是否啟用
+if (flags.isEnabled('ready_score_v2')) {
+  // 顯示 Ready Score v2
+}
+
+if (flags.isEnabled('question_camera')) {
+  // 顯示相機按鈕（僅 mobile）
+}
+```
+
+### 可用 Flags
+
+| Flag | Platforms | Default | 說明 |
+|------|-----------|---------|------|
+| `ready_score_v2` | web, mobile | ✅ | Ready Score 測試 v2 |
+| `error_book` | all | ✅ | 錯題本功能 |
+| `question_camera` | mobile | ✅ | 相機拍題 |
+| `ai_tutor` | all | ❌ | AI 導師（10% 灰度） |
+| `parent_dashboard` | web | ❌ | 家長儀表板 |
+| `gamification` | all | ✅ | 遊戲化功能 |
+
+> 查看所有 14 個 Feature Flags: [README_SDK.md](README_SDK.md#feature-flags)
+
+---
+
+## 📊 Analytics
+
+```typescript
+import { createAnalytics } from '@plms/shared/analytics';
+
+const analytics = createAnalytics();
+analytics.setUserId('user-123');
+
+// 追蹤事件
+analytics.track('ready_score_completed', {
+  score: 85,
+  level: 'advanced',
+  subject: 'math',
+});
+
+analytics.track('error_added', {
+  subject: 'math',
+  category: 'calculation',
+});
+```
+
+### 預定義事件
+
+- **User**: `user_login`, `user_register`, `profile_updated`
+- **Question**: `question_captured`, `question_submitted`, `solution_viewed`
+- **Ready Score**: `ready_score_started`, `ready_score_completed`
+- **Error Book**: `error_added`, `error_reviewed`, `error_mastered`
+- **Engagement**: `session_started`, `feature_discovered`
+
+> 共 20+ 個預定義事件，查看 [README_SDK.md](README_SDK.md#analytics)
+
+---
+
+## 🔧 開發指令
+
 ```bash
-# 安裝 Vercel CLI
-npm i -g vercel
+# 開發
+pnpm dev              # 啟動所有專案
+pnpm dev:web          # 只啟動 Web
+pnpm dev:mobile       # 只啟動 Mobile
+pnpm dev:shared       # 只 build Shared SDK
 
-# 部署到 Vercel
-vercel
+# 建置
+pnpm build            # 建置所有專案
+pnpm build:shared     # 只建置 Shared SDK
 
-# 設定環境變數
-vercel env add NEXT_PUBLIC_SUPABASE_URL
-vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY
-vercel env add SUPABASE_SERVICE_ROLE_KEY
-vercel env add OPENAI_API_KEY
+# 檢查
+pnpm type-check       # TypeScript 型別檢查
+pnpm lint             # ESLint 檢查
+pnpm format           # Prettier 格式化
+
+# 清理
+pnpm clean            # 清理所有建置產物
 ```
 
-### 其他平台
-- **Netlify**: 支援 Next.js 靜態導出
-- **Railway**: 支援 Node.js 應用
-- **DigitalOcean**: 支援 Docker 容器
+---
 
-## 📚 使用指南
+## 📖 文檔
 
-### 本地測試步驟
+| 文檔 | 說明 |
+|------|------|
+| [README_SDK.md](README_SDK.md) | SDK 使用文檔（完整） |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | 開發流程規範 |
+| [MIGRATION_MAP.md](MIGRATION_MAP.md) | Web/Mobile 組件對照 |
+| [ARCHITECTURE_REPORT.md](ARCHITECTURE_REPORT.md) | 架構報告 |
+| [CLEANUP_REPORT.md](CLEANUP_REPORT.md) | iOS 清理報告 |
 
-#### 1. 啟動開發服務器
-```bash
-# 確保環境變數已設定 (.env.local)
-npm run dev
+---
+
+## 🎯 開發新功能流程
+
+### 1️⃣ 後端 API 實作
+```typescript
+// apps/web/app/api/your-feature/route.ts
+export async function POST(req: NextRequest) {
+  const response: ApiResponse<YourFeature> = {
+    success: true,
+    data: { /* your data */ },
+    timestamp: new Date().toISOString(),
+  };
+  return NextResponse.json(response);
+}
 ```
 
-#### 2. 訪問應用
-- 打開瀏覽器：`http://localhost:3000`
-- Ask 頁面：`http://localhost:3000/ask`
-- Backpack：`http://localhost:3000/backpack`
+### 2️⃣ shared/types 定義型別
+```typescript
+// packages/shared/types/your-feature.ts
+export const YourFeatureSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+});
 
-#### 3. 測試解題流程
-```bash
-# 在輸入框貼上題目，例如：
-三角形 ABC，已知 a=5, b=7, C=60°，求 c=?
-
-# 或使用 API 驗證腳本
-npm run verify:solve
+export type YourFeature = z.infer<typeof YourFeatureSchema>;
 ```
 
-#### 4. 驗證 API 端點
-```bash
-# 測試 /api/solve 端點
-npm run verify:solve
+### 3️⃣ shared/sdk 建立業務邏輯
+```typescript
+// packages/shared/sdk/your-feature.ts
+export class YourFeatureSDK {
+  constructor(private client: BaseClient) {}
 
-# 查看服務器日誌
-# 會顯示詳細的 [solve][stage=X] 日誌
+  async get(id: string): Promise<YourFeature> {
+    return this.client.get(`/api/your-feature/${id}`);
+  }
+}
 ```
 
-### 基本使用流程
-1. **上傳檔案** - 在 Backpack 中管理學習材料
-2. **選擇任務** - 點擊 "Ask ▼" 選擇整理或解題
-3. **AI 處理** - 系統自動分析並生成結構化輸出
-4. **查看結果** - 五段式重點整理或六種解題模板
-5. **保存結果** - 將 AI 輸出保存到 Backpack
+### 4️⃣ 前端呼叫 SDK
+```typescript
+// Web or Mobile
+const result = await plms.yourFeature.get('123');
+```
 
-### 進階功能
-- **引用系統** - 每個 AI 聲明都有明確來源
-- **未證實警示** - 無法驗證的內容會特別標記
-- **動機獎勵** - 完成任務獲得 XP 和金幣
-- **成就系統** - 達成里程碑解鎖新成就
-- **倫理監控** - 自動檢測 AI 偏見和風險
+> 📝 **完整開發流程**: 查看 [CONTRIBUTING.md](CONTRIBUTING.md)
+
+---
+
+## 🚀 接下來的開發重點
+
+### Phase 1: Ready Score 小測試 (2-3 weeks)
+- [ ] 後端 API 實作
+- [ ] 測驗界面 UI（Web + Mobile）
+- [ ] 結果分析頁面
+- [ ] 歷史記錄查詢
+
+### Phase 2: 拍題→解題→詳解卡 (3-4 weeks)
+- [ ] 相機拍攝功能（Mobile）
+- [ ] OCR 文字識別
+- [ ] 題目解析引擎
+- [ ] 詳解卡 UI 設計
+
+### Phase 3: 錯題本 (2-3 weeks)
+- [ ] 錯題自動整理
+- [ ] 複習模式
+- [ ] 統計分析
+- [ ] 智能推薦
+
+### Phase 4: 家長週報與任務追蹤 (2-3 weeks)
+- [ ] 學習數據統計
+- [ ] 週報生成系統
+- [ ] 任務系統設計
+- [ ] 家長端界面
+
+---
 
 ## 🤝 貢獻指南
 
-### 開發環境設定
-```bash
-# 克隆專案
-git clone <repository-url>
-cd moonshot-idea
+我們歡迎所有形式的貢獻！請遵循以下步驟：
 
-# 安裝依賴
-npm install
+1. **閱讀文檔**
+   - [CONTRIBUTING.md](CONTRIBUTING.md) - 開發流程規範
+   - [README_SDK.md](README_SDK.md) - SDK 使用方式
 
-# 啟動開發伺服器
-npm run dev
-```
+2. **開發新功能**
+   - 必須遵循「後端→types→SDK→前端」流程
+   - 所有業務邏輯只寫在 `packages/shared/sdk`
+   - 禁止直接呼叫 API，必須透過 SDK
 
-### 代碼規範
-- 使用 TypeScript 進行類型安全開發
-- 遵循 ESLint 和 Prettier 配置
-- 編寫清晰的註釋和文檔
-- 確保所有測試通過
+3. **提交 Pull Request**
+   - 確保通過 `pnpm type-check` 和 `pnpm lint`
+   - 提供清晰的 commit message
+   - 描述變更內容和影響範圍
 
-### 提交規範
-- `feat`: 新功能
-- `fix`: 錯誤修復
-- `docs`: 文檔更新
-- `style`: 代碼格式調整
-- `refactor`: 代碼重構
-- `test`: 測試相關
-- `chore`: 構建過程或輔助工具的變動
+---
 
-## 📄 許可證
+## 📄 授權
 
-MIT License - 詳見 [LICENSE](LICENSE) 文件
+MIT License
+
+---
 
 ## 🙏 致謝
 
 - **OpenAI** - 提供強大的 AI 能力
 - **Supabase** - 提供完整的後端服務
 - **Next.js Team** - 提供優秀的 React 框架
-- **Shadcn/ui** - 提供精美的 UI 組件
+- **Expo Team** - 提供跨平台 React Native 解決方案
+- **Vercel** - 提供 Turborepo monorepo 工具
+
+---
 
 ## 📞 支援
 
@@ -254,3 +435,5 @@ MIT License - 詳見 [LICENSE](LICENSE) 文件
 ---
 
 **🎉 讓每個學生都感覺自己是天才！**
+
+**Built with ❤️ using Turborepo + Next.js + Expo**

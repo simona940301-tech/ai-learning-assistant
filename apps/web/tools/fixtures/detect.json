@@ -1,0 +1,14 @@
+{
+  "phase": "detect",
+  "subject": "English",
+  "confidence": 0.92,
+  "confidence_delta": 0.18,
+  "second_best": {
+    "subject": "MathA",
+    "confidence": 0.74
+  },
+  "subject_choices": [
+    { "subject": "English", "confidence": 0.92 },
+    { "subject": "MathA", "confidence": 0.74 }
+  ]
+}

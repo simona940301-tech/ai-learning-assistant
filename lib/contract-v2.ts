@@ -1,336 +1,146 @@
-/**
- * Contract v2: Unified Response Schema for Ask-AI System
- *
- * All core endpoints (detect, warmup, answer, solve) return a consistent structure
- * that supports the entire flow from question detection to detailed explanation.
- */
-
-// ========================================
-// Core Domain Types
-// ========================================
-
-export type Subject =
-  | 'Chinese' | 'English' | 'MathA' | 'MathB'
-  | 'Physics' | 'Chemistry' | 'Biology' | 'Earth'
-  | 'History' | 'Geography' | 'Civics'
-  | 'unknown'
-
-export type Difficulty = 'easy' | 'medium' | 'hard'
-export type Phase = 'detect' | 'warmup' | 'answer' | 'solve'
-
-// ========================================
-// Contract v2 Response Structure
-// ========================================
+import { z } from 'zod'
 
 /**
- * Unified response contract for all Ask-AI endpoints
+ * Subject types
  */
-export interface ContractV2Response {
-  // Core identifiers
-  phase: Phase
-  session_id?: string
-  question_id?: string
+export type Subject = 'english' | 'math' | 'chinese' | 'social' | 'science' | 'unknown'
 
-  // Subject classification
+/**
+ * ExplainCard model (canonical format)
+ */
+export interface ExplainCard {
+  focus: string
+  summary: string
+  steps: string[]
+  details: string[]
+}
+
+/**
+ * SolveResult from API
+ */
+export interface SolveResult {
   subject: Subject
-  subject_confidence: number // 0-1
-  subject_alternatives?: Array<{
-    subject: Subject
-    confidence: number
-  }>
+  question?: string
+  explainCard?: ExplainCard
+  explanation?: any // Legacy support
+  meta?: any
+}
 
-  // Keypoint/concept identification
-  keypoint?: {
-    id: string
-    code: string
-    name: string
-    category?: string
+/**
+ * Zod schema for ExplainCard
+ */
+export const ExplainCardSchema = z.object({
+  focus: z.string().min(1),
+  summary: z.string().min(1),
+  steps: z.array(z.string()).min(1),
+  details: z.array(z.string()).min(1),
+})
+
+/**
+ * Normalize unknown value to string array
+ */
+function toStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter(Boolean).map(String)
+  }
+  if (typeof value === 'string' && value.trim()) {
+    return [value.trim()]
+  }
+  return []
+}
+
+/**
+ * Normalize SolveResult to ExplainCard
+ * Handles various response formats from different API versions
+ */
+export function normalizeSolveResult(result: any): ExplainCard | null {
+  if (!result) {
+    console.warn('[ExplainPipeline] Missing result')
+    return null
   }
 
-  // Question data
-  question?: {
-    stem: string
-    options?: Array<{
-      id: string
-      label: string
-      is_correct?: boolean
-    }>
+  console.log('[ExplainPipeline] Normalizing result keys:', Object.keys(result))
+
+  // Try to find card data in various locations
+  const rawCard =
+    result.explainCard ||
+    result.explanation?.card ||
+    result.explanation ||
+    result.card ||
+    null
+
+  if (!rawCard) {
+    console.warn('[ExplainPipeline] No card data found in:', Object.keys(result))
+    return null
   }
 
-  // Explanation/solution (populate in solve phase)
-  explanation?: {
-    summary: string // One-sentence concept summary
-    steps: string[] // Solution steps (3-5 items)
-    grammar_table?: Array<{
-      category: string
-      description: string
-      example: string
-    }>
-    checks: string[] // Verification checklist
-    error_hints: string[] // Common mistakes
-    extensions: string[] // Related concepts
+  // Build canonical ExplainCard
+  const card: ExplainCard = {
+    focus: String(rawCard.focus || rawCard.keyPoint || '考點待補充'),
+    summary: String(rawCard.summary || rawCard.oneLiner || '解析待補充'),
+    steps: toStringArray(rawCard.steps || rawCard.reasoning || []),
+    details: toStringArray(rawCard.details || rawCard.explanation || []),
   }
 
-  // Answer judgment (populate in answer phase)
-  judge?: {
-    user_answer: string
-    expected_answer: string | null
-    is_correct: boolean
-    rationale: string | null
-  }
-
-  // UI control flags
-  ui?: {
-    show_warmup: boolean
-    show_explanation: boolean
-    enable_save: boolean
-    enable_retry: boolean
-  }
-
-  // Telemetry
-  telemetry?: {
-    latency_ms: number
-    model_used?: string
-    tokens_used?: number
-  }
-
-  // Debug information (only in dev/debug mode)
-  debug?: {
-    raw_input?: string
-    detection_details?: Record<string, unknown>
-    errors?: string[]
+  // Validate with Zod
+  try {
+    return ExplainCardSchema.parse(card)
+  } catch (err) {
+    console.error('[ExplainPipeline] Validation failed:', err)
+    // Return partial card anyway (graceful degradation)
+    return card
   }
 }
 
-// ========================================
-// Response Builders (helpers for endpoints)
-// ========================================
-
-export function createDetectResponse(
-  subject: Subject,
-  confidence: number,
-  options?: {
-    session_id?: string
-    alternatives?: Array<{ subject: Subject; confidence: number }>
-    debug?: Record<string, unknown>
-  }
-): ContractV2Response {
-  return {
-    phase: 'detect',
-    session_id: options?.session_id,
-    subject,
-    subject_confidence: confidence,
-    subject_alternatives: options?.alternatives,
-    debug: options?.debug ? { detection_details: options.debug } : undefined,
-  }
-}
-
-export function createWarmupResponse(
-  session_id: string,
-  subject: Subject,
-  keypoint: { id: string; code: string; name: string; category?: string },
-  question: {
-    stem: string
-    options: Array<{ id: string; label: string; is_correct?: boolean }>
-  },
-  options?: {
-    confidence?: number
-    telemetry?: ContractV2Response['telemetry']
-  }
-): ContractV2Response {
-  return {
-    phase: 'warmup',
-    session_id,
-    subject,
-    subject_confidence: options?.confidence ?? 0.8,
-    keypoint,
-    question,
-    ui: {
-      show_warmup: true,
-      show_explanation: false,
-      enable_save: false,
-      enable_retry: false,
-    },
-    telemetry: options?.telemetry,
-  }
-}
-
-export function createAnswerResponse(
-  session_id: string,
-  subject: Subject,
-  judge: {
-    user_answer: string
-    expected_answer: string | null
-    is_correct: boolean
-    rationale: string | null
-  },
-  options?: {
-    keypoint?: ContractV2Response['keypoint']
-    telemetry?: ContractV2Response['telemetry']
-  }
-): ContractV2Response {
-  return {
-    phase: 'answer',
-    session_id,
-    subject,
-    subject_confidence: 1.0, // Already determined in warmup
-    keypoint: options?.keypoint,
-    judge,
-    ui: {
-      show_warmup: false,
-      show_explanation: true,
-      enable_save: false,
-      enable_retry: false,
-    },
-    telemetry: options?.telemetry,
-  }
-}
-
-export function createSolveResponse(
-  session_id: string,
-  subject: Subject,
-  keypoint: { id: string; code: string; name: string; category?: string },
-  explanation: {
-    summary: string
-    steps: string[]
-    grammar_table?: Array<{ category: string; description: string; example: string }>
-    checks: string[]
-    error_hints: string[]
-    extensions: string[]
-  },
-  options?: {
-    difficulty?: Difficulty
-    past_papers?: Array<{
-      id: string
-      stem: string
-      tags: string[]
-    }>
-    telemetry?: ContractV2Response['telemetry']
-  }
-): ContractV2Response {
-  return {
-    phase: 'solve',
-    session_id,
-    subject,
-    subject_confidence: 1.0,
-    keypoint,
-    explanation: {
-      ...explanation,
-      // Attach past papers as extensions if provided
-      extensions: [
-        ...explanation.extensions,
-        ...(options?.past_papers?.map(p => `歷屆試題: ${p.stem.substring(0, 50)}...`) ?? []),
+/**
+ * Create a mock ExplainCard for testing
+ */
+export function createMockCard(subject: Subject = 'english'): ExplainCard {
+  const cards: Record<Subject, ExplainCard> = {
+    english: {
+      focus: '語境選詞與固定搭配',
+      summary: '根據句意「恐怖攻擊」，選擇 attack',
+      steps: [
+        '1. 分析句子結構：reports + people injured',
+        '2. 判斷語境：terrorist 恐怖分子',
+        '3. 選擇固定搭配：terrorist attack',
+      ],
+      details: [
+        'terrorist attack 是固定搭配，表示「恐怖攻擊」。',
+        '其他選項不符合語境：access（通道）、supply（供應）、burden（負擔）。',
       ],
     },
-    ui: {
-      show_warmup: false,
-      show_explanation: true,
-      enable_save: true,
-      enable_retry: true,
+    math: {
+      focus: '基本三角函數',
+      summary: '使用正弦定理或餘弦定理求解',
+      steps: ['1. 列出已知條件', '2. 套用定理', '3. 計算結果'],
+      details: ['正弦定理：a/sin(A) = b/sin(B) = c/sin(C)'],
     },
-    telemetry: options?.telemetry,
+    chinese: {
+      focus: '閱讀理解與文意判斷',
+      summary: '根據上下文推測作者意圖',
+      steps: ['1. 找出關鍵句', '2. 分析語氣', '3. 推導結論'],
+      details: ['注意文章的修辭手法與隱含意義'],
+    },
+    social: {
+      focus: '歷史事件與因果關係',
+      summary: '理解事件背景與影響',
+      steps: ['1. 確認時間點', '2. 分析原因', '3. 推導結果'],
+      details: ['需結合時代背景理解'],
+    },
+    science: {
+      focus: '科學原理與實驗',
+      summary: '理解實驗步驟與結果',
+      steps: ['1. 確認實驗目的', '2. 分析步驟', '3. 推導結論'],
+      details: ['注意控制變因與觀察變因'],
+    },
+    unknown: {
+      focus: '題目分析',
+      summary: '根據題目內容判斷考點',
+      steps: ['1. 閱讀題目', '2. 分析關鍵字', '3. 推導答案'],
+      details: ['請提供更多題目資訊以獲得更精確的解析'],
+    },
   }
-}
 
-// ========================================
-// Validation & Type Guards
-// ========================================
-
-export function isValidPhase(phase: string): phase is Phase {
-  return ['detect', 'warmup', 'answer', 'solve'].includes(phase)
-}
-
-export function isValidSubject(subject: string): subject is Subject {
-  const validSubjects = [
-    'Chinese', 'English', 'MathA', 'MathB',
-    'Physics', 'Chemistry', 'Biology', 'Earth',
-    'History', 'Geography', 'Civics', 'unknown',
-  ]
-  return validSubjects.includes(subject)
-}
-
-export function validateContractV2(response: unknown): response is ContractV2Response {
-  if (!response || typeof response !== 'object') return false
-
-  const r = response as Partial<ContractV2Response>
-
-  // Required fields
-  if (!r.phase || !isValidPhase(r.phase)) return false
-  if (!r.subject || !isValidSubject(r.subject)) return false
-  if (typeof r.subject_confidence !== 'number') return false
-  if (r.subject_confidence < 0 || r.subject_confidence > 1) return false
-
-  return true
-}
-
-// ========================================
-// Legacy Adapters (for backward compatibility)
-// ========================================
-
-/**
- * Adapts old WarmupResponse to Contract v2
- */
-export function adaptLegacyWarmup(legacy: {
-  phase: string
-  subject: string
-  confidence: number
-  detected_keypoint: string
-  session_id: string
-  stem: string
-  options: Array<{ option_id: string; label: string }>
-  answer_index?: number
-}): ContractV2Response {
-  return createWarmupResponse(
-    legacy.session_id,
-    legacy.subject as Subject,
-    {
-      id: legacy.detected_keypoint,
-      code: legacy.detected_keypoint,
-      name: legacy.detected_keypoint.replace(/_/g, ' '),
-    },
-    {
-      stem: legacy.stem,
-      options: legacy.options.map((opt, idx) => ({
-        id: opt.option_id,
-        label: opt.label,
-        is_correct: idx === (legacy.answer_index ?? -1),
-      })),
-    },
-    { confidence: legacy.confidence }
-  )
-}
-
-/**
- * Adapts old SolveResponse to Contract v2
- */
-export function adaptLegacySolve(
-  legacy: {
-    subject: string
-    confidence: number
-    detected_keypoint: string
-    phase: string
-    summary: string
-    steps: string[]
-    checks: string[]
-    error_hints: string[]
-    extensions: string[]
-  },
-  session_id: string
-): ContractV2Response {
-  return createSolveResponse(
-    session_id,
-    legacy.subject as Subject,
-    {
-      id: legacy.detected_keypoint,
-      code: legacy.detected_keypoint,
-      name: legacy.detected_keypoint.replace(/_/g, ' '),
-    },
-    {
-      summary: legacy.summary,
-      steps: legacy.steps,
-      checks: legacy.checks,
-      error_hints: legacy.error_hints,
-      extensions: legacy.extensions,
-    }
-  )
+  return cards[subject] || cards.unknown
 }

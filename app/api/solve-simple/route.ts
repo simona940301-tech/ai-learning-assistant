@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import type { Subject } from '@/lib/contract-v2'
+import { detectSubject, mapSubjectToContract, validateSubject } from '@/lib/ai/detectSubject'
 
 const SolveRequestSchema = z
   .object({
@@ -107,7 +109,16 @@ export async function POST(request: NextRequest) {
     const { session_id, question_id, prompt: promptInput, subject: subjectInput, keypoint_code, mode } =
       SolveRequestSchema.parse(body)
 
-    const subjectName = subjectInput || 'MathA'
+    // Detect subject from prompt if not explicitly provided
+    let subjectName = subjectInput || 'MathA'
+    if (promptInput && !subjectInput) {
+      const detectedKind = detectSubject(promptInput)
+      const guardedKind = validateSubject(promptInput, detectedKind)
+      subjectName = mapSubjectToContract(guardedKind)
+      console.log('[subject detected]', detectedKind, '→', guardedKind, '→', subjectName)
+    } else {
+      console.log('[subject provided]', subjectName)
+    }
 
     // Determine primary keypoint
     let primaryKeypoint = mockKeypoints[keypoint_code || 'TRIG_COS_LAW'] // fallback
@@ -138,7 +149,7 @@ export async function POST(request: NextRequest) {
     const extensions = ['相關概念1', '相關概念2']
 
     // Create Contract v2 response
-    const { createSolveResponse, type Subject } = await import('@/lib/contract-v2')
+    const { createSolveResponse } = await import('@/lib/contract-v2')
     const { trackAPICall, trackError } = await import('@/lib/heartbeat')
 
     const contractResponse = createSolveResponse(

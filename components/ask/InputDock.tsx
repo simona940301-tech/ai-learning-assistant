@@ -36,7 +36,16 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
     if (!value.trim() || isBusy) return
-    await onSubmit(value.trim())
+
+    const submitValue = value.trim()
+    console.log(`[InputDock] Submitting at ${new Date().toISOString()}:`, submitValue)
+
+    // Clear input IMMEDIATELY (optimistic UI)
+    onChange('')
+
+    // Then submit (non-blocking for UI)
+    await onSubmit(submitValue)
+    console.log(`[InputDock] Submit complete, input cleared`)
   }
 
   const handleFilePick = async (file: File | null) => {
@@ -123,19 +132,28 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
 
         <div className="flex flex-1 flex-col gap-1">
           <textarea
-            defaultValue={value}
+            value={value}
             placeholder={placeholder}
             onKeyDown={async (event) => {
               if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault()
                 const target = event.target as HTMLTextAreaElement
-                await onSubmit(target.value.trim())
-                target.value = ''
+                const submitValue = target.value.trim()
+
+                if (!submitValue || isBusy) return
+
+                console.log(`[InputDock] Enter pressed at ${new Date().toISOString()}`)
+
+                // Clear input IMMEDIATELY
+                onChange('')
+
+                // Then submit
+                await onSubmit(submitValue)
+                console.log(`[InputDock] Enter submit complete, input cleared`)
               }
             }}
-            onInput={(event) => {
-              const target = event.target as HTMLTextAreaElement
-              onChange(target.value)
+            onChange={(event) => {
+              onChange(event.target.value)
             }}
             className="w-full min-h-[40px] p-3 border-0 rounded-2xl bg-transparent text-sm leading-6 text-[#F1F5F9] placeholder:text-[#A9B7C8]/60 focus:outline-none resize-none"
           />

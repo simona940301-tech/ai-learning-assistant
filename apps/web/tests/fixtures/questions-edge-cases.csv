@@ -1,0 +1,16 @@
+stem,choices,answer,explanation,subject,difficulty
+"下列何者是質數？",A. 4|B. 6|C. 7|D. 9,C,質數是只能被1和自身整除的數字，7符合此定義。,數學,medium
+"下列何者為質數？",A. 4|B. 6|C. 7|D. 9,C,質數只有兩個因數：1和它本身。7只能被1和7整除。,數學,medium
+"如圖所示，三角形ABC的面積為？![triangle](https://example.com/triangle.png)",A. 12|B. 15|C. 18|D. 21,C,使用公式 面積 = (底 × 高) ÷ 2 = (6 × 6) ÷ 2 = 18,數學,hard
+"請選出正確的化學反應式",A. H2 + O2 → H2O|B. 2H2 + O2 → 2H2O|C. H2 + 2O2 → H2O|D. 3H2 + O2 → 2H2O,B,,化學,expert
+"下列哪個選項描述了光合作用的過程？",A. 植物吸收二氧化碳|B. 植物釋放氧氣|C. 植物利用光能製造葡萄糖|D. 以上皆是,D,光合作用包含吸收CO2、釋放O2和製造葡萄糖的過程。,生物,
+"英文單字 'apple' 的中文意思是？",A. 香蕉|B. 蘋果|C. 橘子|D. 葡萄,B,Apple在中文中是蘋果的意思。,英文,easy
+"下列何者為台灣最高峰？",A. 合歡山|B. 玉山|C. 雪山|D. 阿里山,B,玉山主峰海拔3952公尺，是台灣第一高峰。,地理,easy
+"下列何者為臺灣最高峰？",A. 合歡山|B. 玉山|C. 雪山|D. 阿里山,B,玉山主峰標高3952公尺，為台灣百岳之首。,地理,easy
+"計算：25 × 4 = ?",A. 90|B. 95|C. 100|D. 105,C,25乘以4等於100，可以用 (20+5)×4 = 80+20 = 100 來計算。,數學,easy
+"What is the capital of France?",A. London|B. Berlin|C. Paris|D. Madrid,C,Paris is the capital and most populous city of France.,英文,medium
+"下列何者不是再生能源？",A. 太陽能|B. 風能|C. 煤炭|D. 水力,C,煤炭是化石燃料，屬於不可再生能源。太陽能、風能和水力都是可再生的。,自然,medium
+"Python 中如何定義函數？",A. function myFunc()|B. def myFunc():|C. func myFunc()|D. define myFunc(),B,Python使用 def 關鍵字來定義函數，後面接函數名稱和冒號。,資訊,hard
+"一個正方形的邊長為5cm，其面積為多少平方公分？",A. 10|B. 20|C. 25|D. 30,C,正方形面積 = 邊長²，所以 5² = 25 平方公分。,數學,easy
+"下列哪一個是偶數？",A. 3|B. 5|C. 7|D. 8,D,偶數是可以被2整除的整數，8÷2=4，所以8是偶數。,數學,easy
+"地球繞太陽公轉一圈需要多久？",A. 一個月|B. 六個月|C. 一年|D. 兩年,C,地球繞太陽公轉一圈約需365.25天，即一年的時間。,自然,easy
