@@ -326,7 +326,7 @@ export default function ExplainCardV2({ inputText, mode: initialMode = 'fast', o
     }
 
     fetchExplanation()
-  }, [inputText, mode])
+  }, [inputText, mode, conservative])
 
   // Handle mode change
   const handleModeChange = (newMode: ExplainMode) => {
