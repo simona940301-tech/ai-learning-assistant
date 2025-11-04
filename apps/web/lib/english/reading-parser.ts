@@ -462,7 +462,7 @@ export function parseReading(raw: string): ParsedReading {
     }
   }
 
-  const optionMatches = Array.from(normalizedForParser.matchAll(OPT))
+  const parserOptionMatches = Array.from(normalizedForParser.matchAll(OPT))
 
   let passage = ''
   let qaBlock = ''
@@ -472,13 +472,13 @@ export function parseReading(raw: string): ParsedReading {
     // Found question header
     passage = lines.slice(0, firstQLine).join('\n').trim()
     qaBlock = lines.slice(firstQLine).join('\n')
-  } else if (optionMatches.length >= 3) {
+  } else if (parserOptionMatches.length >= 3) {
     // No question header, but found options
     fallbackSingle = true
     pushWarning(warnings, 'Detected options but no question header')
 
     // Try to find passage boundary by looking for options
-    const firstOptionIndex = optionMatches[0].index ?? 0
+    const firstOptionIndex = parserOptionMatches[0].index ?? 0
     const textBeforeOptions = normalizedForParser.slice(0, firstOptionIndex)
 
     // Look for last paragraph or sentence boundary before options
