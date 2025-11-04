@@ -1,5 +1,6 @@
 {
-  "buildCommand": "pnpm install && pnpm --filter web build",
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "pnpm turbo run build --filter=web",
   "outputDirectory": "apps/web/.next",
   "installCommand": "pnpm install"
 }
