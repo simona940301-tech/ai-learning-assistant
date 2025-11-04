@@ -269,49 +269,22 @@ async function generateE6Template(
   const blankCount = parsed.blanks.length
   const optionKeys = options.map(o => o.key).join(', ')
 
-  // Enhanced prompt with strict schema requirements
-  const prompt = `你是英文閱讀理解專家。請針對以下篇章結構題提供詳解：
+  // Optimized prompt - concise and focused on core requirements
+  const prompt = `篇章結構題，${blankCount}個空格。請提供 JSON 陣列（僅輸出 JSON）：
 
-文章（共${blankCount}個空格）：
+文章：
 ${parsed.normalizedPassage.replace(/<mark[^>]*>____<\/mark>/g, '____')}
 
-選項（${options.length}個）：
+選項：
 ${options.map((o) => `(${o.key}) ${o.text}`).join('\n')}
 
-請為【全部${blankCount}個空格】提供 JSON 格式回答（僅輸出 JSON，不要其他文字）：
+格式：
 [
-  {
-    "blankIndex": 1,
-    "answer": "A",
-    "answerZh": "選項A的中文翻譯",
-    "connection": "空格前提到…，後句/下一段描述…，因此…（篇章銜接，必填，≥10字）",
-    "reason": "理由＋解題依據（一句話，≤30字，必填）",
-    "evidence": "對應的原文句（若可定位，必填完整句子）",
-    "discourseTag": "轉折|發展|總結|因果|舉例|對比|定義|時間" // 可選
-  },
-  {
-    "blankIndex": 2,
-    "answer": "E",
-    "answerZh": "選項E的中文翻譯",
-    "connection": "空格前提到…，後句/下一段描述…，因此…（篇章銜接，必填，≥10字）",
-    "reason": "理由＋解題依據（一句話，≤30字，必填）",
-    "evidence": "對應的原文句（若可定位，必填完整句子）",
-    "discourseTag": "轉折|發展|總結|因果|舉例|對比|定義|時間" // 可選
-  }
-  // ... 繼續為所有${blankCount}個空格提供答案
+  {"blankIndex": 1, "answer": "A", "answerZh": "翻譯", "connection": "空格前後邏輯（≥10字）", "reason": "理由（≤30字）", "evidence": "原文句"},
+  {"blankIndex": 2, "answer": "B", "answerZh": "翻譯", "connection": "空格前後邏輯（≥10字）", "reason": "理由（≤30字）", "evidence": "原文句"}
 ]
 
-關鍵要求：
-1. 必須為全部${blankCount}個空格提供答案（blankIndex: 1 到 ${blankCount}）
-2. answer 欄位必須是單一字母（${optionKeys}），不能包含選項文字
-3. connection 必須說明篇章銜接邏輯（≥10字），描述「空格前提到…，後句/下一段描述…，因此…」
-4. reason 必須合併理由與依據，≤30字，必須具體說明為何選此選項
-5. evidence 必須是原文完整句（若可定位），用於後續高亮顯示
-6. discourseTag 可選，僅在有明確語用關係時標註
-7. 禁止使用空泛表達如「最合適」「最能反映主題」；必須基於具體語境與邏輯
-8. 數組必須包含${blankCount}個物件，每個對應一個空格
-
-Output JSON array with ${blankCount} items:`
+要求：${blankCount}個物件；answer 為單一字母（${optionKeys}）；connection 和 reason 必填。Output JSON only:`
 
   const parsedResponse = await chatCompletionJSON<any>(
     [{ role: 'user', content: prompt }],

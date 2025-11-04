@@ -4,6 +4,7 @@ import type { VocabItem, EnglishQuestionInput } from '@/lib/contracts/explain'
 /**
  * Extract vocabulary hints from question stem and options
  * Returns 3-5 key terms with optional translations
+ * Optimized: LLM enrichment has 2s timeout, falls back to basic vocab if slow
  */
 export async function extractVocab(input: EnglishQuestionInput): Promise<VocabItem[]> {
   const { stem, options } = input
@@ -58,28 +59,34 @@ export async function extractVocab(input: EnglishQuestionInput): Promise<VocabIt
     .sort((a, b) => b.score - a.score)
     .slice(0, 5)
   
-  // Convert to VocabItem (with basic translations via LLM if available)
-  const vocabItems: VocabItem[] = []
+  // Convert to VocabItem (basic vocab, ready to return immediately)
+  const basicVocab: VocabItem[] = scored.map(({ word }) => ({
+    term: word,
+    pos: undefined,
+    zh: undefined,
+  }))
   
-  for (const { word } of scored) {
-    vocabItems.push({
-      term: word,
-      pos: undefined, // Could be enhanced with POS tagging
-      zh: undefined,  // Could be enhanced with dictionary lookup
-    })
-  }
-  
-  // If we have API access, enrich with translations
-  if (process.env.OPENAI_API_KEY && vocabItems.length > 0) {
+  // If we have API access, try to enrich with translations (with timeout)
+  if (process.env.OPENAI_API_KEY && basicVocab.length > 0) {
     try {
-      const enriched = await enrichVocabWithLLM(vocabItems)
+      // Set 2-second timeout to avoid blocking the pipeline
+      const enriched = await Promise.race([
+        enrichVocabWithLLM(basicVocab),
+        new Promise<VocabItem[]>((resolve) => 
+          setTimeout(() => {
+            console.log('[vocab-extractor] LLM enrichment timeout (2s), returning basic vocab')
+            resolve(basicVocab)
+          }, 2000)
+        ),
+      ])
       return enriched
     } catch (error) {
       console.warn('[vocab-extractor] LLM enrichment failed, returning basic vocab:', error)
+      return basicVocab
     }
   }
   
-  return vocabItems.slice(0, 5)
+  return basicVocab
 }
 
 /**

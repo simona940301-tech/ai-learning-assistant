@@ -42,23 +42,23 @@ export async function orchestrateEnglishExplanation(
       elapsed_ms: Date.now() - startTime,
     })
     
-    // Step 2: Generate template card
-    console.log('[explain_pipeline] Generating template card for type:', route.type)
-    const cardDraft = await generateTemplateCard({
-      route,
-      stem: input.stem,
-      options: input.options,
-      meta: input.meta,
-    })
+    // Step 2 & 3: Generate template card AND extract vocabulary IN PARALLEL (optimization)
+    console.log('[explain_pipeline] Generating template card and extracting vocab in parallel...')
+    const [cardDraft, vocab] = await Promise.all([
+      generateTemplateCard({
+        route,
+        stem: input.stem,
+        options: input.options,
+        meta: input.meta,
+      }),
+      extractVocab(input), // With timeout protection
+    ])
     
-    // Step 3: Extract vocabulary
-    console.log('[explain_pipeline] Extracting vocabulary hints...')
-    const vocab = await extractVocab(input)
     cardDraft.vocab = vocab
     
-    console.log('[explain_pipeline] Vocabulary extracted:', vocab.length, 'items')
+    console.log('[explain_pipeline] Card generated and vocab extracted:', vocab.length, 'items')
     
-    // Step 4: Validate card
+    // Step 4: Validate card (simplified - only critical checks)
     console.log('[explain_pipeline] Validating card...')
     const validated = validateCard(cardDraft, input)
 
@@ -97,12 +97,13 @@ export async function orchestrateEnglishExplanation(
     }
     
     // Success
-    console.log('[explain_pipeline] ✅ Card validated successfully')
+    const totalTime = Date.now() - startTime
+    console.log('[explain_pipeline] ✅ Card validated successfully in', totalTime, 'ms')
     console.log('[event] explain_card_generated', {
       kind: validated.card.kind,
       has_vocab: validated.card.vocab.length > 0,
       option_count: validated.card.options.length,
-      elapsed_ms: Date.now() - startTime,
+      elapsed_ms: totalTime,
     })
     
     return {
