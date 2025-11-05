@@ -108,8 +108,8 @@ function convertExplainViewModelToCard(vm: ExplainViewModel, inputText: string):
     })
   }
 
-  // Fallback: Parse options from inputText if no distractorNotes
-  if (options.length === 0) {
+  // Fallback: Parse options from inputText if not enough options (need min 2 for validation)
+  if (options.length < 2) {
     const optionMatches = inputText.matchAll(/\(([A-E])\)\s*([^\n(]+)/gi)
     for (const match of optionMatches) {
       const key = match[1].toUpperCase()
