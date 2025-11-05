@@ -54,7 +54,7 @@ fi
 echo ""
 echo "📋 Test 3: Explain Executor (Structure Validation)"
 EXPLAIN_RESPONSE=$(curl -s http://localhost:3000/api/exec/explain -X POST -H "Content-Type: application/json" \
-  -d '{"questionText":"There are reports coming in that a number of people have been injured in a terrorist . (A) access (B) supply (C) attack (D) burden","subject":"english","showSteps":true,"format":"full"}')
+  -d '{"questionText":"There are reports coming in that a number of people have been injured in a terrorist . (A) access (B) supply (C) attack (D) burden","subject":"english"}')
 
 # Check for required fields
 HAS_ANSWER=$(echo $EXPLAIN_RESPONSE | grep -o '"answer"' | wc -l)
@@ -62,7 +62,17 @@ HAS_FOCUS=$(echo $EXPLAIN_RESPONSE | grep -o '"focus"' | wc -l)
 HAS_SUMMARY=$(echo $EXPLAIN_RESPONSE | grep -o '"summary"' | wc -l)
 HAS_STEPS=$(echo $EXPLAIN_RESPONSE | grep -o '"steps"' | wc -l)
 HAS_DETAILS=$(echo $EXPLAIN_RESPONSE | grep -o '"details"' | wc -l)
-HAS_EXTENSION=$(echo $EXPLAIN_RESPONSE | grep -o '延伸練習' | wc -l)
+HAS_E0=$(echo $EXPLAIN_RESPONSE | grep -o '"type":"E0_QUESTION_SET"' | wc -l)
+HAS_REASON=$(echo $EXPLAIN_RESPONSE | grep -o '"one_line_reason"' | wc -l)
+HAS_CONFIDENCE=$(echo $EXPLAIN_RESPONSE | grep -o '"confidence_badge"' | wc -l)
+HAS_DISTRACTOR=$(echo $EXPLAIN_RESPONSE | grep -o '"distractor_rejects"' | wc -l)
+HAS_EVIDENCE=$(echo $EXPLAIN_RESPONSE | grep -o '"evidence_sentence"' | wc -l)
+
+if [ $HAS_E0 -gt 0 ]; then
+    echo "   ✅ Response wrapped in E0_QUESTION_SET"
+else
+    echo "   ❌ Missing E0_QUESTION_SET wrapper"
+fi
 
 if [ $HAS_ANSWER -gt 0 ] && [ $HAS_FOCUS -gt 0 ] && [ $HAS_SUMMARY -gt 0 ] && [ $HAS_STEPS -gt 0 ] && [ $HAS_DETAILS -gt 0 ]; then
     echo "   ✅ All four sections present: 📘考點, 💡解析, 🧩步驟, 📖詳解"
@@ -70,10 +80,10 @@ else
     echo "   ❌ Missing required sections"
 fi
 
-if [ $HAS_EXTENSION -eq 0 ]; then
-    echo "   ✅ No \"延伸練習\" found"
+if [ $HAS_REASON -gt 0 ] && [ $HAS_CONFIDENCE -gt 0 ] && [ $HAS_DISTRACTOR -gt 0 ] && [ $HAS_EVIDENCE -gt 0 ]; then
+    echo "   ✅ VS³ contract fields present (reason/confidence/distractors/evidence)"
 else
-    echo "   ⚠️  Found \"延伸練習\" in response (should be removed)"
+    echo "   ⚠️  VS³ contract fields missing"
 fi
 
 echo ""

@@ -4,125 +4,183 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { chatCompletionJSON } from '@/lib/openai'
-import { ExplainResultSchema, type ExplainResult } from '@/lib/solve-types'
+import { ExplainResultSchema, SolveSubjectSchema, type ExplainResult, type SolveSubject } from '@/lib/solve-types'
 import { z } from 'zod'
+import { buildMockExplanation } from '@/lib/ai/mock-explanation'
+import {
+  runAuraExplanationPipeline,
+  AURA_CONTRACT_VERSION,
+  extractChoices,
+  type AuraJudgeReport,
+} from '@/lib/ai/aura-contract'
 
 const RequestSchema = z.object({
   questionText: z.string().min(1),
-  subject: z.enum(['english', 'math', 'chinese', 'social', 'science', 'unknown']),
-  showSteps: z.boolean().default(true),
-  format: z.enum(['full', 'compact']).default('full'),
+  subject: SolveSubjectSchema,
 })
 
-const EXPLAIN_SYSTEM_PROMPT = `You are an expert GSAT tutor helping high school students.
-Generate a crisp explanation that fits a four-part mobile card.
-
-Return STRICT JSON with this structure:
-{
-  "answer": "答案：[A/B/C/D or actual answer]",
-  "focus": "考點關鍵詞（例如：關係子句）",
-  "summary": "一句話解析，說明為何考這個點",
-  "steps": [
-    "步驟1：簡短說明",
-    "步驟2：簡短說明",
-    "步驟3：簡短說明"
-  ],
-  "details": [
-    "詳解第 1 段（1-2 句）",
-    "詳解第 2 段（可省略）",
-    "詳解第 3 段（可省略）"
-  ],
-  "grammarTable": [
-    {
-      "category": "類別",
-      "description": "說明",
-      "example": "範例"
-    }
-  ],
-  "encouragement": "學長姐風格的鼓勵話（可省略）"
-}
-
-Rules:
-- focus: ONE short noun phrase only
-- summary: exactly one sentence
-- steps: 3-5 concise items, each under 50 chars
-- details: 1-3 short paragraphs, no markdown, no bullet lists
-- grammarTable: Only for English/Chinese subjects, max 3 rows; omit otherwise
-- Do NOT mention延伸練習 or外部連結
-- Keep tone warm but efficient`
+const DEFAULT_CHOICES = ['選項A', '選項B', '選項C', '選項D']
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
+  let parsedInput: z.infer<typeof RequestSchema> | null = null
 
   try {
     const body = await request.json()
-    const { questionText, subject, showSteps, format } = RequestSchema.parse(body)
+    parsedInput = RequestSchema.parse(body)
+    const { questionText, subject } = parsedInput
 
     console.log('[exec/explain] question:', questionText.substring(0, 100), 'subject:', subject)
 
-    // Build prompt
-    let userPrompt = `Question: ${questionText}\nSubject: ${subject}\n\nGenerate explanation.`
+    const parsedChoices = extractChoices(questionText)
 
-    if (format === 'compact') {
-      userPrompt += '\nUse compact format: shorter steps, no grammar table.'
+    let fallbackUsed = false
+    let fallbackReason: string | undefined
+    let judgeReport: AuraJudgeReport | null = null
+    let contractAttempts = 0
+    let explanation: ExplainResult | null = null
+
+    try {
+      const pipeline = await runAuraExplanationPipeline(questionText, subject, { choices: parsedChoices })
+      judgeReport = pipeline.judge ?? null
+      contractAttempts = pipeline.attempts
+
+      if (pipeline.explanation && pipeline.approved) {
+        explanation = pipeline.explanation
+      } else {
+        fallbackUsed = true
+        fallbackReason = pipeline.lastError
+          ? `pipeline_error:${pipeline.lastError}`
+          : pipeline.judge?.issues?.join('|') || 'judge_rejected'
+      }
+    } catch (error) {
+      console.error('[exec/explain] pipeline error:', error)
+      fallbackUsed = true
+      fallbackReason = error instanceof Error ? `exception:${error.message}` : 'unknown_exception'
     }
 
-    if (!showSteps) {
-      userPrompt += '\nReturn empty steps array (student wants answer only).'
+    if (!explanation) {
+      explanation = buildMockExplanation(questionText, subject, parsedChoices)
     }
 
-    // Call OpenAI
-    const result = await chatCompletionJSON<ExplainResult>(
-      [
-        { role: 'system', content: EXPLAIN_SYSTEM_PROMPT },
-        { role: 'user', content: userPrompt },
-      ],
-      { model: 'gpt-4o', temperature: 0.3 }
-    )
-
-    // Validate
-    const validated = ExplainResultSchema.parse(result)
-
-    // Remove grammar table for non-language subjects
-    if (subject !== 'english' && subject !== 'chinese') {
-      validated.grammarTable = undefined
-    }
+    const validated = ExplainResultSchema.parse(explanation)
+    const normalizedChoices = buildChoiceTexts(parsedChoices)
+    const questionSet = buildQuestionSetPayload(questionText, validated, subject, normalizedChoices)
 
     const latency = Date.now() - startTime
     console.log('[exec/explain] generated in', latency, 'ms')
 
     return NextResponse.json({
-      result: validated,
-      _meta: { latency_ms: latency },
+      ...questionSet,
+      _meta: {
+        latency_ms: latency,
+        fallback: fallbackUsed,
+        fallback_reason: fallbackReason,
+        subject,
+        contractVersion: AURA_CONTRACT_VERSION,
+        contractAttempts,
+        judge: judgeReport,
+      },
     })
   } catch (error) {
     console.error('[exec/explain] error:', error)
     const latency = Date.now() - startTime
 
-    // Fallback safe answer (per spec: >12s timeout → safe minimal answer)
-    if (latency > 12000) {
-      const fallback: ExplainResult = {
-        answer: '答案：請參考解析',
-        focus: '核心概念',
-        summary: '這題考察基礎概念的理解與應用',
-        steps: ['仔細閱讀題幹', '識別關鍵字詞', '運用相關概念解題'],
-        details: ['伺服器忙碌時提供安全回覆：先確認題幹、鎖定考點，再以基本概念檢查選項。'],
-        encouragement: '慢慢來，多練習就會進步！',
-      }
-      return NextResponse.json({
-        result: fallback,
-        _meta: { latency_ms: latency, fallback: true },
-      })
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        {
+          error: 'invalid_request',
+          message: 'Invalid explain request payload',
+          details: error.issues,
+          _meta: { latency_ms: latency },
+        },
+        { status: 400 }
+      )
     }
 
-    return NextResponse.json(
-      {
-        error: 'explain_executor_failed',
-        message: error instanceof Error ? error.message : 'Unknown error',
-        _meta: { latency_ms: latency },
-      },
-      { status: 500 }
+    const subject: SolveSubject = parsedInput?.subject ?? 'unknown'
+    const questionText = parsedInput?.questionText ?? ''
+    const fallbackChoices = extractChoices(questionText)
+    const fallbackExplanation = buildMockExplanation(questionText, subject, fallbackChoices)
+    const validated = ExplainResultSchema.parse(fallbackExplanation)
+    const questionSet = buildQuestionSetPayload(
+      questionText,
+      validated,
+      subject,
+      buildChoiceTexts(fallbackChoices)
     )
+
+    return NextResponse.json({
+      ...questionSet,
+      _meta: {
+        latency_ms: latency,
+        fallback: true,
+        fallback_reason: error instanceof Error ? `exception:${error.message}` : 'unknown_exception',
+        subject,
+        contractVersion: AURA_CONTRACT_VERSION,
+        contractAttempts: 0,
+        judge: null,
+      },
+    })
+  }
+}
+
+function buildChoiceTexts(choices: ReturnType<typeof extractChoices>): string[] {
+  if (choices.length >= 2) {
+    return choices.map((choice, index) => {
+      const trimmed = choice.text.trim()
+      return trimmed.length > 0 ? trimmed : `選項${String.fromCharCode(65 + index)}`
+    })
+  }
+  return [...DEFAULT_CHOICES]
+}
+
+function extractAnswerLabel(answer: string): string | undefined {
+  const match = answer.match(/[A-H]/i)
+  return match ? match[0].toUpperCase() : undefined
+}
+
+function buildQuestionSetPayload(
+  questionText: string,
+  explanation: ExplainResult,
+  subject: SolveSubject,
+  choices: string[]
+) {
+  const answerLabel = extractAnswerLabel(explanation.answer)
+
+  return {
+    type: 'E0_QUESTION_SET' as const,
+    source_context: 'exec.explain',
+    questions: [
+      {
+        qid: 1,
+        kind: 'unknown',
+        stem: questionText,
+        choices: choices.length >= 2 ? choices : DEFAULT_CHOICES,
+        answer: explanation.answer,
+        answer_label: answerLabel,
+        one_line_reason: explanation.one_line_reason,
+        distractor_rejects: explanation.distractor_rejects ?? [],
+        meta: {
+          subject,
+          focus: explanation.focus,
+          summary: explanation.summary,
+          steps: explanation.steps,
+          details: explanation.details,
+          confidence_badge: explanation.confidence_badge,
+          contract_version: AURA_CONTRACT_VERSION,
+          contract: explanation,
+          evidence_sentence: explanation.evidence_sentence,
+          tested_rule: explanation.tested_rule,
+          grammatical_focus: explanation.grammatical_focus,
+          transition_word: explanation.transition_word,
+          before_after_fit: explanation.before_after_fit,
+          native_upgrade: explanation.native_upgrade,
+          maws_scores: explanation.maws_scores,
+          encouragement: explanation.encouragement,
+          grammarTable: explanation.grammarTable,
+        },
+      },
+    ],
   }
 }

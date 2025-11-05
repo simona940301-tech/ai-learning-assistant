@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { nanoid } from 'nanoid'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -33,7 +33,16 @@ import { ContextualCompletionExplain } from './explain/ContextualCompletionExpla
 import { toQuestionSetVM } from '@/lib/mapper/explain-presenter'
 import { detectMultipleQuestions } from '@/lib/explain/multi-question-detector'
 import QuestionSetExplain from './explain/QuestionSetExplain'
-import type { QuestionSetVM } from '@/lib/mapper/vm/question-set'
+import type { QuestionSetVM, E0Question } from '@/lib/mapper/vm/question-set'
+import { supabaseBrowserClient } from '@/lib/supabase'
+import { useFeatureFlag } from '@/lib/feature-flags'
+import {
+  analyseQuestionSet,
+  detectQuestionSetKind,
+  type QuestionSetAnalysis,
+  type QuestionSetKind,
+} from '@/lib/explain/question-set-detector'
+import { X } from 'lucide-react'
 
 interface ExplainCardV2Props {
   inputText: string
@@ -68,6 +77,192 @@ function LoadingState({ currentStep }: { currentStep: number }) {
         <span>{message}</span>
       </div>
     </motion.div>
+  )
+}
+
+const CONFIDENCE_LABEL: Record<string, string> = {
+  high: '高信心',
+  medium: '中信心',
+  low: '低信心',
+}
+
+const CONFIDENCE_STYLE: Record<string, string> = {
+  high: 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200',
+  medium: 'border-amber-400/40 bg-amber-500/15 text-amber-200',
+  low: 'border-red-400/40 bg-red-500/15 text-red-200',
+}
+
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mediaQuery = window.matchMedia(`(max-width: ${breakpoint}px)`)
+    const update = () => setIsMobile(mediaQuery.matches)
+    update()
+    mediaQuery.addEventListener('change', update)
+    return () => mediaQuery.removeEventListener('change', update)
+  }, [breakpoint])
+
+  return isMobile
+}
+
+interface ChipDescriptor {
+  id: string
+  label: string
+  detail?: string
+  helper?: string
+}
+
+interface ChipPanelProps {
+  chip: ChipDescriptor | null
+  onClose: () => void
+  isMobile: boolean
+}
+
+function ChipPanel({ chip, onClose, isMobile }: ChipPanelProps) {
+  if (!chip) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex">
+      <div className="flex-1 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <motion.div
+        initial={{ x: isMobile ? '100%' : 320, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        exit={{ x: isMobile ? '100%' : 320, opacity: 0 }}
+        transition={{ duration: 0.25 }}
+        className={`relative flex h-full w-full max-w-sm flex-col bg-zinc-950 p-6 text-sm text-zinc-200 shadow-xl shadow-blue-900/30 ${
+          isMobile ? '' : 'border-l border-zinc-800'
+        }`}
+      >
+        <button
+          onClick={onClose}
+          className="absolute right-4 top-4 rounded-full border border-zinc-700/60 p-1 text-zinc-400 transition hover:text-zinc-100"
+          aria-label="關閉說明"
+        >
+          <X className="h-4 w-4" />
+        </button>
+        <div className="mt-6 space-y-3">
+          <p className="text-xs uppercase tracking-wide text-blue-300/80">Micro Focus</p>
+          <h3 className="text-lg font-semibold text-blue-100">{chip.label}</h3>
+          {chip.helper && (
+            <p className="rounded-md border border-blue-500/20 bg-blue-500/10 px-3 py-2 text-xs text-blue-200/90">
+              {chip.helper}
+            </p>
+          )}
+          {chip.detail && (
+            <p className="leading-relaxed text-zinc-300">
+              {chip.detail}
+            </p>
+          )}
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
+interface ClarityStripeProps {
+  enabled: boolean
+  data: ClarityStripeData | null
+  onChipClick: (chip: ChipDescriptor) => void
+}
+
+interface ClarityStripeData {
+  answerLabel?: string
+  answerText?: string
+  reason?: string
+  canonicalKind?: CanonicalKind
+  legacyKind?: string | undefined
+  chips: ChipDescriptor[]
+  confidence?: string
+  kindLabel?: string | null
+}
+
+function ClarityStripe({ enabled, data, onChipClick }: ClarityStripeProps) {
+  if (!enabled || !data) return null
+
+  const { answerLabel, answerText, reason, chips, confidence, kindLabel } = data
+  const reasonShort = reason ? Array.from(reason).slice(0, 20).join('') : undefined
+
+  return (
+    <div className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-blue-500/20 bg-blue-500/10 px-4 py-3">
+      <div className="flex flex-1 flex-col gap-1 text-xs text-blue-50/80 sm:flex-row sm:items-center sm:gap-3 sm:text-sm">
+        {kindLabel && (
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-blue-200/70 sm:text-xs">
+            {kindLabel}
+          </span>
+        )}
+        {answerLabel && (
+          <span className="flex items-center gap-2 text-emerald-200">
+            <span className="rounded-md border border-emerald-400/40 bg-emerald-500/20 px-2 py-0.5 text-xs font-semibold">
+              {answerLabel}
+            </span>
+            <span className="font-semibold text-emerald-100">{answerText}</span>
+          </span>
+        )}
+        {reasonShort && (
+          <span className="truncate text-xs text-blue-100/80 sm:text-sm" title={reason}>
+            {reasonShort}
+          </span>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {confidence && (
+          <span
+            className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
+              CONFIDENCE_STYLE[confidence] ?? 'border-blue-400/40 bg-blue-500/15 text-blue-100'
+            }`}
+          >
+            {CONFIDENCE_LABEL[confidence] ?? confidence}
+          </span>
+        )}
+        {chips.map((chip) => (
+          <button
+            key={chip.id}
+            onClick={() => onChipClick(chip)}
+            className="rounded-full border border-blue-400/40 bg-blue-500/15 px-2.5 py-1 text-xs text-blue-100 transition hover:border-blue-300/60 hover:bg-blue-500/25"
+          >
+            {chip.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+interface ActionFooterProps {
+  visible: boolean
+  isSaving: boolean
+  saveStatus: 'idle' | 'success' | 'error'
+  saveMessage: string
+  onPrimaryClick: () => void
+}
+
+function ActionFooter({ visible, isSaving, saveStatus, saveMessage, onPrimaryClick }: ActionFooterProps) {
+  if (!visible) return null
+
+  return (
+    <div className="sticky bottom-0 z-20 border-t border-zinc-800/40 bg-zinc-950/80 px-4 py-3 backdrop-blur">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <button
+          type="button"
+          onClick={onPrimaryClick}
+          disabled={isSaving}
+          className="w-full rounded-full bg-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-500/20 transition hover:bg-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-300 disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+        >
+          {isSaving ? '儲存中…' : '加入錯題本'}
+        </button>
+        {saveStatus !== 'idle' && (
+          <span
+            className={`text-xs ${
+              saveStatus === 'success' ? 'text-emerald-300' : 'text-amber-300'
+            }`}
+          >
+            {saveMessage}
+          </span>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -114,7 +309,8 @@ function convertExplainViewModelToCard(vm: ExplainViewModel, inputText: string):
     for (const match of optionMatches) {
       const key = match[1].toUpperCase()
       const text = match[2].trim()
-      if (text) {
+      // Check for duplicates before adding
+      if (text && !options.find((opt) => opt.key === key)) {
         options.push({
           key,
           text,
@@ -361,7 +557,132 @@ export default function ExplainCardV2({ inputText, conservative = false }: Expla
   const [isLoading, setIsLoading] = useState(false)
   const [loadingStep, setLoadingStep] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [questionSetKind, setQuestionSetKind] = useState<QuestionSetKind>('unknown')
+  const [questionSetAnalysis, setQuestionSetAnalysis] = useState<QuestionSetAnalysis | null>(null)
+  const [activeChip, setActiveChip] = useState<ChipDescriptor | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [saveMessage, setSaveMessage] = useState('')
+  const [pauseHighlights, setPauseHighlights] = useState(false)
+
+  const clarityStripeEnabled = useFeatureFlag('CLARITY_STRIPE_V1')
+  const evidenceLensEnabled = useFeatureFlag('READING_EVIDENCE_LENS')
+  const isMobile = useIsMobile()
   const abortRef = useRef<AbortController | null>(null)
+
+  const buildChipDescriptors = useCallback((question: E0Question): ChipDescriptor[] => {
+    const chips: ChipDescriptor[] = []
+    const meta = question.meta ?? {}
+    const contract = (meta.contract ?? {}) as Record<string, any>
+
+    const transitionWord = meta.transition_word ?? contract.transition_word
+    if (transitionWord) {
+      chips.push({
+        id: 'transition_word',
+        label: transitionWord,
+        helper: '轉折提示',
+        detail: contract.transition_word_note || '掌握文章轉折語氣與線索。',
+      })
+    }
+
+    const testedRule =
+      meta.tested_rule ||
+      contract.tested_rule ||
+      contract.grammatical_focus ||
+      contract.focus ||
+      ''
+    if (testedRule) {
+      chips.push({
+        id: 'tested_rule',
+        label: String(testedRule),
+        helper: '考點',
+        detail: contract.rule_explanation || question.one_line_reason || '對應的文法或語意考點。',
+      })
+    }
+
+    const keywords: string[] = Array.isArray(meta.keywords)
+      ? meta.keywords
+      : Array.isArray(contract.keywords)
+      ? contract.keywords
+      : []
+    if (keywords.length > 0) {
+      chips.push({
+        id: 'keyword',
+        label: keywords[0],
+        helper: '關鍵詞',
+        detail: keywords.slice(0, 3).join('、'),
+      })
+    }
+
+    if (Array.isArray(contract.vocab) && contract.vocab.length > 0 && typeof contract.vocab[0] === 'string') {
+      chips.push({
+        id: 'vocab',
+        label: contract.vocab[0],
+        helper: '焦點字詞',
+        detail: contract.vocab.slice(0, 3).join('、'),
+      })
+    }
+
+    return chips
+  }, [])
+
+  const buildWrongbookNote = useCallback((): string => {
+    const lines: string[] = ['# 錯題筆記', '']
+
+    if (questionSetVM && questionSetVM.questions.length > 0) {
+      if (questionSetAnalysis?.passage) {
+        lines.push('## Passage', questionSetAnalysis.passage.trim(), '')
+      }
+
+      questionSetVM.questions.forEach((question, index) => {
+        lines.push(`## Q${index + 1}`, question.stem, '')
+        if (question.answer_label || question.answer) {
+          lines.push(`- 答案：${question.answer_label ?? ''} ${question.answer ?? ''}`.trim())
+        }
+        if (question.one_line_reason) {
+          lines.push(`- 一句理由：${question.one_line_reason}`)
+        }
+        if (question.distractor_rejects?.length) {
+          lines.push('- 排除：')
+          question.distractor_rejects.forEach((reject) => {
+            lines.push(`  - ${reject.option}: ${reject.reason || '未提供理由'}`)
+          })
+        }
+        const meta = question.meta ?? {}
+        if (meta.transition_word) {
+          lines.push(`- 轉折詞：${meta.transition_word}`)
+        }
+        if (meta.tested_rule) {
+          lines.push(`- 考點：${meta.tested_rule}`)
+        }
+        lines.push('')
+      })
+      return lines.join('\n')
+    }
+
+    if (explainView) {
+      lines.push(`- 題幹：${explainView.stem?.en ?? inputText}`)
+      if (explainView.answer?.label || explainView.answer?.text) {
+        lines.push(`- 答案：${explainView.answer.label ?? ''} ${explainView.answer.text ?? ''}`.trim())
+      }
+      if (explainView.meta && 'reasonLine' in explainView.meta && explainView.meta.reasonLine) {
+        lines.push(`- 一句理由：${(explainView.meta as any).reasonLine}`)
+      }
+      if (Array.isArray(explainView.options) && explainView.options.length > 0) {
+        lines.push('- 選項解析：')
+        explainView.options.forEach((option) => {
+          if (option.reason) {
+            lines.push(`  - ${option.label}: ${option.reason}`)
+          }
+        })
+      }
+      lines.push('')
+      return lines.join('\n')
+    }
+
+    lines.push(inputText.trim())
+    return lines.join('\n')
+  }, [questionSetVM, questionSetAnalysis, explainView, inputText])
 
   // Convert ExplainViewModel to ExplainCard, then to ExplainVM
   const explainView = useMemo<ExplainVM | null>(() => {
@@ -388,6 +709,46 @@ export default function ExplainCardV2({ inputText, conservative = false }: Expla
   // Check rendering threshold and get missing fields
   const missingFields = useMemo(() => getMissingFields(explainView), [explainView])
   const canRender = useMemo(() => missingFields.length === 0, [missingFields])
+  const clarityStripeData = useMemo<ClarityStripeData | null>(() => {
+    if (questionSetVM && questionSetVM.questions.length > 0) {
+      const primary = questionSetVM.questions[0]
+      const canonicalKind = toCanonicalKind(primary.kind)
+      const legacyKind = canonicalKind ? toLegacyCanonicalKind(canonicalKind) : undefined
+      const metaContract = (primary.meta?.contract ?? {}) as Record<string, any>
+      const confidence =
+        (primary.meta?.confidence_badge ?? metaContract.confidence_badge) as string | undefined
+
+      return {
+        answerLabel: primary.answer_label,
+        answerText: primary.answer,
+        reason: primary.one_line_reason,
+        canonicalKind,
+        legacyKind,
+        chips: buildChipDescriptors(primary),
+        confidence,
+        kindLabel: canonicalKind ? getKindLabel(canonicalKind) : null,
+      }
+    }
+
+    if (vm) {
+      const canonicalKind = toCanonicalKind(vm.kind)
+      const legacyKind = canonicalKind ? toLegacyCanonicalKind(canonicalKind) : undefined
+      const answerMatch = vm.answer?.match(/^\(?([A-E])\)?\s*(.*)$/i)
+
+      return {
+        answerLabel: answerMatch ? answerMatch[1].toUpperCase() : undefined,
+        answerText: answerMatch ? answerMatch[2]?.trim() : vm.answer,
+        reason: vm.briefReason,
+        canonicalKind,
+        legacyKind,
+        chips: [],
+        confidence: undefined,
+        kindLabel: canonicalKind ? getKindLabel(canonicalKind) : null,
+      }
+    }
+
+    return null
+  }, [questionSetVM, vm, buildChipDescriptors])
 
   // Fetch explanation with 4-phase loading + AbortController
   useEffect(() => {
@@ -414,6 +775,11 @@ export default function ExplainCardV2({ inputText, conservative = false }: Expla
       setIsLoading(true)
       setError(null)
       setLoadingStep(0)
+      setQuestionSetKind('unknown')
+      setQuestionSetAnalysis(null)
+      setActiveChip(null)
+      setSaveStatus('idle')
+      setSaveMessage('')
 
       // Phase 1-3: Rotate through loading messages (1.2s each)
       for (let i = 0; i < loadingSteps.length - 1; i++) {
@@ -483,6 +849,10 @@ export default function ExplainCardV2({ inputText, conservative = false }: Expla
             const qset = toQuestionSetVM(data)
             setQuestionSetVM(qset)
             setVm(null) // Clear single-question VM
+
+            const analysis = analyseQuestionSet(inputText)
+            setQuestionSetAnalysis(analysis)
+            setQuestionSetKind(analysis.questionKind)
             
             // Track E0 render
             track('explain.render' as any, {
@@ -512,6 +882,8 @@ export default function ExplainCardV2({ inputText, conservative = false }: Expla
 
           setVm(data as ExplainViewModel)
             setQuestionSetVM(null) // Clear question set
+            setQuestionSetAnalysis(null)
+            setQuestionSetKind('unknown')
 
             // Track after view is computed (in next render)
             setTimeout(() => {
@@ -555,6 +927,96 @@ export default function ExplainCardV2({ inputText, conservative = false }: Expla
     }
   }, [inputText, conservative])
 
+  const handlePrimaryAction = useCallback(async () => {
+    if (isSaving) return
+
+    try {
+      setIsSaving(true)
+      setSaveStatus('idle')
+      setSaveMessage('')
+
+      const canonicalSkill =
+        clarityStripeData?.legacyKind ??
+        (questionSetKind !== 'unknown' ? `english_${questionSetKind}` : vm?.kind ?? 'english')
+      const questionTitle = questionSetVM
+        ? `題組解析（${questionSetVM.questions.length} 題）`
+        : explainView?.stem?.en ?? inputText.slice(0, 60)
+
+      let userId: string | null = null
+      try {
+        const { data, error } = await supabaseBrowserClient.auth.getUser()
+        if (error) {
+          console.warn('[ExplainCardV2] supabase auth getUser error:', error.message)
+        }
+        userId = data?.user?.id ?? null
+      } catch (err) {
+        console.warn('[ExplainCardV2] Unable to retrieve Supabase user:', err)
+      }
+
+      if (!userId) {
+        throw new Error('請先登入以收藏錯題')
+      }
+
+      const note_md = buildWrongbookNote()
+
+      const res = await fetch('/api/backpack/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userId,
+          question: questionTitle,
+          canonical_skill: canonicalSkill ?? 'english',
+          note_md,
+        }),
+      })
+
+      if (!res.ok) {
+        throw new Error('儲存錯題失敗，請稍後再試')
+      }
+
+      setSaveStatus('success')
+      setSaveMessage('已加入錯題本')
+
+      track('explain.action' as any, {
+        action: 'save-error',
+        mode: questionSetVM ? 'question-set' : 'single',
+        status: 'success',
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '儲存錯題失敗'
+      setSaveStatus('error')
+      setSaveMessage(message)
+      track('explain.action' as any, {
+        action: 'save-error',
+        mode: questionSetVM ? 'question-set' : 'single',
+        status: 'error',
+        message,
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }, [
+    isSaving,
+    buildWrongbookNote,
+    clarityStripeData,
+    questionSetKind,
+    questionSetVM,
+    explainView,
+    inputText,
+    vm,
+  ])
+
+  const handleChipClick = useCallback(
+    (chip: ChipDescriptor) => {
+      track('explain.focus-chip' as any, {
+        chip: chip.id,
+        mode: questionSetVM ? 'question-set' : 'single',
+      })
+      setActiveChip(chip)
+    },
+    [questionSetVM],
+  )
+
   // Update tracking when view changes
   useEffect(() => {
     if (explainView && !isLoading && !conservativeResult) {
@@ -570,44 +1032,67 @@ export default function ExplainCardV2({ inputText, conservative = false }: Expla
   }, [explainView, canRender, missingFields, vm, isLoading, conservativeResult])
 
   return (
-    <div className="space-y-4 min-h-[40vh] max-h-[70vh] overflow-y-auto">
-      {/* Loading State with 4-phase animation */}
-      <AnimatePresence mode="wait">
-        {isLoading && <LoadingState key={loadingStep} currentStep={loadingStep} />}
-      </AnimatePresence>
+    <div className="relative flex min-h-[40vh] max-h-[70vh] flex-col overflow-hidden rounded-xl border border-zinc-800/40 bg-zinc-950/10 backdrop-blur">
+      <ClarityStripe
+        enabled={clarityStripeEnabled}
+        data={clarityStripeData}
+        onChipClick={handleChipClick}
+      />
 
-      {/* Error State */}
-      {error && (
-        <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-4 text-sm text-red-400">
-          {error}
+      <div className="flex-1 overflow-y-auto px-4 py-4">
+        <div className="space-y-4">
+          <AnimatePresence mode="wait">
+            {isLoading && <LoadingState key={loadingStep} currentStep={loadingStep} />}
+          </AnimatePresence>
+
+          {error && (
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
+              {error}
+            </div>
+          )}
+
+          {conservativeResult && !isLoading && (
+            <ConservativePresenter result={conservativeResult} />
+          )}
+
+          {questionSetVM && !isLoading && !conservativeResult && (
+            <QuestionSetExplain
+              vm={questionSetVM}
+              detectedKind={questionSetKind}
+              analysis={questionSetAnalysis}
+              evidenceLensEnabled={evidenceLensEnabled}
+              pauseHighlights={pauseHighlights}
+              onPauseHighlights={setPauseHighlights}
+            />
+          )}
+
+          {!questionSetVM && explainView && canRender && !isLoading && !conservativeResult && (
+            <AnimatePresence mode="wait">
+              {renderByKind(explainView)}
+            </AnimatePresence>
+          )}
+
+          {!questionSetVM && vm && (!explainView || !canRender) && !isLoading && !conservativeResult && (
+            <DevFallbackUI data={vm} kind={toCanonicalKind(vm.kind)} missingFields={missingFields} />
+          )}
         </div>
-      )}
+      </div>
 
-      {/* Conservative Mode Content */}
-      {conservativeResult && !isLoading && (
-        <ConservativePresenter result={conservativeResult} />
-      )}
+      <ActionFooter
+        visible={!isLoading && !conservativeResult && (questionSetVM || explainView || vm)}
+        isSaving={isSaving}
+        saveStatus={saveStatus}
+        saveMessage={saveMessage}
+        onPrimaryClick={handlePrimaryAction}
+      />
 
-      {/* E0 Question Set - 題組模式 */}
-      {questionSetVM && !isLoading && !conservativeResult && (
-        <QuestionSetExplain vm={questionSetVM} />
-      )}
-
-      {/* Unified Content - 使用專業組件系統（單題模式） */}
-      {!questionSetVM && explainView && canRender && !isLoading && !conservativeResult && (
-        <AnimatePresence mode="wait">
-          {renderByKind(explainView)}
-        </AnimatePresence>
-      )}
-
-      {/* Fallback UI for unknown kinds or missing fields */}
-      {!questionSetVM && vm && (!explainView || !canRender) && !isLoading && !conservativeResult && (
-        <DevFallbackUI 
-          data={vm} 
-          kind={toCanonicalKind(vm.kind)} 
-          missingFields={missingFields}
-        />
-      )}
+      <AnimatePresence>
+        {activeChip && (
+          <ChipPanel chip={activeChip} onClose={() => setActiveChip(null)} isMobile={isMobile} />
+        )}
+      </AnimatePresence>
     </div>
   )
 }
+
+export { ClarityStripe, ActionFooter }

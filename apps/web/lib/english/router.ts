@@ -291,7 +291,6 @@ export async function classifyEnglishType(input: EnglishQuestionInput): Promise<
       choicesShape,
       optionsCount,
       passageChars,
-      passageLength,
       confidence,
       finalKind,
     })
@@ -309,7 +308,6 @@ export async function classifyEnglishType(input: EnglishQuestionInput): Promise<
       choicesShape,
       optionsCount,
       passageChars,
-      passageLength,
       confidence,
       finalKind,
     })
@@ -373,7 +371,8 @@ export async function classifyEnglishType(input: EnglishQuestionInput): Promise<
       reason: 'FALLBACK: 有編號空格但不符合 E6/E7 條件',
     })
     console.warn('[router] Has numbered blanks but failed E6/E7 detection, using FALLBACK', {
-      uniqueNumberedBlanks,
+      blankNumbers,
+      blankCount: numberedBlankCount,
       normalizedBlankMatches: normalizedBlankMatches.length,
       choicesShape,
       optionsCount,

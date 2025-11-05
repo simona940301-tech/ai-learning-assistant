@@ -64,10 +64,7 @@ const BaseSlotSchema = z.object({
 })
 
 // ExplainQuestion slots
-export const ExplainQuestionSlotsSchema = BaseSlotSchema.extend({
-  showSteps: z.boolean().default(true),
-  format: z.enum(['full', 'compact']).default('full'),
-})
+export const ExplainQuestionSlotsSchema = BaseSlotSchema.extend({})
 export type ExplainQuestionSlots = z.infer<typeof ExplainQuestionSlotsSchema>
 
 // GenerateSimilar slots
@@ -113,8 +110,7 @@ export const ScriptMetadataSchema = z.object({
 export type ScriptMetadata = z.infer<typeof ScriptMetadataSchema>
 
 const ExplainParamsSchema = z.object({
-  showSteps: z.boolean(),
-  format: z.enum(['full', 'compact']),
+  contract: z.literal('AuraExplain.v1').default('AuraExplain.v1'),
 })
 
 const SimilarParamsSchema = z.object({
@@ -162,21 +158,58 @@ export type ScriptGeneratorRequest = z.infer<typeof ScriptGeneratorRequestSchema
 // EXECUTOR RESPONSES
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+const DistractorRejectSchema = z.object({
+  option: z.string(),
+  reason: z.string().optional().default(''),
+})
+
+const OptionalTextField = z
+  .union([z.string(), z.null(), z.undefined()])
+  .transform((val) => {
+    if (typeof val !== 'string') return undefined
+    const trimmed = val.trim()
+    return trimmed.length === 0 ? undefined : trimmed
+  })
+  .optional()
+
+const GrammarTableRowSchema = z.object({
+  category: z.string(),
+  description: z.string(),
+  example: z.string(),
+})
+
+const MawsScoresSchema = z.object({
+  content: z.number().min(0).max(5),
+  organization: z.number().min(0).max(5),
+  sentence_structure: z.number().min(0).max(5),
+  vocabulary: z.number().min(0).max(5),
+})
+
+const OptionalMawsScoresSchema = z
+  .union([MawsScoresSchema, z.null(), z.undefined()])
+  .transform((val) => {
+    if (!val || typeof val !== 'object') return undefined
+    return val
+  })
+  .optional()
+
 export const ExplainResultSchema = z.object({
   answer: z.string(), // 正確答案 e.g., "答案：A"
   focus: z.string(), // 單詞考點，如「關係子句」
   summary: z.string(), // 一句話解析
-  steps: z.array(z.string()).max(5), // 解題步驟 (0-5 steps，依 showSteps 控制)
+  one_line_reason: z.string(), // 首屏 10-20 字理由
+  confidence_badge: z.enum(['high', 'medium', 'low']),
+  steps: z.array(z.string()).min(3).max(5), // 解題步驟 (3-5 steps)
   details: z.array(z.string()).min(1).max(4), // 詳解段落 (≤4, collapsible)
-  grammarTable: z
-    .array(
-      z.object({
-        category: z.string(),
-        description: z.string(),
-        example: z.string(),
-      })
-    )
-    .optional(),
+  distractor_rejects: z.array(DistractorRejectSchema).max(6).default([]),
+  evidence_sentence: OptionalTextField,
+  tested_rule: OptionalTextField,
+  grammatical_focus: OptionalTextField,
+  transition_word: OptionalTextField,
+  before_after_fit: OptionalTextField,
+  native_upgrade: OptionalTextField,
+  maws_scores: OptionalMawsScoresSchema,
+  grammarTable: z.array(GrammarTableRowSchema).optional(),
   encouragement: z.string().optional(), // 學長姐風格鼓勵（可選）
 })
 export type ExplainResult = z.infer<typeof ExplainResultSchema>

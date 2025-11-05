@@ -24,7 +24,7 @@ Return STRICT JSON only.
 Common: { "subject": "english|math|chinese|social|science|unknown" }
 
 ExplainQuestion:
-{ "subject": "...", "showSteps": true, "format": "full" }
+{ "subject": "..." }
 
 GenerateSimilar:
 { "subject": "...", "difficulty": "A1|A2|B1|B2|C1|mixed", "count": 10,
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
 User input: "${input}"
 Detected subject: ${solveSubject}
 
-Return JSON with: subject, showSteps (boolean), format ("full" or "compact")`
+Return JSON with: subject only.`
       expectedSchema = ExplainQuestionSlotsSchema
     } else if (intent === 'GenerateSimilar') {
       schemaPrompt = `Extract slots for GenerateSimilar.

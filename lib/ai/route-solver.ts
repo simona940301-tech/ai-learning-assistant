@@ -1,8 +1,14 @@
 import { createHash } from 'crypto'
-import { chatCompletionJSON } from '@/lib/openai'
-import { ExplainResultSchema, type ExplainResult } from '@/lib/solve-types'
+import type { ExplainResult, SolveSubject } from '@/lib/solve-types'
 import { runHardGuard } from './hard-guard'
 import { probeExperts, type ExpertProbe } from './experts'
+import { buildMockExplanation } from './mock-explanation'
+import {
+  runAuraExplanationPipeline,
+  AURA_CONTRACT_VERSION,
+  extractChoices,
+  type AuraJudgeReport,
+} from './aura-contract'
 
 const DEFAULT_CONFIG = {
   ExpertThreshold: 0.55,
@@ -27,29 +33,14 @@ export interface HybridSolveResponse {
     }
     config: typeof DEFAULT_CONFIG
     reason: string
+    fallback: boolean
+    fallback_reason?: string
+    contractVersion: string
+    contractAttempts: number
+    judge: AuraJudgeReport | null
+    choices: ReturnType<typeof extractChoices>
   }
 }
-
-const GENERAL_SOLVER_PROMPT = `You are an Any-Subject GSAT tutor. Produce concise, scannable JSON with four sections.
-
-JSON schema:
-{
-  "answer": "答案：...",
-  "focus": "考點關鍵詞（最短名詞片語）",
-  "summary": "一句話解析 (<= 24 字)",
-  "steps": ["1...", "2...", "3..."],
-  "details": ["段落1", "段落2", "段落3", "段落4?"],
-  "grammarTable": [
-    { "category": "類別", "description": "說明", "example": "範例" }
-  ],
-  "encouragement": "可選，簡短加油句"
-}
-
-Rules:
-- steps: 3-5 items, each < 50 characters.
-- details: 2-4 short paragraphs, no markdown, no numbering.
-- grammarTable: only when language cues exist; max 3 rows.
-- Never mention 延伸練習 or external links.`
 
 export async function runHybridSolve(questionText: string): Promise<HybridSolveResponse> {
   const guard = runHardGuard(questionText)
@@ -58,8 +49,36 @@ export async function runHybridSolve(questionText: string): Promise<HybridSolveR
   const chosen = pickExperts(experts, DEFAULT_CONFIG.ExpertThreshold, DEFAULT_CONFIG.PickTopK)
   const reason = chosen[0]?.notes || chosen[0]?.tags.join('/') || 'general'
   const subjectHint = deriveSubjectHint(guard.subject, chosen)
+  const parsedChoices = extractChoices(questionText)
 
-  const explanation = await generateGeneralSolution(questionText)
+  let fallbackUsed = false
+  let fallbackReason: string | undefined
+  let judgeReport: AuraJudgeReport | null = null
+  let contractAttempts = 0
+  let explanation: ExplainResult
+  try {
+    const contractSubject = subjectHint as SolveSubject
+    const pipeline = await runAuraExplanationPipeline(questionText, contractSubject, { choices: parsedChoices })
+    judgeReport = pipeline.judge ?? null
+    contractAttempts = pipeline.attempts
+
+    if (pipeline.explanation && pipeline.approved) {
+      explanation = pipeline.explanation
+    } else {
+      fallbackUsed = true
+      fallbackReason = pipeline.lastError
+        ? `pipeline_error:${pipeline.lastError}`
+        : pipeline.judge?.issues?.join('|') || 'judge_rejected'
+      explanation = buildMockExplanation(questionText, contractSubject, parsedChoices)
+    }
+  } catch (error) {
+    console.error('[hybrid-solve] OpenAI generate failed, using fallback:', error)
+    fallbackReason = error instanceof Error ? `exception:${error.message}` : 'unknown_exception'
+    const contractSubject = subjectHint as SolveSubject
+    explanation = buildMockExplanation(questionText, contractSubject, parsedChoices)
+    fallbackUsed = true
+  }
+
   const refined = refineExplanation(explanation, chosen)
   const retrieval = buildRetrieval(questionText, chosen)
   const questionId = hashQuestion(questionText)
@@ -70,6 +89,9 @@ export async function runHybridSolve(questionText: string): Promise<HybridSolveR
     .join(',')}], chosen=${chosen.map((c) => c.subject).join('/') || 'general'}, tags=[${tagSummary}], reason="${reason}"`
   console.log(logLine)
   console.log('✅ Subject detection validated:', subjectHint)
+  if (fallbackUsed) {
+    console.warn('[hybrid-solve] Returned mock explanation due to upstream failure')
+  }
 
   return {
     explanation: refined,
@@ -82,6 +104,12 @@ export async function runHybridSolve(questionText: string): Promise<HybridSolveR
       retrieval,
       config: DEFAULT_CONFIG,
       reason,
+      fallback: fallbackUsed,
+      fallback_reason: fallbackReason,
+      contractVersion: AURA_CONTRACT_VERSION,
+      contractAttempts,
+      judge: judgeReport,
+      choices: parsedChoices,
     },
   }
 }
@@ -90,18 +118,6 @@ function pickExperts(experts: ExpertProbe[], threshold: number, pickTopK: number
   const filtered = experts.filter((expert) => expert.confidence >= threshold)
   if (filtered.length === 0) return []
   return filtered.slice(0, pickTopK)
-}
-
-async function generateGeneralSolution(questionText: string): Promise<ExplainResult> {
-  const prompt = `Question:\n${questionText}\n\nGeneral explanation requested.`
-  const result = await chatCompletionJSON<ExplainResult>(
-    [
-      { role: 'system', content: GENERAL_SOLVER_PROMPT },
-      { role: 'user', content: prompt },
-    ],
-    { model: 'gpt-4o-mini', temperature: 0.35 }
-  )
-  return ExplainResultSchema.parse(result)
 }
 
 function refineExplanation(explanation: ExplainResult, chosen: ExpertProbe[]): ExplainResult {
