@@ -200,7 +200,7 @@ function DevFallbackUI({
 }) {
   const displayKind = kind || 'unknown'
   const legacyKind = kind ? toLegacyCanonicalKind(kind) : 'unknown'
-  
+
   return (
     <Card className="border-yellow-500/50 bg-yellow-500/10">
       <CardHeader>
@@ -214,7 +214,7 @@ function DevFallbackUI({
           <div className="text-zinc-600 dark:text-zinc-400">
             <div className="font-medium mb-1">
               Kind: <code className="px-1.5 py-0.5 bg-zinc-800/30 rounded">{displayKind}</code>
-            </div>
+      </div>
             {missingFields.length > 0 && (
               <div className="mt-2">
                 <div className="font-medium mb-1 text-red-400">缺欄位：</div>
@@ -471,9 +471,9 @@ export default function ExplainCardV2({ inputText, conservative = false }: Expla
               type: 'E0',
               total: qset.questions.length,
               kinds: qset.questions.map((q) => q.kind),
-              latency_ms: Math.round(latency),
-            })
-            
+            latency_ms: Math.round(latency),
+          })
+
             // Track each question
             qset.questions.forEach((q) => {
               track('explain.question.render' as any, {
@@ -489,10 +489,10 @@ export default function ExplainCardV2({ inputText, conservative = false }: Expla
             console.log('[ExplainCardV2] Explanation received:', {
               originalKind: data.kind,
               normalizedKind,
-              latency_ms: Math.round(latency),
-            })
+            latency_ms: Math.round(latency),
+          })
 
-            setVm(data as ExplainViewModel)
+          setVm(data as ExplainViewModel)
             setQuestionSetVM(null) // Clear question set
 
             // Track after view is computed (in next render)

@@ -1,6 +1,9 @@
 import type { QuestionSetVM, E0Question } from './vm/question-set'
 import { QuestionSetVMSchema } from './vm/question-set'
 import { toCanonicalKind } from '@/lib/explain/kind-alias'
+import { buildExplainView } from '@/lib/explain-normalizer'
+import type { ExplainCard } from '@/lib/contracts/explain'
+import { parseReading, type ParsedReading, type ReadingQuestionBlock } from '@/lib/english/reading-parser'
 
 type OptionLabel = 'A' | 'B' | 'C' | 'D'
 const LETTERS = ['A', 'B', 'C', 'D', 'E'] as const
