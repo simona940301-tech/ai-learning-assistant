@@ -43,5 +43,9 @@
     "node": ">=18.0.0",
     "pnpm": ">=8.0.0"
   },
-  "packageManager": "pnpm@8.15.0"
+  "packageManager": "pnpm@8.15.0",
+  "dependencies": {
+    "@types/dompurify": "^3.2.0",
+    "dompurify": "^3.3.0"
+  }
 }
