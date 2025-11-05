@@ -1,4 +1,5 @@
-import { QuestionSetVM, type E0Question } from './vm/question-set'
+import type { QuestionSetVM, E0Question } from './vm/question-set'
+import { QuestionSetVMSchema } from './vm/question-set'
 import { toCanonicalKind } from '@/lib/explain/kind-alias'
 
 type OptionLabel = 'A' | 'B' | 'C' | 'D'
@@ -2343,7 +2344,7 @@ export function toQuestionSetVM(resp: any): QuestionSetVM {
       }),
     }
     
-    return QuestionSetVM.parse(normalized)
+    return QuestionSetVMSchema.parse(normalized)
   }
   
   // 單題 → 包成一題題組（保守兜底）
@@ -2376,7 +2377,7 @@ export function toQuestionSetVM(resp: any): QuestionSetVM {
     },
   }
   
-  return QuestionSetVM.parse({
+  return QuestionSetVMSchema.parse({
     type: 'E0_QUESTION_SET',
     source_context: resp?.source_context ?? 'N/A',
     questions: [one],

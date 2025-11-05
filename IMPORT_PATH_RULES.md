@@ -67,6 +67,20 @@ import { Card } from '../../../components/ui/card'
    import type { LocalType } from './types'
    ```
 
+3. **從子目錄導入父目錄的文件（需謹慎）**
+   ```typescript
+   // 從 explain/ 導入父目錄 solve/ 的文件
+   // ⚠️ 可用但建議改為絕對路徑
+   import Typewriter from '../Typewriter'  // 當前可用
+   import { ExtendedVocab } from '../ExtendedVocab'  // 當前可用
+   
+   // ✅ 建議改為絕對路徑（更安全）
+   import Typewriter from '@/components/solve/Typewriter'
+   import { ExtendedVocab } from '@/components/solve/ExtendedVocab'
+   ```
+
+   **注意：** 從子目錄導入父目錄雖然可行，但建議統一使用絕對路徑以避免未來重構時的問題。
+
 ## 🔍 檢查清單
 
 在提交代碼前，請檢查：
