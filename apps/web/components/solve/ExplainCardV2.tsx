@@ -1,17 +1,38 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import type { ExplainViewModel, ExplainMode } from '@/lib/types'
+import type { ExplainViewModel } from '@/lib/types'
 import type { ConservativeResult } from '@/lib/ai/conservative-types'
 import { track } from '@plms/shared/analytics'
 import Typewriter from './Typewriter'
 import ConservativePresenter from './explain/ConservativePresenter'
+import { toCanonicalKind, type CanonicalKind, getKindLabel } from '@/lib/explain/kind-alias'
+import type { ExplainCard as ExplainCardModel } from '@/lib/contracts/explain'
+import {
+  presentExplainCard,
+  type ExplainVM,
+  type VocabularyVM,
+  type GrammarVM,
+  type ClozeVM,
+  type ReadingVM,
+  type TranslationVM,
+  type ParagraphOrganizationVM,
+  type ContextualCompletionVM,
+  type GenericVM,
+} from '@/lib/mapper/explain-presenter'
+import { VocabularyExplain } from './explain/VocabularyExplain'
+import { GrammarExplain } from './explain/GrammarExplain'
+import { ClozeExplain } from './explain/ClozeExplain'
+import ReadingExplain from './explain/ReadingExplain'
+import { ParagraphOrganizationExplain } from './explain/ParagraphOrganizationExplain'
+import { TranslationExplain } from './explain/TranslationExplain'
+import { ContextualCompletionExplain } from './explain/ContextualCompletionExplain'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { nanoid } from 'nanoid'
 
 interface ExplainCardV2Props {
   inputText: string
-  mode?: ExplainMode
-  onModeChange?: (mode: ExplainMode) => void
   conservative?: boolean // Enable conservative mode
 }
 
@@ -47,193 +68,301 @@ function LoadingState({ currentStep }: { currentStep: number }) {
 }
 
 /**
- * Fast mode presenter - minimal output
+ * Convert ExplainViewModel (legacy API format) to ExplainCard (canonical format)
  */
-function FastModePresenter({ vm }: { vm: ExplainViewModel }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-4"
-    >
-      <div className="rounded-lg bg-zinc-900/60 border border-zinc-800/50 p-4">
-        <div className="text-sm font-medium text-zinc-300 mb-2">答案</div>
-        <div className="text-lg text-green-400 font-semibold">{vm.answer}</div>
-      </div>
-      
-      <div className="rounded-lg bg-zinc-900/60 border border-zinc-800/50 p-4">
-        <div className="text-sm font-medium text-zinc-300 mb-2">理由</div>
-        <div className="text-base text-zinc-200">
-          <Typewriter text={vm.briefReason} />
-        </div>
-      </div>
-    </motion.div>
-  )
-}
+function convertExplainViewModelToCard(vm: ExplainViewModel, inputText: string): ExplainCardModel {
+  const canonicalKind = toCanonicalKind(vm.kind)
+  
+  // Extract answer key from answer string (e.g., "(A) answer" -> "A")
+  const answerMatch = vm.answer.match(/^\(?([A-D])\)?\s*/i)
+  const answerKey = answerMatch ? answerMatch[1].toUpperCase() : undefined
+  const answerText = vm.answer.replace(/^\(?[A-D]\)?\s*/i, '').trim()
 
-/**
- * Deep mode presenter - full explanation
- */
-function DeepModePresenter({ vm }: { vm: ExplainViewModel }) {
-  const articleRef = useRef<HTMLDivElement | null>(null)
-
-  // Preserve scroll/highlight behavior for reading questions
-  useEffect(() => {
-    if (vm.kind === 'reading' && vm.evidenceBlocks && vm.evidenceBlocks.length > 0) {
-      // Wire up evidence highlight if needed
-      console.log('[ExplainCardV2] Evidence blocks available for highlighting:', vm.evidenceBlocks)
+  // Build options from distractorNotes if available
+  const options = vm.distractorNotes?.map((note) => {
+    const optionMatch = note.option.match(/^\(?([A-D])\)?\s*/i)
+    const key = optionMatch ? optionMatch[1].toUpperCase() : note.option
+    const text = note.note.split('｜')[0] || note.note
+    
+    return {
+      key,
+      text: text.trim(),
+      verdict: key === answerKey ? ('fit' as const) : ('unfit' as const),
+      reason: note.note,
     }
-  }, [vm.kind, vm.evidenceBlocks])
+  }) || []
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-4"
-      ref={articleRef}
-    >
-      {/* Answer */}
-      <div className="rounded-lg bg-zinc-900/60 border border-zinc-800/50 p-4">
-        <div className="text-sm font-medium text-zinc-300 mb-2">答案</div>
-        <div className="text-lg text-green-400 font-semibold">{vm.answer}</div>
-      </div>
+  // Add correct answer if not in distractorNotes
+  if (answerKey && !options.find((opt) => opt.key === answerKey)) {
+    options.push({
+      key: answerKey,
+      text: answerText,
+      verdict: 'fit' as const,
+      reason: vm.briefReason,
+    })
+  }
 
-      {/* Translation (if available) */}
-      {vm.cnTranslation && (
-        <div className="rounded-lg bg-zinc-900/60 border border-zinc-800/50 p-4">
-          <div className="text-sm font-medium text-zinc-300 mb-2">中譯</div>
-          <div className="text-base text-zinc-200">
-            <Typewriter text={vm.cnTranslation} />
-          </div>
-        </div>
-      )}
-
-      {/* Full Explanation (Markdown-ready) */}
-      {vm.fullExplanation && (
-        <div className="rounded-lg bg-zinc-900/60 border border-zinc-800/50 p-4">
-          <div className="text-sm font-medium text-zinc-300 mb-2">詳解</div>
-          <div className="text-base text-zinc-200 whitespace-pre-wrap">
-            <Typewriter text={vm.fullExplanation} />
-          </div>
-        </div>
-      )}
-
-      {/* Distractor Notes */}
-      {vm.distractorNotes && vm.distractorNotes.length > 0 && (
-        <div className="rounded-lg bg-zinc-900/60 border border-zinc-800/50 p-4">
-          <div className="text-sm font-medium text-zinc-300 mb-2">選項分析</div>
-          <div className="space-y-2">
-            {vm.distractorNotes.map((note, idx) => (
-              <div key={idx} className="text-sm text-zinc-300">
-                <span className="font-medium text-zinc-400">{note.option}:</span> {note.note}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Grammar Highlights */}
-      {vm.grammarHighlights && vm.grammarHighlights.length > 0 && (
-        <div className="rounded-lg bg-zinc-900/60 border border-zinc-800/50 p-4">
-          <div className="text-sm font-medium text-zinc-300 mb-2">核心語法點</div>
-          <ul className="space-y-1 list-disc list-inside text-sm text-zinc-300">
-            {vm.grammarHighlights.map((highlight, idx) => (
-              <li key={idx}>{highlight}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Evidence Blocks (Reading) */}
-      {vm.evidenceBlocks && vm.evidenceBlocks.length > 0 && (
-        <div className="rounded-lg bg-zinc-900/60 border border-zinc-800/50 p-4">
-          <div className="text-sm font-medium text-zinc-300 mb-2">關鍵證據</div>
-          <div className="space-y-2">
-            {vm.evidenceBlocks.map((evidence, idx) => (
-              <div
-                key={idx}
-                className="text-sm text-zinc-300 p-2 rounded bg-zinc-800/30 hover:bg-zinc-800/50 cursor-pointer transition-colors"
-                onClick={() => {
-                  // Scroll to evidence in original passage
-                  console.log('[ExplainCardV2] Evidence clicked:', evidence)
-                }}
-              >
-                {evidence}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Discourse Role */}
-      {vm.discourseRole && (
-        <div className="rounded-lg bg-zinc-900/60 border border-zinc-800/50 p-4">
-          <div className="text-sm font-medium text-zinc-300 mb-2">篇章功能</div>
-          <div className="text-sm text-zinc-300">{vm.discourseRole}</div>
-        </div>
-      )}
-
-      {/* Mix Answer Extra */}
-      {vm.mixAnswerExtra && (
-        <div className="rounded-lg bg-zinc-900/60 border border-zinc-800/50 p-4">
-          <div className="text-sm font-medium text-zinc-300 mb-2">補充說明</div>
-          <div className="text-sm text-zinc-300">{vm.mixAnswerExtra}</div>
-        </div>
-      )}
-    </motion.div>
-  )
+  return {
+    id: nanoid(),
+    question: inputText,
+    kind: canonicalKind === 'unknown' ? 'FALLBACK' : (canonicalKind === 'E8' ? 'FALLBACK' : canonicalKind),
+    translation: vm.cnTranslation,
+    cues: vm.grammarHighlights || [],
+    options,
+    steps: vm.fullExplanation
+      ? [{ title: '解題步驟', detail: vm.fullExplanation }]
+      : [{ title: '解析', detail: vm.briefReason }],
+    correct: answerKey
+      ? {
+          key: answerKey,
+          text: answerText,
+          reason: vm.briefReason,
+        }
+      : undefined,
+    vocab: [],
+    meta: {
+      evidenceBlocks: vm.evidenceBlocks,
+      discourseRole: vm.discourseRole,
+      mixAnswerExtra: vm.mixAnswerExtra,
+    },
+    nextActions: [],
+  }
 }
 
 /**
- * Mode toggle button
+ * Check rendering threshold for each kind
  */
-function ModeToggle({
-  currentMode,
-  onModeChange,
-}: {
-  currentMode: ExplainMode
-  onModeChange?: (mode: ExplainMode) => void
+function getMissingFields(view: ExplainVM | null): string[] {
+  if (!view) return ['view is null']
+  
+  const missing: string[] = []
+  
+  switch (view.kind) {
+    case 'E1': // Vocabulary
+      if (!view.stem?.en) missing.push('question.text')
+      if (!view.options || view.options.length < 2) missing.push('choices (min 2)')
+      if (!view.answer) missing.push('answer')
+      break
+    case 'E2': // Grammar
+      if (!view.stem?.en) missing.push('sentence')
+      if (!view.options || view.options.length < 2) missing.push('choices (min 2)')
+      if (!view.answer) missing.push('answer')
+      break
+    case 'E3': // Cloze
+      if (!view.article?.en) missing.push('passage')
+      if (!view.meta?.blankIndex) missing.push('blanks')
+      break
+    case 'E4': // Reading
+      if (!view.passage?.paragraphs || view.passage.paragraphs.length < 1) missing.push('passage.text')
+      if (!view.questions || view.questions.length < 1) missing.push('questions (min 1)')
+      break
+    case 'E5': // Translation
+      if (!view.stem?.en) missing.push('source')
+      break
+    case 'E6': // Paragraph Organization
+      if (!view.blanks || view.blanks.length < 1) missing.push('blanks')
+      break
+    case 'E7': // Contextual Completion
+      if (!view.questions || view.questions.length < 1) missing.push('questions')
+      break
+    default:
+      // Generic fallback
+      if (!view.stem?.en && !view.answer) missing.push('stem or answer')
+  }
+  
+  return missing
+}
+
+/**
+ * Dev Fallback UI - 優雅處理未知題型 + 缺欄位提示
+ */
+function DevFallbackUI({ 
+  data, 
+  kind,
+  missingFields = [],
+}: { 
+  data: any
+  kind: CanonicalKind
+  missingFields?: string[]
 }) {
   return (
-    <div className="flex items-center gap-2 text-xs">
-      <button
-        onClick={() => onModeChange?.('fast')}
-        className={`px-3 py-1 rounded transition-colors ${
-          currentMode === 'fast'
-            ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-            : 'bg-zinc-800/50 text-zinc-400 hover:bg-zinc-800/70'
-        }`}
-      >
-        快速
-      </button>
-      <button
-        onClick={() => onModeChange?.('deep')}
-        className={`px-3 py-1 rounded transition-colors ${
-          currentMode === 'deep'
-            ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-            : 'bg-zinc-800/50 text-zinc-400 hover:bg-zinc-800/70'
-        }`}
-      >
-        深度
-      </button>
+    <Card className="border-yellow-500/50 bg-yellow-500/10">
+      <CardHeader>
+        <CardTitle className="text-yellow-600 dark:text-yellow-400 text-sm flex items-center gap-2">
+          <span>⚠️</span>
+          <span>題型未知 ({getKindLabel(kind)})</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3 text-sm">
+          <div className="text-zinc-600 dark:text-zinc-400">
+            <div className="font-medium mb-1">
+              Kind: <code className="px-1.5 py-0.5 bg-zinc-800/30 rounded">{kind}</code>
+            </div>
+            {missingFields.length > 0 && (
+              <div className="mt-2">
+                <div className="font-medium mb-1 text-red-400">缺欄位：</div>
+                <ul className="list-disc list-inside space-y-1 text-xs">
+                  {missingFields.map((field, idx) => (
+                    <li key={idx}>{field}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <p className="text-xs mt-2">建議聯繫支援團隊處理此題型。</p>
+          </div>
+          {process.env.NODE_ENV !== 'production' && (
+            <details className="mt-3">
+              <summary className="cursor-pointer text-xs text-zinc-500 hover:text-zinc-400">
+                View Raw Data (Dev Mode)
+              </summary>
+              <pre className="text-xs overflow-auto max-h-96 mt-2 p-2 bg-zinc-900/50 rounded border border-zinc-800/50">
+                {JSON.stringify(data, null, 2)}
+              </pre>
+            </details>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+/**
+ * Render content by kind - 使用專業組件系統
+ */
+function renderByKind(view: ExplainVM): React.ReactNode {
+  const motionProps = {
+    initial: { opacity: 0, y: 8 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -8 },
+    transition: { duration: 0.3 },
+  }
+
+  switch (view.kind) {
+    case 'E1':
+      return (
+        <motion.div key="vocabulary-card" {...motionProps}>
+          <VocabularyExplain view={view as VocabularyVM} />
+        </motion.div>
+      )
+    case 'E2':
+      return (
+        <motion.div key="grammar-card" {...motionProps}>
+          <GrammarExplain view={view as GrammarVM} />
+        </motion.div>
+      )
+    case 'E3':
+      return (
+        <motion.div key="cloze-card" {...motionProps}>
+          <ClozeExplain view={view as ClozeVM} />
+        </motion.div>
+      )
+    case 'E4':
+      return (
+        <motion.div key="reading-card" {...motionProps}>
+          <ReadingExplain view={view as ReadingVM} />
+        </motion.div>
+      )
+    case 'E5':
+      return (
+        <motion.div key="translation-card" {...motionProps}>
+          <TranslationExplain view={view as TranslationVM} />
+        </motion.div>
+      )
+    case 'E6':
+      return (
+        <motion.div key="paragraph-organization-card" {...motionProps}>
+          <ParagraphOrganizationExplain view={view as ParagraphOrganizationVM} />
+        </motion.div>
+      )
+    case 'E7':
+      return (
+        <motion.div key="contextual-completion-card" {...motionProps}>
+          <ContextualCompletionExplain view={view as ContextualCompletionVM} />
+        </motion.div>
+      )
+    case 'GENERIC':
+    default:
+      return (
+        <motion.div key="generic-card" {...motionProps}>
+          <GenericExplain view={view as GenericVM} />
+        </motion.div>
+      )
+  }
+}
+
+/**
+ * Generic Explain Component - 簡化版通用解析
+ */
+function GenericExplain({ view }: { view: GenericVM }) {
+  return (
+    <div className="space-y-3">
+      {view.answer && (
+        <div className="rounded-lg bg-zinc-900/60 border border-zinc-800/50 p-4">
+          <div className="text-sm font-medium text-zinc-300 mb-2">答案</div>
+          <div className="text-lg text-green-400 font-semibold">
+            <Typewriter text={`${view.answer.label}. ${view.answer.text}`} />
+          </div>
+        </div>
+      )}
+      {view.stem.en && (
+        <div className="rounded-lg bg-zinc-900/60 border border-zinc-800/50 p-4">
+          <div className="text-sm text-zinc-200">{view.stem.en}</div>
+          {view.stem.zh && (
+            <div className="text-sm text-zinc-400 mt-2">{view.stem.zh}</div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
 
 /**
- * Main ExplainCardV2 component
+ * Main ExplainCardV2 component - 極簡統一架構
  */
-export default function ExplainCardV2({ inputText, mode: initialMode = 'fast', onModeChange, conservative = false }: ExplainCardV2Props) {
+export default function ExplainCardV2({ inputText, conservative = false }: ExplainCardV2Props) {
   const [vm, setVm] = useState<ExplainViewModel | null>(null)
   const [conservativeResult, setConservativeResult] = useState<ConservativeResult | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [loadingStep, setLoadingStep] = useState(0)
-  const [mode, setMode] = useState<ExplainMode>(initialMode)
   const [error, setError] = useState<string | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
-  // Fetch explanation with 4-phase loading
+  // Convert ExplainViewModel to ExplainCard, then to ExplainVM
+  const explainView = useMemo<ExplainVM | null>(() => {
+    if (!vm) return null
+
+    // Normalize kind immediately
+    const canonicalKind = toCanonicalKind(vm.kind)
+    console.log(`[ExplainCardV2] Normalized: ${vm.kind} → ${canonicalKind}`)
+
+    // Convert to ExplainCard format
+    const card = convertExplainViewModelToCard(vm, inputText)
+    
+    // Present using presenter
+    const view = presentExplainCard(card)
+    
+    if (!view) {
+      console.warn('[ExplainCardV2] Failed to present card')
+      return null
+    }
+
+    return view
+  }, [vm, inputText])
+
+  // Check rendering threshold and get missing fields
+  const missingFields = useMemo(() => getMissingFields(explainView), [explainView])
+  const canRender = useMemo(() => missingFields.length === 0, [missingFields])
+
+  // Fetch explanation with 4-phase loading + AbortController
   useEffect(() => {
     if (!inputText.trim()) return
+
+    // Abort previous request
+    if (abortRef.current) {
+      abortRef.current.abort()
+      abortRef.current = null
+    }
 
     const loadingSteps = [
       '正在分析題型…',
@@ -243,23 +372,29 @@ export default function ExplainCardV2({ inputText, mode: initialMode = 'fast', o
     ]
 
     const fetchExplanation = async () => {
+      // Create new AbortController
+      const controller = new AbortController()
+      abortRef.current = controller
+
       setIsLoading(true)
       setError(null)
       setLoadingStep(0)
 
       // Phase 1-3: Rotate through loading messages (1.2s each)
       for (let i = 0; i < loadingSteps.length - 1; i++) {
+        if (controller.signal.aborted) return
         setLoadingStep(i)
         await new Promise((resolve) => setTimeout(resolve, 1200))
       }
 
       // Phase 4: Final step before API call
+      if (controller.signal.aborted) return
       setLoadingStep(loadingSteps.length - 1)
 
       try {
         // Track request
-        track('explain.request', {
-          mode: conservative ? 'conservative' : mode,
+        track('explain.request' as any, {
+          mode: conservative ? 'conservative' : 'unified',
           input_len: inputText.length,
         })
 
@@ -272,9 +407,10 @@ export default function ExplainCardV2({ inputText, mode: initialMode = 'fast', o
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             input: { text: inputText },
-            mode,
+            mode: 'deep', // Always use deep mode (equivalent to unified)
             conservative,
           }),
+          signal: controller.signal,
         })
 
         if (!res.ok) {
@@ -292,63 +428,83 @@ export default function ExplainCardV2({ inputText, mode: initialMode = 'fast', o
             latency_ms: Math.round(latency),
           })
 
-          track('explain.render', {
+          track('explain.render' as any, {
             mode: 'conservative',
             kind: data.detected_type,
             latency_ms: Math.round(latency),
+            vm_valid: true,
+            missing_fields: [],
           })
 
           setConservativeResult(data as ConservativeResult)
         } else {
           // Normal TARS+KCE response
+          const normalizedKind = toCanonicalKind(data.kind)
           console.log('[ExplainCardV2] Explanation received:', {
-            kind: data.kind,
-            mode: data.mode,
-            latency_ms: Math.round(latency),
-          })
-
-          track('explain.render', {
-            mode: data.mode,
-            kind: data.kind,
+            originalKind: data.kind,
+            normalizedKind,
             latency_ms: Math.round(latency),
           })
 
           setVm(data as ExplainViewModel)
+
+          // Track after view is computed (in next render)
+          setTimeout(() => {
+            track('explain.render' as any, {
+              mode: 'unified',
+              kind: normalizedKind,
+              originalKind: data.kind,
+              latency_ms: Math.round(latency),
+              vm_valid: canRender,
+              missing_fields: missingFields,
+            })
+          }, 0)
         }
 
         setIsLoading(false)
         console.log('[ExplainCardV2] Rendering completed')
       } catch (err) {
+        // Ignore abort errors
+        if (err instanceof Error && err.name === 'AbortError') {
+          console.log('[ExplainCardV2] Request aborted')
+          return
+        }
+        
         console.error('[ExplainCardV2] Error:', err)
         setError(err instanceof Error ? err.message : 'Unknown error')
         setIsLoading(false)
+      } finally {
+        abortRef.current = null
       }
     }
 
     fetchExplanation()
-  }, [inputText, mode, conservative])
 
-  // Handle mode change
-  const handleModeChange = (newMode: ExplainMode) => {
-    if (newMode === mode) return
+    // Cleanup: abort on unmount or input change
+    return () => {
+      if (abortRef.current) {
+        abortRef.current.abort()
+        abortRef.current = null
+      }
+    }
+  }, [inputText, conservative])
 
-    track('explain.mode_change', {
-      from: mode,
-      to: newMode,
-      kind: vm?.kind,
-    })
-
-    setMode(newMode)
-    onModeChange?.(newMode)
-  }
+  // Update tracking when view changes
+  useEffect(() => {
+    if (explainView && !isLoading && !conservativeResult) {
+      const normalizedKind = toCanonicalKind(vm?.kind || 'unknown')
+      track('explain.render' as any, {
+        mode: 'unified',
+        kind: normalizedKind,
+        originalKind: vm?.kind,
+        vm_valid: canRender,
+        missing_fields: missingFields,
+      })
+    }
+  }, [explainView, canRender, missingFields, vm, isLoading, conservativeResult])
 
   return (
-    <div className="space-y-4">
-      {/* Mode Toggle */}
-      <div className="flex justify-end">
-        <ModeToggle currentMode={mode} onModeChange={handleModeChange} />
-      </div>
-
+    <div className="space-y-4 min-h-[40vh] max-h-[70vh] overflow-y-auto">
       {/* Loading State with 4-phase animation */}
       <AnimatePresence mode="wait">
         {isLoading && <LoadingState key={loadingStep} currentStep={loadingStep} />}
@@ -361,19 +517,25 @@ export default function ExplainCardV2({ inputText, mode: initialMode = 'fast', o
         </div>
       )}
 
-      {/* Content */}
+      {/* Conservative Mode Content */}
       {conservativeResult && !isLoading && (
         <ConservativePresenter result={conservativeResult} />
       )}
 
-      {vm && !isLoading && !conservativeResult && (
-        <>
-          {mode === 'fast' ? (
-            <FastModePresenter vm={vm} />
-          ) : (
-            <DeepModePresenter vm={vm} />
-          )}
-        </>
+      {/* Unified Content - 使用專業組件系統 */}
+      {explainView && canRender && !isLoading && !conservativeResult && (
+        <AnimatePresence mode="wait">
+          {renderByKind(explainView)}
+        </AnimatePresence>
+      )}
+
+      {/* Fallback UI for unknown kinds or missing fields */}
+      {vm && (!explainView || !canRender) && !isLoading && !conservativeResult && (
+        <DevFallbackUI 
+          data={vm} 
+          kind={toCanonicalKind(vm.kind)} 
+          missingFields={missingFields}
+        />
       )}
     </div>
   )
