@@ -77,18 +77,19 @@ function LoadingState({ currentStep }: { currentStep: number }) {
 function convertExplainViewModelToCard(vm: ExplainViewModel, inputText: string): ExplainCardModel {
   // Use legacy canonical kind for compatibility with ExplainCardModel
   const legacyKind = toLegacyCanonicalKind(vm.kind)
-  
-  // Extract answer key from answer string (e.g., "(A) answer" -> "A")
-  const answerMatch = vm.answer.match(/^\(?([A-D])\)?\s*/i)
+
+  // Extract answer key from answer string (e.g., "(A) answer" -> "A")  // Safe access with default
+  const answerString = vm.answer || ''
+  const answerMatch = answerString.match(/^\(?([A-E])\)?\s*/i)
   const answerKey = answerMatch ? answerMatch[1].toUpperCase() : undefined
-  const answerText = vm.answer.replace(/^\(?[A-D]\)?\s*/i, '').trim()
+  const answerText = answerString.replace(/^\(?[A-E]\)?\s*/i, '').trim()
 
   // Build options from distractorNotes if available
   const options = vm.distractorNotes?.map((note) => {
-    const optionMatch = note.option.match(/^\(?([A-D])\)?\s*/i)
+    const optionMatch = note.option.match(/^\(?([A-E])\)?\s*/i)
     const key = optionMatch ? optionMatch[1].toUpperCase() : note.option
     const text = note.note.split('｜')[0] || note.note
-    
+
     return {
       key,
       text: text.trim(),
@@ -101,10 +102,27 @@ function convertExplainViewModelToCard(vm: ExplainViewModel, inputText: string):
   if (answerKey && !options.find((opt) => opt.key === answerKey)) {
     options.push({
       key: answerKey,
-      text: answerText,
+      text: answerText || `選項 ${answerKey}`,
       verdict: 'fit' as const,
-      reason: vm.briefReason,
+      reason: vm.briefReason || '',
     })
+  }
+
+  // Fallback: Parse options from inputText if no distractorNotes
+  if (options.length === 0) {
+    const optionMatches = inputText.matchAll(/\(([A-E])\)\s*([^\n(]+)/gi)
+    for (const match of optionMatches) {
+      const key = match[1].toUpperCase()
+      const text = match[2].trim()
+      if (text) {
+        options.push({
+          key,
+          text,
+          verdict: key === answerKey ? ('fit' as const) : ('unfit' as const),
+          reason: '',
+        })
+      }
+    }
   }
 
   // Map legacy kind to ExplainCardModel kind
