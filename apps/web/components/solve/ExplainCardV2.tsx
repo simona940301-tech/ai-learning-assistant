@@ -2,12 +2,14 @@
 
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { nanoid } from 'nanoid'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { ExplainViewModel } from '@/lib/types'
 import type { ConservativeResult } from '@/lib/ai/conservative-types'
 import { track } from '@plms/shared/analytics'
 import Typewriter from './Typewriter'
 import ConservativePresenter from './explain/ConservativePresenter'
-import { toCanonicalKind, type CanonicalKind, getKindLabel } from '@/lib/explain/kind-alias'
+import { toCanonicalKind, toLegacyCanonicalKind, type CanonicalKind, getKindLabel } from '@/lib/explain/kind-alias'
 import type { ExplainCard as ExplainCardModel } from '@/lib/contracts/explain'
 import {
   presentExplainCard,
@@ -28,8 +30,10 @@ import ReadingExplain from './explain/ReadingExplain'
 import { ParagraphOrganizationExplain } from './explain/ParagraphOrganizationExplain'
 import { TranslationExplain } from './explain/TranslationExplain'
 import { ContextualCompletionExplain } from './explain/ContextualCompletionExplain'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { nanoid } from 'nanoid'
+import { toQuestionSetVM } from '@/lib/mapper/explain-presenter'
+import { detectMultipleQuestions } from '@/lib/explain/multi-question-detector'
+import QuestionSetExplain from './explain/QuestionSetExplain'
+import type { QuestionSetVM } from '@/lib/mapper/vm/question-set'
 
 interface ExplainCardV2Props {
   inputText: string
@@ -71,7 +75,8 @@ function LoadingState({ currentStep }: { currentStep: number }) {
  * Convert ExplainViewModel (legacy API format) to ExplainCard (canonical format)
  */
 function convertExplainViewModelToCard(vm: ExplainViewModel, inputText: string): ExplainCardModel {
-  const canonicalKind = toCanonicalKind(vm.kind)
+  // Use legacy canonical kind for compatibility with ExplainCardModel
+  const legacyKind = toLegacyCanonicalKind(vm.kind)
   
   // Extract answer key from answer string (e.g., "(A) answer" -> "A")
   const answerMatch = vm.answer.match(/^\(?([A-D])\)?\s*/i)
@@ -102,10 +107,18 @@ function convertExplainViewModelToCard(vm: ExplainViewModel, inputText: string):
     })
   }
 
+  // Map legacy kind to ExplainCardModel kind
+  let cardKind: 'E1' | 'E2' | 'E3' | 'E4' | 'E5' | 'E6' | 'E7' | 'FALLBACK' = 'FALLBACK'
+  if (legacyKind === 'unknown' || legacyKind === 'E8') {
+    cardKind = 'FALLBACK'
+  } else if (['E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7'].includes(legacyKind)) {
+    cardKind = legacyKind as 'E1' | 'E2' | 'E3' | 'E4' | 'E5' | 'E6' | 'E7'
+  }
+
   return {
     id: nanoid(),
     question: inputText,
-    kind: canonicalKind === 'unknown' ? 'FALLBACK' : (canonicalKind === 'E8' ? 'FALLBACK' : canonicalKind),
+    kind: cardKind,
     translation: vm.cnTranslation,
     cues: vm.grammarHighlights || [],
     options,
@@ -182,22 +195,25 @@ function DevFallbackUI({
   missingFields = [],
 }: { 
   data: any
-  kind: CanonicalKind
+  kind: CanonicalKind | undefined
   missingFields?: string[]
 }) {
+  const displayKind = kind || 'unknown'
+  const legacyKind = kind ? toLegacyCanonicalKind(kind) : 'unknown'
+  
   return (
     <Card className="border-yellow-500/50 bg-yellow-500/10">
       <CardHeader>
         <CardTitle className="text-yellow-600 dark:text-yellow-400 text-sm flex items-center gap-2">
           <span>⚠️</span>
-          <span>題型未知 ({getKindLabel(kind)})</span>
+          <span>題型未知 ({getKindLabel(legacyKind)})</span>
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-3 text-sm">
           <div className="text-zinc-600 dark:text-zinc-400">
             <div className="font-medium mb-1">
-              Kind: <code className="px-1.5 py-0.5 bg-zinc-800/30 rounded">{kind}</code>
+              Kind: <code className="px-1.5 py-0.5 bg-zinc-800/30 rounded">{displayKind}</code>
             </div>
             {missingFields.length > 0 && (
               <div className="mt-2">
@@ -322,6 +338,7 @@ function GenericExplain({ view }: { view: GenericVM }) {
  */
 export default function ExplainCardV2({ inputText, conservative = false }: ExplainCardV2Props) {
   const [vm, setVm] = useState<ExplainViewModel | null>(null)
+  const [questionSetVM, setQuestionSetVM] = useState<QuestionSetVM | null>(null)
   const [conservativeResult, setConservativeResult] = useState<ConservativeResult | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [loadingStep, setLoadingStep] = useState(0)
@@ -439,26 +456,57 @@ export default function ExplainCardV2({ inputText, conservative = false }: Expla
           setConservativeResult(data as ConservativeResult)
         } else {
           // Normal TARS+KCE response
-          const normalizedKind = toCanonicalKind(data.kind)
-          console.log('[ExplainCardV2] Explanation received:', {
-            originalKind: data.kind,
-            normalizedKind,
-            latency_ms: Math.round(latency),
-          })
-
-          setVm(data as ExplainViewModel)
-
-          // Track after view is computed (in next render)
-          setTimeout(() => {
+          // Check if response is E0_QUESTION_SET or needs multi-question detection
+          const isE0Response = data.type === 'E0_QUESTION_SET'
+          const needsMultiDetection = !isE0Response && detectMultipleQuestions(inputText)
+          
+          if (isE0Response || needsMultiDetection) {
+            // Convert to QuestionSetVM
+            const qset = toQuestionSetVM(data)
+            setQuestionSetVM(qset)
+            setVm(null) // Clear single-question VM
+            
+            // Track E0 render
             track('explain.render' as any, {
-              mode: 'unified',
-              kind: normalizedKind,
-              originalKind: data.kind,
+              type: 'E0',
+              total: qset.questions.length,
+              kinds: qset.questions.map((q) => q.kind),
               latency_ms: Math.round(latency),
-              vm_valid: canRender,
-              missing_fields: missingFields,
             })
-          }, 0)
+            
+            // Track each question
+            qset.questions.forEach((q) => {
+              track('explain.question.render' as any, {
+                qid: q.qid,
+                kind: q.kind,
+                has_reason: !!q.one_line_reason,
+                choices: q.choices.length,
+              })
+            })
+          } else {
+            // Single question - use existing flow
+            const normalizedKind = toCanonicalKind(data.kind)
+            console.log('[ExplainCardV2] Explanation received:', {
+              originalKind: data.kind,
+              normalizedKind,
+              latency_ms: Math.round(latency),
+            })
+
+            setVm(data as ExplainViewModel)
+            setQuestionSetVM(null) // Clear question set
+
+            // Track after view is computed (in next render)
+            setTimeout(() => {
+              track('explain.render' as any, {
+                mode: 'unified',
+                kind: normalizedKind,
+                originalKind: data.kind,
+                latency_ms: Math.round(latency),
+                vm_valid: canRender,
+                missing_fields: missingFields,
+              })
+            }, 0)
+          }
         }
 
         setIsLoading(false)
@@ -522,15 +570,20 @@ export default function ExplainCardV2({ inputText, conservative = false }: Expla
         <ConservativePresenter result={conservativeResult} />
       )}
 
-      {/* Unified Content - 使用專業組件系統 */}
-      {explainView && canRender && !isLoading && !conservativeResult && (
+      {/* E0 Question Set - 題組模式 */}
+      {questionSetVM && !isLoading && !conservativeResult && (
+        <QuestionSetExplain vm={questionSetVM} />
+      )}
+
+      {/* Unified Content - 使用專業組件系統（單題模式） */}
+      {!questionSetVM && explainView && canRender && !isLoading && !conservativeResult && (
         <AnimatePresence mode="wait">
           {renderByKind(explainView)}
         </AnimatePresence>
       )}
 
       {/* Fallback UI for unknown kinds or missing fields */}
-      {vm && (!explainView || !canRender) && !isLoading && !conservativeResult && (
+      {!questionSetVM && vm && (!explainView || !canRender) && !isLoading && !conservativeResult && (
         <DevFallbackUI 
           data={vm} 
           kind={toCanonicalKind(vm.kind)} 

@@ -1,6 +1,5 @@
-import { buildExplainView } from '@/lib/explain-normalizer'
-import type { ExplainCard } from '@/lib/contracts/explain'
-import { parseReading, type ParsedReading, type ReadingQuestionBlock } from '@/lib/english/reading-parser'
+import { QuestionSetVM, type E0Question } from './vm/question-set'
+import { toCanonicalKind } from '@/lib/explain/kind-alias'
 
 type OptionLabel = 'A' | 'B' | 'C' | 'D'
 const LETTERS = ['A', 'B', 'C', 'D', 'E'] as const
@@ -2316,4 +2315,70 @@ export function presentExplainCard(card: ExplainCard | null): ExplainVM | null {
     default:
       return prepareGenericVM(base, baseView, card)
   }
+}
+
+/**
+ * Convert API response to QuestionSetVM
+ * 將 API response 映射為 QuestionSetVM（若是單題也能包成一題）
+ */
+export function toQuestionSetVM(resp: any): QuestionSetVM {
+  if (resp?.type === 'E0_QUESTION_SET') {
+    // 服務端已組好，僅做 kind 正規化與驗證
+    const normalized = {
+      ...resp,
+      questions: (resp.questions ?? []).map((q: any, i: number) => {
+        const canonicalKind = toCanonicalKind(q.kind) ?? toCanonicalKind(q.original_kind) ?? 'vocab'
+        
+        return {
+          qid: q.qid ?? i + 1,
+          kind: canonicalKind,
+          stem: q.stem ?? q.question_text ?? q.question?.text ?? '',
+          choices: q.choices ?? q.options?.map((opt: any) => String(opt?.text ?? opt)) ?? [],
+          answer: q.answer_text ?? q.answer ?? '',
+          answer_label: q.answer_label ?? q.answerLabel,
+          one_line_reason: q.one_line_reason ?? q.reasoning ?? q.reason ?? '',
+          distractor_rejects: q.distractor_rejects ?? q.distractorRejects ?? [],
+          meta: q.meta ?? {},
+        }
+      }),
+    }
+    
+    return QuestionSetVM.parse(normalized)
+  }
+  
+  // 單題 → 包成一題題組（保守兜底）
+  const kind = toCanonicalKind(resp?.kind) ?? 'vocab'
+  const p = resp?.payload ?? resp
+  
+  // 提取選項
+  const choices = p?.choices ?? p?.options ?? []
+  const choicesArray = Array.isArray(choices)
+    ? choices.map((c: any) => String(c?.text ?? c ?? ''))
+    : []
+  
+  // 提取答案
+  const answerText = p?.answer_text ?? p?.answer ?? ''
+  const answerLabel = p?.answer_label ?? p?.answerLabel
+  
+  const one: E0Question = {
+    qid: 1,
+    kind,
+    stem: p?.question?.text ?? p?.stem ?? p?.question_text ?? resp?.prompt ?? '',
+    choices: choicesArray.length >= 2 ? choicesArray : ['A', 'B', 'C', 'D'], // Fallback
+    answer: answerText,
+    answer_label: answerLabel,
+    one_line_reason: p?.one_line_reason ?? p?.reasoning ?? p?.reason ?? resp?.briefReason ?? '',
+    distractor_rejects: p?.distractor_rejects ?? p?.distractorRejects ?? [],
+    meta: {
+      mode: resp?.mode,
+      latency_ms: resp?.meta?.latency_ms,
+      original_response: resp,
+    },
+  }
+  
+  return QuestionSetVM.parse({
+    type: 'E0_QUESTION_SET',
+    source_context: resp?.source_context ?? 'N/A',
+    questions: [one],
+  })
 }

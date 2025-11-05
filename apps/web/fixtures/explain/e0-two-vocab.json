@@ -1,0 +1,55 @@
+{
+  "type": "E0_QUESTION_SET",
+  "source_context": "N/A",
+  "questions": [
+    {
+      "qid": 1,
+      "kind": "vocab",
+      "stem": "There are reports coming in that a number of people have been injured in a terrorist ____.",
+      "choices": ["access", "supply", "attack", "burden"],
+      "answer": "attack",
+      "answer_label": "C",
+      "one_line_reason": "語義搭配：terrorist attack（恐怖攻擊）為常見搭配",
+      "distractor_rejects": [
+        {
+          "option": "A",
+          "reason": "access（接近）語義不合"
+        },
+        {
+          "option": "B",
+          "reason": "supply（供應）語義不合"
+        },
+        {
+          "option": "D",
+          "reason": "burden（負擔）語義不合"
+        }
+      ],
+      "meta": {}
+    },
+    {
+      "qid": 2,
+      "kind": "vocab",
+      "stem": "The police broke into a computer room and arrested a few young men who were involved in ____ online activities.",
+      "choices": ["eager", "local", "illegal", "suitable"],
+      "answer": "illegal",
+      "answer_label": "C",
+      "one_line_reason": "'involved in illegal activities' 為常見搭配，表示從事非法活動",
+      "distractor_rejects": [
+        {
+          "option": "A",
+          "reason": "eager（急切的）語義不合"
+        },
+        {
+          "option": "B",
+          "reason": "local（本地的）語義不合"
+        },
+        {
+          "option": "D",
+          "reason": "suitable（適合的）語義不合"
+        }
+      ],
+      "meta": {}
+    }
+  ]
+}
+
