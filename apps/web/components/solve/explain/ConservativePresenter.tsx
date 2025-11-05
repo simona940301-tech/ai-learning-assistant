@@ -11,7 +11,7 @@ import type {
   E5TranslationAnswer,
   E6WritingAnswer,
 } from '@/lib/ai/conservative-types'
-import Typewriter from '../solve/Typewriter'
+import Typewriter from '../Typewriter'
 
 interface ConservativePresenterProps {
   result: ConservativeResult
