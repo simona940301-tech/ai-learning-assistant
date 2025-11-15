@@ -2,17 +2,19 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
+import React from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
+import { supabaseBrowserClient } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { motion } from 'framer-motion'
-import { Eye, EyeOff, Mail, Lock, Chrome, Facebook, Apple } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Eye, EyeOff, Mail, Lock, Chrome, Facebook, Apple, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 
-export default function LoginPage() {
+function LoginForm() {
   const [isLogin, setIsLogin] = useState(true)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -21,10 +23,44 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
 
-  const { signIn, signUp, signInWithOAuth } = useAuth()
+  const { signIn, signUp, signInWithOAuth, user, loading: authLoading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
+
+  // If already logged in, check if onboarding completed
+  // Only redirect if user is already logged in (not during initial load)
+  React.useEffect(() => {
+    // Only check if we're not in the middle of a login attempt
+    if (user && !authLoading && !loading) {
+      // Small delay to prevent flash of login page
+      const timer = setTimeout(() => {
+        // Check if user has completed onboarding
+        supabaseBrowserClient
+          .from('profiles')
+          .select('onboarding_completed')
+          .eq('id', user.id)
+          .single()
+          .then(({ data }) => {
+            if (data?.onboarding_completed) {
+              // Already completed onboarding, go to app
+              router.push('/play')
+            } else {
+              // Not completed, go to goal selection
+              router.push('/onboarding/goal')
+            }
+          })
+          .catch(() => {
+            // Profile doesn't exist or error, go to goal selection
+            router.push('/onboarding/goal')
+          })
+      }, 300)
+
+      return () => clearTimeout(timer)
+    }
+  }, [user, authLoading, loading, router])
+
   const redirectTo = searchParams.get('redirect') || '/play'
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -286,6 +322,21 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="mb-4 text-4xl animate-spin">⏳</div>
+          <p className="text-muted-foreground">載入中...</p>
+        </div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   )
 }
 
