@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { TaskType, SolveType, AskResult, Reference, AttachedFile } from '@/lib/types'
+import { chatCompletionJSON } from '@/lib/openai'
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 
@@ -151,13 +152,6 @@ export async function POST(request: NextRequest) {
   try {
     const { type, solveType, prompt, attachments, sourceMode, scholarMode = false }: AIRequest = await request.json()
 
-    if (!GEMINI_API_KEY) {
-      return NextResponse.json(
-        { error: 'Gemini API key not configured' },
-        { status: 500 }
-      )
-    }
-
     if (!prompt.trim() && attachments.length === 0 && !scholarMode) {
       return NextResponse.json(
         { error: '請加入附件或貼上文字，或開啟「學霸補充」' },
@@ -177,39 +171,17 @@ export async function POST(request: NextRequest) {
 
     const finalPrompt = systemPrompt + sourceRestriction
 
-    // 調用 Gemini API
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: finalPrompt,
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.2, // 低溫度確保一致性
-            maxOutputTokens: 2048,
-          },
-        }),
+    let aiResponse: string
+    try {
+      if (GEMINI_API_KEY) {
+        aiResponse = await generateWithGemini(finalPrompt)
+      } else {
+        aiResponse = await generateWithOpenAI(finalPrompt, type)
       }
-    )
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(`Gemini API request failed: ${errorData.error?.message || 'Unknown error'}`)
+    } catch (modelError) {
+      console.error('AI generation failed, using fallback summary', modelError)
+      aiResponse = buildFallbackSummary(prompt, attachments, type)
     }
-
-    const data = await response.json()
-    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || '無法生成回應'
 
     // 解析回應
     const result = parseAIResponse(aiResponse, attachments)
@@ -225,4 +197,80 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+async function generateWithGemini(prompt: string): Promise<string> {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt,
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 2048,
+        },
+      }),
+    }
+  )
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    throw new Error(`Gemini API request failed: ${errorData.error?.message || 'Unknown error'}`)
+  }
+
+  const data = await response.json()
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '無法生成回應'
+}
+
+async function generateWithOpenAI(prompt: string, type: TaskType): Promise<string> {
+  const persona =
+    type === 'summary'
+      ? 'You are a bilingual study designer who rewrites notes into WHY/WHAT/HOW/CHECK sections plus optional tables or charts.'
+      : 'You are a calm exam tutor who explains problems step-by-step with clear checkpoints.'
+
+  const result = await chatCompletionJSON<{ content: string }>([
+    {
+      role: 'system',
+      content: `${persona} Always cite evidence using [A1], [A2] tags that match the attachments listed in the prompt.`,
+    },
+    {
+      role: 'user',
+      content: `${prompt}\n\nReturn JSON {"content": "<markdown>"}. No prose outside JSON.`,
+    },
+  ])
+
+  if (!result?.content) {
+    throw new Error('OpenAI returned empty content')
+  }
+  return result.content.trim()
+}
+
+function buildFallbackSummary(userPrompt: string, attachments: AttachedFile[], type: TaskType): string {
+  const headline = type === 'summary' ? '## WHY/WHAT/HOW/CHECK 快速草稿' : '## 解題草稿'
+  const tableRows = attachments.length
+    ? attachments
+        .map((file, index) => {
+          const tag = `[A${index + 1}]`
+          const snippet = (file.content || '').replace(/\s+/g, ' ').slice(0, 120) || '已上傳，等待解析'
+          return `| ${tag} ${file.name} | ${snippet} |`
+        })
+        .join('\n')
+    : '| — | 尚未提供附件，僅根據輸入生成草稿 |'
+
+  const table = `| 來源 | 初步觀察 |\n| --- | --- |\n${tableRows}`
+  const promptSection = userPrompt?.trim() ? `\n\n### 使用者補充\n${userPrompt.trim()}` : ''
+  const notice = '\n\n> ⚠️ 目前採用離線備援摘要，建議完成上傳後再重新整理。'
+  return `${headline}\n\n${table}${promptSection}${notice}`
 }

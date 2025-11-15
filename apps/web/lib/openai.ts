@@ -50,41 +50,68 @@ export async function chatCompletion(
   return content
 }
 
+const JSON_ENFORCER_MESSAGE: ChatMessage = {
+  role: 'system',
+  content: 'You MUST reply with a single JSON object only. No prose, no markdown, no code fences.',
+}
+
 export async function chatCompletionJSON<T>(
   messages: ChatMessage[],
   options: ChatCompletionOptions = {}
 ): Promise<T> {
-  // If responseFormat is explicitly undefined, use text mode and parse manually
-  // This allows arrays to be returned (json_object mode forces object returns)
-  const useJsonObject = options.responseFormat !== undefined
-  
-  const raw = useJsonObject
-    ? await chatCompletion(messages, { ...options, responseFormat: options.responseFormat ?? { type: 'json_object' } })
-    : await chatCompletion(messages, { ...options, responseFormat: undefined })
-  
+  const client = getClient()
+  const hasExplicitResponseFormat = Object.prototype.hasOwnProperty.call(options, 'responseFormat')
+
+  const model = options.model ?? 'gpt-4o-mini'
+  const maxTokens = options.maxOutputTokens ?? 1200
+  const temperature = hasExplicitResponseFormat ? options.temperature ?? 0.2 : 0.15
+  const responseFormat = hasExplicitResponseFormat ? options.responseFormat : { type: 'json_object' }
+
+  const baseMessages = hasExplicitResponseFormat ? messages : [JSON_ENFORCER_MESSAGE, ...messages]
+
+  const baseParams = {
+    model,
+    messages: baseMessages,
+    temperature,
+    max_tokens: maxTokens,
+    response_format: responseFormat,
+  }
+
+  const primary = await client.chat.completions.create(baseParams as any)
+  const primaryText = primary.choices?.[0]?.message?.content ?? ''
+  const firstParse = parseJsonWithRepair<T>(primaryText)
+  if (firstParse) {
+    return firstParse
+  }
+
+  const repairPrompt: ChatMessage = {
+    role: 'user',
+    content:
+      'Your last reply was invalid JSON (truncated or malformed). Return a single valid JSON object now, fixing any issues. Do NOT include explanations.',
+  }
+
+  const retryParams = {
+    ...baseParams,
+    messages: [...baseMessages, { role: 'assistant', content: primaryText }, repairPrompt],
+  }
+
+  const retry = await client.chat.completions.create(retryParams as any)
+  const retryText = retry.choices?.[0]?.message?.content ?? ''
+  const retryParse = parseJsonWithRepair<T>(retryText)
+  if (retryParse) {
+    return retryParse
+  }
+
+  const fallbackCandidate = sanitizeJsonCandidate(retryText || primaryText)
+  const repaired = cheapRepair(fallbackCandidate)
+
   try {
-    // Try to extract JSON array if wrapped in markdown or text
-    let jsonStr = raw.trim()
-    
-    // Remove markdown code fences
-    jsonStr = jsonStr.replace(/^```json\s*|\s*```$/gi, '').replace(/^```\s*|\s*```$/gi, '').trim()
-    
-    // Try to find JSON array in the response
-    const arrayMatch = jsonStr.match(/\[[\s\S]*\]/)
-    if (arrayMatch) {
-      return JSON.parse(arrayMatch[0]) as T
-    }
-    
-    // Try to find JSON object
-    const objectMatch = jsonStr.match(/\{[\s\S]*\}/)
-    if (objectMatch) {
-      return JSON.parse(objectMatch[0]) as T
-    }
-    
-    // Fallback: parse entire string
-    return JSON.parse(jsonStr) as T
+    return JSON.parse(repaired) as T
   } catch (error) {
-    throw new Error(`Failed to parse OpenAI JSON response: ${(error as Error).message}\nRaw: ${raw.substring(0, 500)}`)
+    const snippet = (retryText || primaryText || '').substring(0, 400)
+    throw new Error(
+      `Failed to parse OpenAI JSON response after retry: ${(error as Error).message}. Snippet: ${snippet}`
+    )
   }
 }
 
@@ -129,6 +156,69 @@ export async function* chatCompletionStream(
     const content = chunk.choices?.[0]?.delta?.content
     if (content) {
       yield content
+    }
+  }
+}
+
+function sanitizeJsonCandidate(raw: string): string {
+  if (!raw) return ''
+  let cleaned = raw.trim()
+
+  cleaned = cleaned.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim()
+
+  const objectMatch = cleaned.match(/\{[\s\S]*\}/)
+  if (objectMatch) {
+    return objectMatch[0]
+  }
+
+  const arrayMatch = cleaned.match(/\[[\s\S]*\]/)
+  if (arrayMatch) {
+    return arrayMatch[0]
+  }
+
+  const firstBrace = cleaned.indexOf('{')
+  const firstBracket = cleaned.indexOf('[')
+  const starts = [firstBrace, firstBracket].filter((index) => index >= 0)
+  if (starts.length > 0) {
+    const start = Math.min(...starts)
+    cleaned = cleaned.slice(start)
+  }
+
+  return cleaned
+}
+
+function cheapRepair(input: string): string {
+  let repaired = input
+  repaired = repaired.replace(/```(?:json)?/gi, '').replace(/```/g, '')
+
+  const openBraces = (repaired.match(/\{/g) ?? []).length
+  const closeBraces = (repaired.match(/\}/g) ?? []).length
+  if (closeBraces < openBraces) {
+    repaired += '}'.repeat(openBraces - closeBraces)
+  }
+
+  const openBrackets = (repaired.match(/\[/g) ?? []).length
+  const closeBrackets = (repaired.match(/]/g) ?? []).length
+  if (closeBrackets < openBrackets) {
+    repaired += ']'.repeat(openBrackets - closeBrackets)
+  }
+
+  return repaired
+}
+
+function parseJsonWithRepair<T>(raw: string): T | null {
+  if (!raw) return null
+  const candidate = sanitizeJsonCandidate(raw)
+  if (!candidate) return null
+
+  try {
+    return JSON.parse(candidate) as T
+  } catch {
+    try {
+      const repaired = cheapRepair(candidate)
+      return JSON.parse(repaired) as T
+    } catch {
+      return null
     }
   }
 }

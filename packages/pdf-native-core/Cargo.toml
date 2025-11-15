@@ -1,0 +1,43 @@
+[package]
+name = "pdf-native-core"
+version = "0.1.0"
+edition = "2021"
+authors = ["PLMS Team"]
+description = "High-performance PDF text selection core engine with pixel-perfect accuracy - surpassing GoodNotes precision"
+license = "MIT"
+
+[lib]
+name = "pdf_native_core"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dependencies]
+# PDF 解析庫（輕量級，適合移動設備）
+lopdf = "0.32"
+
+# 序列化（用於 FFI 數據傳遞）
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# 錯誤處理
+thiserror = "1.0"
+
+# FFI 支援
+libc = "0.2"
+
+[build-dependencies]
+cbindgen = "0.26"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+
+
+
+

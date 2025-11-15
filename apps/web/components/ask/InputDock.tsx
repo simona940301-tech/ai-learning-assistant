@@ -12,7 +12,7 @@ import {
   useState,
 } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Image, Loader2, Paperclip, Plus, Send, WifiOff } from 'lucide-react'
+import { Image, Loader2, Paperclip, Plus, Send } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n'
 import { track } from '@plms/shared/analytics'
@@ -146,14 +146,15 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
   const [isFocused, setIsFocused] = useState(false)
   const [keyboardOffset, setKeyboardOffset] = useState(0)
   const [spacerHeight, setSpacerHeight] = useState<number>(() => {
-    if (typeof document === 'undefined') return 112
+    if (typeof document === 'undefined') return 56
     const computed = parseInt(
       getComputedStyle(document.documentElement).getPropertyValue('--ask-input-dock-height'),
       10
     )
-    return Number.isFinite(computed) && computed > 0 ? computed : 112
+    return Number.isFinite(computed) && computed > 0 ? computed : 56
   })
-  const [isOnline, setIsOnline] = useState(() => getNetworkState() === 'online')
+  // 初始值設為 true 以避免 hydration 錯誤（服務端和客戶端一致）
+  const [isOnline, setIsOnline] = useState(true)
   const [pendingSend, setPendingSend] = useState(false)
   const compositionRef = useRef(false)
   const lastSubmitRef = useRef(0)
@@ -168,7 +169,10 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
   }, [mode, t])
 
   useEffect(() => {
+    // 只在客戶端執行，設置實際的網路狀態
     if (typeof window === 'undefined') return
+    // 初始化網路狀態
+    setIsOnline(getNetworkState() === 'online')
     const updateOnline = () => setIsOnline(getNetworkState() === 'online')
     window.addEventListener('online', updateOnline)
     window.addEventListener('offline', updateOnline)
@@ -202,17 +206,12 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
 
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0]
-      const height = Math.ceil(entry.contentRect.height + 24)
+      const height = Math.ceil(entry.contentRect.height + 12)
       document.documentElement.style.setProperty('--ask-input-dock-height', `${height}px`)
       setSpacerHeight(height)
     })
     observer.observe(node)
     return () => observer.disconnect()
-  }, [])
-
-  const resetUploadState = useCallback(() => {
-    setUploadState(DEFAULT_UPLOAD_STATE)
-    uploadAbortRef.current = null
   }, [])
 
   const validateImageFile = (file: File): { code: string; message: string } | null => {
@@ -513,37 +512,10 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
     }
   }
 
-  const cancelUpload = () => {
-    if (uploadAbortRef.current) {
-      uploadAbortRef.current.abort()
-    }
-    onOcrComplete({ type: 'error', message: t('ask.input.status.uploadCanceled') })
-    setUploadState({ status: 'idle', progress: 0, message: t('ask.input.status.uploadCanceled') })
-  }
-
-  const statusText = useMemo(() => {
-    if (uploadState.status === 'uploading') {
-      return `${t('ask.input.status.uploading')}… ${Math.min(uploadState.progress, 99)}%`
-    }
-    if (!isOnline) {
-      return t('ask.input.status.offline')
-    }
-    if (uploadState.status === 'success') {
-      return uploadState.message
-    }
-    if (uploadState.status === 'error') {
-      return uploadState.message
-    }
-    if (ocrStatus) {
-      return ocrStatus.message
-    }
-    return t('ask.input.status.hint')
-  }, [isOnline, ocrStatus, t, uploadState])
-
   return (
     <>
       <div className="input-dock-spacer" aria-hidden style={{ height: spacerHeight + keyboardOffset }} />
-      <div className="input-dock-shell" style={{ bottom: keyboardOffset }}>
+      <div className="input-dock-shell" style={{ bottom: `calc(var(--tab-bar-height, 64px) + 8px + ${keyboardOffset}px)` }}>
         <motion.form
           ref={dockRef}
           role="toolbar"
@@ -565,13 +537,13 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
               type="button"
               onClick={() => setMenuOpen((prev) => !prev)}
               className={cn(
-                'flex h-11 w-11 items-center justify-center rounded-full bg-white/5 text-[#6EC1E4] transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-                menuOpen && 'shadow-[0_0_16px_rgba(110,193,228,0.3)]'
+                'flex h-6 w-6 items-center justify-center rounded-full bg-white/5 text-[#6EC1E4] transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                menuOpen && 'shadow-[0_0_12px_rgba(110,193,228,0.3)]'
               )}
               aria-expanded={menuOpen}
               aria-label={t('ask.input.action.openMenu')}
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-3.5 w-3.5" />
             </button>
             <AnimatePresence>
               {menuOpen && (
@@ -580,22 +552,22 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
                   transition={{ duration: 0.18 }}
-                  className="absolute left-0 top-12 w-44 rounded-2xl border border-white/10 bg-[#141A20] p-2 text-sm text-[#F1F5F9] shadow-[0_12px_28px_rgba(0,0,0,0.4)]"
+                  className="absolute left-0 top-10 w-40 rounded-xl border border-white/10 bg-[#141A20] p-1.5 text-xs text-[#F1F5F9] shadow-[0_8px_20px_rgba(0,0,0,0.4)]"
                 >
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-left text-xs text-[#E6EDF4] transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="flex w-full items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-left text-xs text-[#E6EDF4] transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
-                    <Paperclip className="h-4 w-4 text-[#6EC1E4]" />
+                    <Paperclip className="h-3.5 w-3.5 text-[#6EC1E4]" />
                     {t('ask.input.action.uploadFile')}
                   </button>
                   <button
                     type="button"
                     onClick={() => photoInputRef.current?.click()}
-                    className="mt-1 flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-left text-xs text-[#E6EDF4] transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="mt-0.5 flex w-full items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-left text-xs text-[#E6EDF4] transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
-                    <Image className="h-4 w-4 text-[#6EC1E4]" />
+                    <Image className="h-3.5 w-3.5 text-[#6EC1E4]" />
                     {t('ask.input.action.uploadPhoto')}
                   </button>
                 </motion.div>
@@ -637,7 +609,7 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
             aria-label={t('ask.input.action.uploadPhoto', { default: '拍照上傳' })}
           />
 
-          <div className="flex flex-1 flex-col gap-2">
+          <div className="flex flex-1 items-center rounded-xl bg-white/5 px-2 py-1">
             <textarea
               ref={textAreaRef}
               value={value}
@@ -656,59 +628,23 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
               onBlur={() => setIsFocused(false)}
               onChange={(event) => onChange(event.target.value)}
               onPaste={handlePaste}
-              className="w-full min-h-[44px] resize-none rounded-2xl border-0 bg-transparent p-3 text-sm leading-6 text-[#F1F5F9] placeholder:text-[#A9B7C8]/60 focus:outline-none"
+              className="w-full min-h-[20px] max-h-[48px] resize-none border-0 bg-transparent px-1.5 py-0.5 text-[13px] leading-5 text-[#F1F5F9] placeholder:text-[#A9B7C8]/60 focus:outline-none"
               aria-label={placeholder}
               aria-multiline="true"
             />
-            <div className="flex flex-wrap items-center justify-between text-[11px] uppercase tracking-[0.18em] text-[#6EC1E4]/60">
-              <span className="flex items-center gap-2">
-                {!isOnline && <WifiOff className="h-3.5 w-3.5" />}
-                {statusText}
-              </span>
-              {uploadState.status === 'uploading' && (
-                <div className="flex min-w-[120px] items-center gap-2 text-xs normal-case tracking-normal text-[#E6EDF4]">
-                  <span className="inline-flex h-1.5 flex-1 overflow-hidden rounded-full bg-white/5">
-                    <span
-                      className="h-full rounded-full bg-[#6EC1E4] transition-all"
-                      style={{ width: `${Math.min(uploadState.progress, 100)}%` }}
-                    />
-                  </span>
-                  <button
-                    type="button"
-                    onClick={cancelUpload}
-                    className="text-[11px] uppercase tracking-[0.2em] text-[#A9B7C8]/70 hover:text-[#F1F5F9]"
-                  >
-                    {t('ask.input.status.cancel')}
-                  </button>
-                </div>
-              )}
-              {uploadState.status === 'error' && (
-                <button
-                  type="button"
-                  className="text-[11px] uppercase tracking-[0.2em] text-[#A9B7C8]/70 hover:text-[#F1F5F9]"
-                  onClick={() => {
-                    resetUploadState()
-                    onOcrComplete(null)
-                    setMenuOpen(true)
-                  }}
-                >
-                  {t('ask.input.status.retry')}
-                </button>
-              )}
-            </div>
           </div>
 
           <button
             type="submit"
             disabled={isBusy || pendingSend || uploadState.status === 'uploading'}
             className={cn(
-              'flex h-11 w-11 items-center justify-center rounded-full bg-[#1E2A34] text-[#6EC1E4] shadow-[0_0_14px_rgba(110,193,228,0.35)] transition hover:bg-[#23313C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+              'flex h-6 w-6 items-center justify-center rounded-full bg-[#1E2A34] text-[#6EC1E4] shadow-[0_0_10px_rgba(110,193,228,0.3)] transition hover:bg-[#23313C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
               (isBusy || pendingSend || uploadState.status === 'uploading') && 'opacity-60'
             )}
             aria-label={t('ask.input.sendLabel')}
             aria-busy={pendingSend || isBusy}
           >
-            {isBusy || pendingSend ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            {isBusy || pendingSend ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
           </button>
         </motion.form>
       </div>

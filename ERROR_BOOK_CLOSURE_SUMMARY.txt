@@ -1,0 +1,179 @@
+================================================================================
+「詳解卡內容加到錯題本」完整性檢查結果
+================================================================================
+
+檢查日期: 2025-11-15
+檢查分支: fix-explaincard-rollback
+
+================================================================================
+快速評估表
+================================================================================
+
+┌─────────────────────────────┬────────┬─────────────────────────────────────┐
+│ 組件                         │ 狀態   │ 評估                                 │
+├─────────────────────────────┼────────┼─────────────────────────────────────┤
+│ 1. API Endpoints            │ ✗ 部分 │ error_book 缺少更新/刪除端點         │
+│ 2. 資料庫 Schema            │ ✗ 部分 │ backpack_notes 缺少關鍵欄位          │
+│ 3. 前端 UI 按鈕             │ ✗ 有誤 │ 文案誤導「加入錯題本」→backpack     │
+│ 4. 前端呈現邏輯             │ ✗ 不完 │ 錯題本分頁無法展示詳解內容          │
+│ 5. 資料流完整性             │ ✗ 斷裂 │ 詳解 → backpack_notes，無法跟蹤掌握 │
+└─────────────────────────────┴────────┴─────────────────────────────────────┘
+
+整體評估: 不完整 (3/5 功能缺陷)
+
+================================================================================
+核心問題三大點
+================================================================================
+
+[問題 1] 架構混亂
+└─ 「加入錯題本」→ backpack_notes (筆記系統)
+└─ 而非 error_book (題目跟蹤系統)
+└─ 導致無法跟蹤掌握度、間隔重複等
+
+[問題 2] API 不完整
+├─ error_book 只有 GET/POST，缺少 PUT/DELETE
+│  ├─ ✗ 無法更新 status (active → mastered)
+│  └─ ✗ 無法刪除錯題
+└─ backpack_notes 無外鍵
+   ├─ ✗ 無 question_id
+   └─ ✗ 無法與題庫關聯
+
+[問題 3] 前端呈現缺陷
+├─ ExplainCard
+│  ├─ ✗ 按鈕文案: 「加入錯題本」(實際加到 backpack)
+│  └─ ✗ 無法獲取 question_id
+└─ BackpackContent
+   ├─ ✓ 有錯題本 API 呼叫
+   └─ ✗ UI 呈現邏輯不完整
+
+================================================================================
+檔案位置速查
+================================================================================
+
+1. API Endpoints
+   ├─ error_book API
+   │  └─ /apps/web/app/api/error-book/route.ts [部分完整]
+   ├─ backpack save API
+   │  └─ /apps/web/app/api/backpack/save/route.ts [✓完整]
+   └─ MCP wrongbook 服務
+      └─ /apps/web/lib/services/mcp/wrongbook.ts [✓完整但未使用]
+
+2. 資料庫 Schema
+   ├─ error_book 表
+   │  └─ supabase/migrations/SAFE_20251026_NEW_TABLES_ONLY.sql [✓完整]
+   └─ backpack_notes 表
+      └─ /apps/web/supabase/schema.sql:114 [✗缺欄位]
+
+3. 前端實現
+   ├─ ExplainCardV2 元件
+   │  └─ /apps/web/components/solve/ExplainCardV2.tsx [✗流程錯誤]
+   │     ├─ handlePrimaryAction (1100-1177 行)
+   │     └─ buildWrongbookNote (735-853 行)
+   └─ BackpackContent
+      └─ /apps/web/app/(app)/backpack/BackpackContent.tsx [✗呈現不完整]
+         └─ loadErrorBookItems (109-127 行)
+
+================================================================================
+關鍵代碼片段
+================================================================================
+
+【錯誤】ExplainCardV2.tsx 第 1132-1140 行
+┌────────────────────────────────────────────────────────────────────┐
+│ const res = await fetch('/api/backpack/save', {  ← 錯誤！         │
+│   method: 'POST',                                                  │
+│   headers: { 'Content-Type': 'application/json' },                │
+│   body: JSON.stringify({                                           │
+│     user_id: userId,                                              │
+│     question: questionTitle,                                       │
+│     canonical_skill: canonicalSkill,                              │
+│     note_md,              ← Markdown 詳解內容                     │
+│   }),                                                              │
+│ })                                                                 │
+│                                                                    │
+│ 應該: POST /api/error-book { questionId: "UUID" }                │
+└────────────────────────────────────────────────────────────────────┘
+
+【正確】MCP wrongbook.ts (已實現但未使用)
+┌────────────────────────────────────────────────────────────────────┐
+│ export async function create_wrongbook_entry(args: {              │
+│   userId: string                                                   │
+│   questionId: string      ← 需要題目 ID                           │
+│   explanation: unknown                                             │
+│ }): Promise<{ ok: boolean; entryId?: string }>                    │
+│                                                                    │
+│ 邏輯:                                                              │
+│ 1. 檢查題目是否已在錯題本                                          │
+│ 2. 存在 → 更新 last_attempted_at                                  │
+│ 3. 不存在 → 新增 error_book 項目                                  │
+└────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+修復優先級
+================================================================================
+
+優先級 1 (必須修復 - 確保閉環完整)
+├─ [ ] 補充 error_book API
+│  ├─ PUT /api/error-book/{id} - 更新狀態 (active→mastered)
+│  └─ DELETE /api/error-book/{id} - 刪除錯題
+├─ [ ] ExplainCard 改用 error_book API
+│  ├─ 無法獲取 question_id 時 → 仍用 backpack_notes (備用)
+│  └─ 有 question_id 時 → 優先用 error_book (推薦)
+└─ [ ] 修復文案 (「加入錯題本」vs「保存詳解」)
+
+優先級 2 (完善功能 - 增強體驗)
+├─ [ ] 增強 backpack_notes schema
+│  ├─ 添加 question_id (可選外鍵)
+│  ├─ 添加 updated_at (版本控制)
+│  └─ 添加 subject/difficulty (分類)
+├─ [ ] 完善 BackpackContent UI
+│  ├─ 實現錯題本分頁的呈現
+│  ├─ 顯示掌握度指標
+│  └─ 支援篩選和排序
+└─ [ ] 實現間隔重複
+   ├─ 根據 last_attempted_at 推薦複習
+   └─ 根據 status 過濾顯示
+
+================================================================================
+數據流對比
+================================================================================
+
+【當前 - 有問題】
+  ExplainCard (無 question_id)
+      ↓
+  handlePrimaryAction()
+      ↓
+  buildWrongbookNote() → Markdown 詳解
+      ↓
+  POST /api/backpack/save
+      ↓
+  backpack_notes (無法跟蹤、無外鍵)
+      ↓
+  ✗ 錯題本分頁無法展示
+
+【應該 - 正確】
+  ExplainCard (需要 question_id)
+      ↓
+  POST /api/error-book { questionId }
+      ↓
+  error_book (跟蹤題目、掌握度)
+      ↓
+  同時: 保存詳解 → backpack_notes (備用)
+      ↓
+  ✓ 錯題本/Backpack 都能展示
+
+================================================================================
+結論
+================================================================================
+
+「詳解卡內容加到錯題本」的閉環存在設計缺陷，需要修復：
+
+1. 架構不清晰: 兩個系統（backpack_notes vs error_book）混用
+2. API 不完整: error_book 缺少更新/刪除操作
+3. 前端誤導: 按鈕文案與實際行為不符
+4. 呈現斷裂: 詳解內容無法在錯題本頁面展示
+
+建議優先完成「優先級 1」的修復，確保資料流暢。
+
+詳細報告已保存至:
+  /Users/simonac/Desktop/moonshot idea/ERROR_BOOK_CLOSURE_CHECK.md
+

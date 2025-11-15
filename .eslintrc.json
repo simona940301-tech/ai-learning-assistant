@@ -1,3 +1,46 @@
 {
-  "extends": ["next/core-web-vitals"]
+  "extends": ["next/core-web-vitals"],
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "@/lib/tutor-utils",
+            "importNames": ["supabase"],
+            "message": "❌ Route 禁止直接使用 supabase，請使用 Service/Repo 層。參考：ARCHITECTURE.md"
+          }
+        ],
+        "patterns": [
+          {
+            "group": ["@/lib/tutor-utils"],
+            "message": "❌ Route 禁止直接導入 tutor-utils，請使用 Service/Repo 層。參考：ARCHITECTURE.md"
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["app/api/**/route.ts"],
+      "rules": {
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "CallExpression[callee.property.name='from']",
+            "message": "❌ Route 禁止直接查詢數據庫（supabase.from()），請使用 Repo 層。參考：ARCHITECTURE.md"
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "app/api/tutor/answer/route.ts",
+        "app/api/warmup/keypoint-mcq/route.ts"
+      ],
+      "rules": {
+        "no-restricted-imports": "warn"
+      }
+    }
+  ]
 }

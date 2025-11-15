@@ -54,6 +54,7 @@ export interface BackpackNoteInsert {
   question: string
   canonical_skill: string
   note_md: string
+  folder?: string // Optional: 'error_book', 'general', etc.
   created_at?: string
 }
 

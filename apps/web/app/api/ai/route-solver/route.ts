@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { orchestrateEnglishExplanation } from '@/lib/english'
 import { ExplainCardSchema } from '@/lib/contracts/explain'
+import { getAskCacheKey, readAskCache, writeAskCache } from '@/lib/cache/ask-solver-cache'
+import type { AskSolverCachePayload } from '@/lib/cache/ask-solver-cache'
 
 // Input Schema with tolerance
 const InputSchema = z
@@ -252,6 +254,52 @@ export async function POST(request: NextRequest) {
 
     const input = InputSchema.parse(body)
     const questionText = input.text || input.questionText || input.voiceText || ''
+    const cacheKey = getAskCacheKey(questionText)
+
+    const cachedResponse = cacheKey ? await readAskCache(questionText) : null
+    if (cachedResponse && cacheKey) {
+      const latency = Date.now() - start
+      console.log('[AskCache][Metrics]', {
+        event: 'ask_cache_hit',
+        key: cacheKey,
+        latency_ms: latency,
+      })
+      return NextResponse.json({
+        ...cachedResponse,
+        _meta: {
+          ...(cachedResponse._meta || {}),
+          latency_ms: latency,
+          cached: true,
+        },
+      })
+    }
+
+    const respondWithCache = async (payload: AskSolverCachePayload) => {
+      const enrichedPayload: AskSolverCachePayload = {
+        ...payload,
+        _meta: {
+          ...(payload._meta || {}),
+          latency_ms: Date.now() - start,
+          cached: false,
+        },
+      }
+      if (cacheKey) {
+        console.log('[AskCache][Metrics]', {
+          event: 'ask_cache_miss',
+          key: cacheKey,
+          latency_ms: enrichedPayload._meta?.latency_ms,
+        })
+      }
+      const writeResult = await writeAskCache(questionText, enrichedPayload)
+      if (writeResult) {
+        console.log('[AskCache][Metrics]', {
+          event: 'ask_cache_write',
+          key: writeResult.key,
+          ttl_seconds: writeResult.ttl,
+        })
+      }
+      return NextResponse.json(enrichedPayload)
+    }
 
     // Detect subject if not provided
     const subject = input.subjectHint || (await detectSubjectFromText(questionText))
@@ -311,7 +359,7 @@ export async function POST(request: NextRequest) {
               })))
             }
             
-            return NextResponse.json({
+            return respondWithCache({
               subject: 'english',
               question: questionText,
               explanation: {
@@ -320,10 +368,9 @@ export async function POST(request: NextRequest) {
               routing: englishResult.routing,
               meta: {
                 questionId: cardValidation.data.id,
-                subjectHint: 'english' as const,
+                subjectHint: 'english',
                 pipeline: 'english_router_v1',
               },
-              _meta: { latency_ms: Date.now() - start },
             })
           }
         } else {
@@ -389,7 +436,7 @@ export async function POST(request: NextRequest) {
             ],
           }
 
-          return NextResponse.json({
+          return respondWithCache({
             subject: 'english',
             question: questionText,
             explanation: {
@@ -398,10 +445,9 @@ export async function POST(request: NextRequest) {
             routing: { type: 'FALLBACK', confidence: 0.5, signals: ['validation_failed'] },
             meta: {
               questionId: fallbackCard.id,
-              subjectHint: 'english' as const,
+              subjectHint: 'english',
               pipeline: 'english_router_v1_fallback',
             },
-            _meta: { latency_ms: Date.now() - start },
           })
         }
 
@@ -423,7 +469,7 @@ export async function POST(request: NextRequest) {
         }
         
         // Return validated card
-        return NextResponse.json({
+        return respondWithCache({
           subject: 'english',
           question: questionText,
           explanation: {
@@ -432,10 +478,9 @@ export async function POST(request: NextRequest) {
           routing: englishResult.routing,
           meta: {
             questionId: cardValidation.data.id,
-            subjectHint: 'english' as const,
+            subjectHint: 'english',
             pipeline: 'english_router_v1',
           },
-          _meta: { latency_ms: Date.now() - start },
         })
       }
     }
@@ -445,7 +490,7 @@ export async function POST(request: NextRequest) {
     // TODO: Implement proper routers for math/chinese/etc
     console.warn('[route-solver] No English router match, returning minimal fallback')
 
-    return NextResponse.json({
+    return respondWithCache({
       subject: subject,
       question: questionText,
       explanation: {
@@ -469,7 +514,6 @@ export async function POST(request: NextRequest) {
         subjectHint: subject,
         pipeline: 'fallback_minimal',
       },
-      _meta: { latency_ms: Date.now() - start },
     })
   } catch (error) {
     console.error('[route-solver] error:', error)
