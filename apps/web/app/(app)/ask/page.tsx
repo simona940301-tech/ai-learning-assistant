@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+export const dynamic = 'force-dynamic'
+
+import { useState, useEffect, Suspense } from 'react'
 import { motion } from 'framer-motion'
 import ModeTabs from '@/components/ask/ModeTabs'
 import AnySubjectSolver from '@/components/ask/AnySubjectSolver'
-import SummaryCard from '@/components/ask/SummaryCard'
+import { SummaryWorkbench } from '@/components/ask/SummaryWorkbench'
 import { installGlobalFetchGuard } from '@/lib/api-client'
 
 export default function AskPage() {
@@ -22,7 +24,7 @@ export default function AskPage() {
   }, [])
 
   return (
-    <div className="relative flex min-h-screen flex-col bg-background text-foreground">
+    <div className="relative flex h-screen flex-col overflow-hidden bg-background text-foreground">
       <motion.div
         className="fixed inset-x-0 top-0 z-20 flex justify-center border-b border-border bg-background/95 px-4 py-4 backdrop-blur"
         initial={{ opacity: 0, y: -12 }}
@@ -31,12 +33,14 @@ export default function AskPage() {
         <ModeTabs active={activeTab} onChange={setActiveTab} />
       </motion.div>
 
-      <main className="flex-1 overflow-y-auto pt-24 pb-12">
+      <main className="flex flex-1 flex-col overflow-hidden pt-24">
         {activeTab === 'solve' ? (
-          <AnySubjectSolver />
+          <Suspense fallback={<div className="flex items-center justify-center min-h-[60vh]">載入中...</div>}>
+            <AnySubjectSolver />
+          </Suspense>
         ) : (
-          <div className="mx-auto max-w-3xl px-4 py-6">
-            <SummaryCard title="重點統整" bullets={['這裡可以顯示學習重點統整內容']} />
+          <div className="flex-1 overflow-y-auto">
+            <SummaryWorkbench />
           </div>
         )}
       </main>

@@ -30,7 +30,10 @@ import ReadingExplain from './explain/ReadingExplain'
 import { ParagraphOrganizationExplain } from './explain/ParagraphOrganizationExplain'
 import { TranslationExplain } from './explain/TranslationExplain'
 import { ContextualCompletionExplain } from './explain/ContextualCompletionExplain'
+import { UnifiedExplain } from './explain/UnifiedExplain'
+import { SharedPassageExplain } from './explain/SharedPassageExplain'
 import { toQuestionSetVM } from '@/lib/mapper/explain-presenter'
+import type { QuestionItem, SharedPassagePayload, IndependentListPayload } from '@/lib/explain/types'
 import { detectMultipleQuestions } from '@/lib/explain/multi-question-detector'
 import QuestionSetExplain from './explain/QuestionSetExplain'
 import type { QuestionSetVM, E0Question } from '@/lib/mapper/vm/question-set'
@@ -46,7 +49,9 @@ import { X } from 'lucide-react'
 
 interface ExplainCardV2Props {
   inputText: string
+  questionId?: string // Optional: If from question bank, enables error_book tracking
   conservative?: boolean // Enable conservative mode
+  onLoadingChange?: (isLoading: boolean) => void
 }
 
 
@@ -236,9 +241,10 @@ interface ActionFooterProps {
   saveStatus: 'idle' | 'success' | 'error'
   saveMessage: string
   onPrimaryClick: () => void
+  hasQuestionId?: boolean // ✅ 用於判斷按鈕文案
 }
 
-function ActionFooter({ visible, isSaving, saveStatus, saveMessage, onPrimaryClick }: ActionFooterProps) {
+function ActionFooter({ visible, isSaving, saveStatus, saveMessage, onPrimaryClick, hasQuestionId }: ActionFooterProps) {
   if (!visible) return null
 
   return (
@@ -250,7 +256,7 @@ function ActionFooter({ visible, isSaving, saveStatus, saveMessage, onPrimaryCli
           disabled={isSaving}
           className="w-full rounded-full bg-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-500/20 transition hover:bg-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-300 disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
         >
-          {isSaving ? '儲存中…' : '加入錯題本'}
+          {isSaving ? '儲存中…' : hasQuestionId ? '加入錯題本' : '加入筆記'}
         </button>
         {saveStatus !== 'idle' && (
           <span
@@ -522,7 +528,71 @@ function renderByKind(view: ExplainVM): React.ReactNode {
 }
 
 /**
- * Generic Explain Component - 簡化版通用解析
+ * 統一格式渲染器
+ */
+function UnifiedExplainRenderer({ data }: { data: { type: string; data: any } }) {
+  if (data.type === 'structured') {
+    const structured = data.data
+    return (
+      <UnifiedExplain
+        question={structured.question || ''}
+        options={structured.options || []}
+        answer={structured.answer || ''}
+        reasoning={structured.reasoning || ''}
+        counterpoints={structured.counterpoints}
+        optionDetails={structured.optionDetails}
+        tips={structured.tips}
+      />
+    )
+  }
+
+  if (data.type === 'questions') {
+    const questions = data.data as IndependentListPayload
+    if (questions.length === 0) return null
+
+    return (
+      <div className="space-y-6">
+        {questions.map((q, idx) => (
+          <div key={idx}>
+            {idx > 0 && <div className="my-6 border-t border-zinc-800/50" />}
+            <UnifiedExplain
+              question={q.question || ''}
+              options={q.options || []}
+              answer={q.explanation.answer}
+              reasoning={q.explanation.reasoning}
+              counterpoints={q.explanation.counterpoints}
+              optionDetails={q.explanation.optionDetails}
+              tips={q.tips}
+            />
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  if (data.type === 'sharedPassage') {
+    const shared = data.data as SharedPassagePayload
+    return <SharedPassageExplain data={shared} />
+  }
+
+  return null
+}
+
+/**
+ * Markdown 渲染器（fallback）
+ */
+function MarkdownRenderer({ markdown }: { markdown: string }) {
+  return (
+    <div className="prose prose-invert max-w-none">
+      <div className="text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed">
+        {markdown}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Generic Explain Component - 簡化版通用解析（向後兼容）
  */
 function GenericExplain({ view }: { view: GenericVM }) {
   return (
@@ -550,11 +620,11 @@ function GenericExplain({ view }: { view: GenericVM }) {
 /**
  * Main ExplainCardV2 component - 極簡統一架構
  */
-export default function ExplainCardV2({ inputText, conservative = false }: ExplainCardV2Props) {
+export default function ExplainCardV2({ inputText, questionId, conservative = false, onLoadingChange }: ExplainCardV2Props) {
   const [vm, setVm] = useState<ExplainViewModel | null>(null)
   const [questionSetVM, setQuestionSetVM] = useState<QuestionSetVM | null>(null)
   const [conservativeResult, setConservativeResult] = useState<ConservativeResult | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(() => Boolean(inputText))
   const [loadingStep, setLoadingStep] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [questionSetKind, setQuestionSetKind] = useState<QuestionSetKind>('unknown')
@@ -569,6 +639,16 @@ export default function ExplainCardV2({ inputText, conservative = false }: Expla
   const evidenceLensEnabled = useFeatureFlag('READING_EVIDENCE_LENS')
   const isMobile = useIsMobile()
   const abortRef = useRef<AbortController | null>(null)
+  useEffect(() => {
+    onLoadingChange?.(isLoading)
+  }, [isLoading, onLoadingChange])
+
+  useEffect(() => {
+    return () => {
+      onLoadingChange?.(false)
+    }
+  }, [onLoadingChange])
+
 
   const buildChipDescriptors = useCallback((question: E0Question): ChipDescriptor[] => {
     const chips: ChipDescriptor[] = []
@@ -626,8 +706,98 @@ export default function ExplainCardV2({ inputText, conservative = false }: Expla
     return chips
   }, [])
 
+  // 先定義 explainView，再定義 buildWrongbookNote
+  // Convert ExplainViewModel to ExplainCard, then to ExplainVM（保留作為 fallback）
+  const explainView = useMemo<ExplainVM | null>(() => {
+    if (!vm) return null
+
+    // 如果已經有新格式，不需要轉換
+    if ((vm as any).structured || (vm as any).questions || (vm as any).sharedPassage) {
+      return null
+    }
+
+    // Normalize kind immediately
+    const canonicalKind = toCanonicalKind(vm.kind)
+    console.log(`[ExplainCardV2] Normalized: ${vm.kind} → ${canonicalKind}`)
+
+    // Convert to ExplainCard format
+    const card = convertExplainViewModelToCard(vm, inputText)
+    
+    // Present using presenter
+    const view = presentExplainCard(card)
+    
+    if (!view) {
+      console.warn('[ExplainCardV2] Failed to present card')
+      return null
+    }
+
+    return view
+  }, [vm, inputText])
+
   const buildWrongbookNote = useCallback((): string => {
     const lines: string[] = ['# 錯題筆記', '']
+
+    // 優先使用新格式的 structuredData（直接從 vm 提取）
+    const currentStructuredData = vm ? (() => {
+      if ((vm as any).structured) {
+        return { type: 'structured' as const, data: (vm as any).structured }
+      }
+      if ((vm as any).questions) {
+        return { type: 'questions' as const, data: (vm as any).questions }
+      }
+      if ((vm as any).sharedPassage) {
+        return { type: 'sharedPassage' as const, data: (vm as any).sharedPassage }
+      }
+      return null
+    })() : null
+
+    if (currentStructuredData) {
+      if (currentStructuredData.type === 'sharedPassage') {
+        const shared = currentStructuredData.data as SharedPassagePayload
+        if (shared.sharedPassage) {
+          lines.push('## Passage', shared.sharedPassage.trim(), '')
+        }
+        shared.questions.forEach((q, idx) => {
+          lines.push(`## Q${idx + 1}`, q.question || '', '')
+          if (q.explanation.answer) {
+            lines.push(`- 答案：${q.explanation.answer}`)
+          }
+          if (q.explanation.reasoning) {
+            lines.push(`- 理由：${q.explanation.reasoning}`)
+          }
+          lines.push('')
+        })
+        return lines.join('\n')
+      }
+      
+      if (currentStructuredData.type === 'questions') {
+        const questions = currentStructuredData.data as IndependentListPayload
+        questions.forEach((q, idx) => {
+          lines.push(`## Q${idx + 1}`, q.question || '', '')
+          if (q.explanation.answer) {
+            lines.push(`- 答案：${q.explanation.answer}`)
+          }
+          if (q.explanation.reasoning) {
+            lines.push(`- 理由：${q.explanation.reasoning}`)
+          }
+          lines.push('')
+        })
+        return lines.join('\n')
+      }
+      
+      if (currentStructuredData.type === 'structured') {
+        const structured = currentStructuredData.data
+        lines.push(`- 題幹：${structured.question || inputText}`)
+        if (structured.answer) {
+          lines.push(`- 答案：${structured.answer}`)
+        }
+        if (structured.reasoning) {
+          lines.push(`- 理由：${structured.reasoning}`)
+        }
+        lines.push('')
+        return lines.join('\n')
+      }
+    }
 
     if (questionSetVM && questionSetVM.questions.length > 0) {
       if (questionSetAnalysis?.passage) {
@@ -682,32 +852,34 @@ export default function ExplainCardV2({ inputText, conservative = false }: Expla
 
     lines.push(inputText.trim())
     return lines.join('\n')
-  }, [questionSetVM, questionSetAnalysis, explainView, inputText])
+  }, [questionSetVM, questionSetAnalysis, explainView, inputText, vm])
 
-  // Convert ExplainViewModel to ExplainCard, then to ExplainVM
-  const explainView = useMemo<ExplainVM | null>(() => {
+  // 直接使用 API 返回的結構化資料，不再轉換為 E1-E7 格式
+  // 如果 API 返回了 structured 或 questions/sharedPassage，直接使用
+  const structuredData = useMemo(() => {
     if (!vm) return null
-
-    // Normalize kind immediately
-    const canonicalKind = toCanonicalKind(vm.kind)
-    console.log(`[ExplainCardV2] Normalized: ${vm.kind} → ${canonicalKind}`)
-
-    // Convert to ExplainCard format
-    const card = convertExplainViewModelToCard(vm, inputText)
     
-    // Present using presenter
-    const view = presentExplainCard(card)
-    
-    if (!view) {
-      console.warn('[ExplainCardV2] Failed to present card')
-      return null
+    // 優先使用新的結構化格式
+    if ((vm as any).structured) {
+      return { type: 'structured', data: (vm as any).structured }
     }
+    if ((vm as any).questions) {
+      return { type: 'questions', data: (vm as any).questions }
+    }
+    if ((vm as any).sharedPassage) {
+      return { type: 'sharedPassage', data: (vm as any).sharedPassage }
+    }
+    
+    // 如果沒有新格式，返回 null（將使用 markdown 渲染）
+    return null
+  }, [vm])
 
-    return view
-  }, [vm, inputText])
 
-  // Check rendering threshold and get missing fields
-  const missingFields = useMemo(() => getMissingFields(explainView), [explainView])
+  // Check rendering threshold and get missing fields（僅用於舊格式 fallback）
+  const missingFields = useMemo(() => {
+    if (!explainView) return []
+    return getMissingFields(explainView)
+  }, [explainView])
   const canRender = useMemo(() => missingFields.length === 0, [missingFields])
   const clarityStripeData = useMemo<ClarityStripeData | null>(() => {
     if (questionSetVM && questionSetVM.questions.length > 0) {
@@ -942,40 +1114,66 @@ export default function ExplainCardV2({ inputText, conservative = false }: Expla
         ? `題組解析（${questionSetVM.questions.length} 題）`
         : explainView?.stem?.en ?? inputText.slice(0, 60)
 
-      let userId: string | null = null
-      try {
-        const { data, error } = await supabaseBrowserClient.auth.getUser()
-        if (error) {
-          console.warn('[ExplainCardV2] supabase auth getUser error:', error.message)
-        }
-        userId = data?.user?.id ?? null
-      } catch (err) {
-        console.warn('[ExplainCardV2] Unable to retrieve Supabase user:', err)
+      const {
+        data: sessionData,
+        error: sessionError,
+      } = await supabaseBrowserClient.auth.getSession()
+
+      if (sessionError || !sessionData?.session?.access_token) {
+        throw new Error('請先登入以收藏錯題')
       }
+
+      const accessToken = sessionData.session.access_token
+      const userId = sessionData.session.user?.id
 
       if (!userId) {
         throw new Error('請先登入以收藏錯題')
       }
 
-      const note_md = buildWrongbookNote()
+      // ✅ 雙軌邏輯：有 questionId → error_book (可追蹤重複)，無 questionId → backpack_notes (純筆記)
+      if (questionId) {
+        // Route 1: 存到 error_book（可追蹤題目、間隔重複）
+        const res = await fetch('/api/error-book', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ questionId }),
+        })
 
-      const res = await fetch('/api/backpack/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: userId,
-          question: questionTitle,
-          canonical_skill: canonicalSkill ?? 'english',
-          note_md,
-        }),
-      })
+        if (!res.ok) {
+          throw new Error('儲存錯題失敗，請稍後再試')
+        }
 
-      if (!res.ok) {
-        throw new Error('儲存錯題失敗，請稍後再試')
+        setSaveStatus('success')
+        setSaveMessage('已加入錯題本（可追蹤復習）')
+      } else {
+        // Route 2: 存到 backpack_notes（純筆記，標記為錯題資料夾）
+        const note_md = buildWrongbookNote()
+
+        const res = await fetch('/api/backpack/save', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            user_id: userId,
+            question: questionTitle,
+            canonical_skill: canonicalSkill ?? 'english',
+            note_md,
+            folder: 'error_book', // ✅ 標記為錯題本資料夾
+          }),
+        })
+
+        if (!res.ok) {
+          throw new Error('儲存筆記失敗，請稍後再試')
+        }
+
+        setSaveStatus('success')
+        setSaveMessage('已加入錯題筆記')
       }
-
-      setSaveStatus('success')
-      setSaveMessage('已加入錯題本')
 
       track('explain.action' as any, {
         action: 'save-error',
@@ -1066,13 +1264,24 @@ export default function ExplainCardV2({ inputText, conservative = false }: Expla
             />
           )}
 
-          {!questionSetVM && explainView && canRender && !isLoading && !conservativeResult && (
+          {/* 優先使用新的統一格式渲染 */}
+          {!questionSetVM && structuredData && !isLoading && !conservativeResult && (
+            <UnifiedExplainRenderer data={structuredData} />
+          )}
+
+          {/* 如果有 markdown，使用 markdown 渲染 */}
+          {!questionSetVM && !structuredData && vm?.fullExplanation && !isLoading && !conservativeResult && (
+            <MarkdownRenderer markdown={vm.fullExplanation} />
+          )}
+
+          {/* Fallback: 使用舊格式（向後兼容） */}
+          {!questionSetVM && !structuredData && !vm?.fullExplanation && explainView && canRender && !isLoading && !conservativeResult && (
             <AnimatePresence mode="wait">
               {renderByKind(explainView)}
             </AnimatePresence>
           )}
 
-          {!questionSetVM && vm && (!explainView || !canRender) && !isLoading && !conservativeResult && (
+          {!questionSetVM && vm && !structuredData && !vm?.fullExplanation && (!explainView || !canRender) && !isLoading && !conservativeResult && (
             <DevFallbackUI data={vm} kind={toCanonicalKind(vm.kind)} missingFields={missingFields} />
           )}
         </div>
@@ -1084,6 +1293,7 @@ export default function ExplainCardV2({ inputText, conservative = false }: Expla
         saveStatus={saveStatus}
         saveMessage={saveMessage}
         onPrimaryClick={handlePrimaryAction}
+        hasQuestionId={Boolean(questionId)}
       />
 
       <AnimatePresence>

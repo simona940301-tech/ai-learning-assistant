@@ -3,6 +3,9 @@ import { z } from 'zod'
 import { saveBackpackNote } from '@/lib/supabase'
 import { trackAPICall, trackError } from '@/lib/heartbeat'
 import type { ContractV2Response } from '@/lib/contract-v2'
+export const dynamic = 'force-dynamic'
+
+import { createClient, createClientWithAccessToken } from '@/lib/supabase/server'
 
 // Schema for saving from Contract v2 response
 const SaveFromContractSchema = z.object({
@@ -37,16 +40,66 @@ const SaveLegacySchema = z.object({
   note_md: z.string().min(1),
 })
 
+async function resolveUserContext(req: NextRequest) {
+  const authHeader = req.headers.get('authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice('Bearer '.length).trim()
+    if (!token) {
+      return { userId: null, requiresAuth: true }
+    }
+    try {
+      const supabase = createClientWithAccessToken(token)
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser()
+      if (error || !user) {
+        return { userId: null, requiresAuth: true }
+      }
+      return { userId: user.id, requiresAuth: true }
+    } catch (error) {
+      console.error('[Backpack Save API] Failed to create Supabase client from Authorization header:', error)
+      return { userId: null, requiresAuth: true }
+    }
+  }
+
+  try {
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (user) {
+      return { userId: user.id, requiresAuth: false }
+    }
+  } catch {
+    // Ignore cookie-based auth errors; fall back to request payload
+  }
+
+  return { userId: null, requiresAuth: false }
+}
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
 
   try {
+    const authContext = await resolveUserContext(request)
+    if (authContext.requiresAuth && !authContext.userId) {
+      return NextResponse.json(
+        {
+          error: 'UNAUTHORIZED',
+          message: 'Authentication required',
+        },
+        { status: 401 },
+      )
+    }
+
     const body = await request.json()
 
     // Try Contract v2 format first
     const contractParse = SaveFromContractSchema.safeParse(body)
     if (contractParse.success) {
       const { user_id, contract_response } = contractParse.data
+      const finalUserId = authContext.userId ?? user_id
 
       // Extract data from Contract v2 response
       const question = contract_response.question?.stem || 'No question provided'
@@ -74,7 +127,7 @@ export async function POST(request: NextRequest) {
       }
 
       const data = await saveBackpackNote({
-        user_id,
+        user_id: finalUserId,
         question,
         canonical_skill,
         note_md,
@@ -90,9 +143,10 @@ export async function POST(request: NextRequest) {
     const legacyParse = SaveLegacySchema.safeParse(body)
     if (legacyParse.success) {
       const { user_id, question, canonical_skill, note_md } = legacyParse.data
+      const finalUserId = authContext.userId ?? user_id
 
       const data = await saveBackpackNote({
-        user_id,
+        user_id: finalUserId,
         question,
         canonical_skill,
         note_md,
