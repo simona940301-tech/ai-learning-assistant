@@ -10,7 +10,6 @@ import { PremiumLoader } from '@/components/ui/premium-loader'
 import { motion } from 'framer-motion'
 import { Trophy, Gift, Sparkles, BookOpen, FileText, Target, Check, Save, ArrowRight } from 'lucide-react'
 import { supabaseBrowserClient } from '@/lib/supabase'
-import confetti from 'canvas-confetti'
 
 /**
  * STEP 3 — 獎勵頁面
@@ -122,13 +121,16 @@ export default function OnboardingRewardPage() {
           setTasks(analyzeTasks(score))
         }
 
-        // Trigger confetti
-        confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { y: 0.6 },
-          colors: ['#FED168', '#528555', '#FFFDF5'],
-        })
+        // Trigger confetti (dynamic import for client-side only)
+        if (typeof window !== 'undefined') {
+          const confetti = (await import('canvas-confetti')).default
+          confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.6 },
+            colors: ['#FED168', '#528555', '#FFFDF5'],
+          })
+        }
 
         setLoading(false)
       } catch (error) {
