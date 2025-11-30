@@ -1,7 +1,14 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { RecallOverlayPayload } from '@/lib/ws/types'
+
+type RecallOverlayPayload = {
+  duration_sec: number
+  items: Array<{
+    qid: string
+    prompt: string
+  }>
+}
 
 type RecallChoice = 'confident' | 'needs_work'
 
@@ -39,7 +46,7 @@ async function logChoice(
 }
 
 export function PostMatchRecallOverlay({ payload, visible, matchId, onChoice, onDismiss }: Props) {
-  const [timeLeft, setTimeLeft] = useState(payload?.duration_sec ?? 0)
+  const [timeLeft, setTimeLeft] = useState<number>(payload?.duration_sec ?? 0)
 
   useEffect(() => {
     if (!visible || !payload) {
@@ -59,7 +66,7 @@ export function PostMatchRecallOverlay({ payload, visible, matchId, onChoice, on
     }
   }, [timeLeft, visible, onDismiss])
 
-  const prompts = useMemo(() => payload?.items ?? [], [payload])
+  const prompts = useMemo<RecallOverlayPayload['items']>(() => payload?.items ?? [], [payload])
 
   if (!visible || !payload) {
     return null

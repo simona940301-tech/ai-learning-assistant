@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { TaskType, SolveType, AskResult, Reference, AttachedFile } from '@/lib/types'
-import { chatCompletionJSON } from '@/lib/openai'
+import { chatCompletionJSON } from '@/lib/gemini'
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 

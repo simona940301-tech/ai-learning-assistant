@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getSupabaseClient } from '@/lib/api/auth';
 import { getSimilarQuestion } from '@/lib/mission-sampler';
 import type { GetSimilarQuestionRequest, GetSimilarQuestionResponse } from '@plms/shared/types';
 import { GetSimilarQuestionRequestSchema } from '@plms/shared/types';
@@ -13,7 +13,7 @@ import { GetSimilarQuestionRequestSchema } from '@plms/shared/types';
  */
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createClient();
+    const supabase = getSupabaseClient(req);
 
     // Check authentication
     const {

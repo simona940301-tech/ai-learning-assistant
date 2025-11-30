@@ -15,11 +15,7 @@ interface SubjectSelectProps {
 }
 
 const subjects = [
-  { id: 'chinese', name: '國文' },
   { id: 'english', name: '英文' },
-  { id: 'math', name: '數學' },
-  { id: 'science', name: '自然' },
-  { id: 'social', name: '社會' },
 ]
 
 export function SubjectSelect({

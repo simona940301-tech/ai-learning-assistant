@@ -6,11 +6,21 @@ import type { User } from '@supabase/supabase-js'
 // Development/Preview mode: Mock user configuration
 // - In local development: NODE_ENV === 'development'
 // - In Vercel preview: PREVIEW_FORCE_MOCK === 'true'
-const USE_MOCK_USER =
-  process.env.NODE_ENV === 'development' ||
-  process.env.PREVIEW_FORCE_MOCK === 'true'
+// 🎯 修復：只在明確啟用且不在測試模式時才使用 Mock User
+const USE_MOCK_USER = (
+  process.env.NODE_ENV === 'development' &&
+  process.env.NEXT_PUBLIC_DISABLE_MOCK_USER !== 'true' &&
+  process.env.NEXT_PUBLIC_ENABLE_REAL_AUTH_TEST !== 'true'
+) || (
+  process.env.PREVIEW_FORCE_MOCK === 'true' &&
+  process.env.NEXT_PUBLIC_DISABLE_MOCK_USER !== 'true'
+) || (
+  process.env.APP_USE_MOCK_USER === 'true' &&
+  process.env.NEXT_PUBLIC_DISABLE_MOCK_USER !== 'true'
+)
 
-const MOCK_USER_ID = 'e770f9cd-52a7-43de-b983-70f6f78d2f53'
+const MOCK_USER_ID =
+  process.env.BACKPACK_DEV_USER_ID || 'e770f9cd-52a7-43de-b983-70f6f78d2f53'
 
 export function createClient() {
   const cookieStore = cookies()
@@ -21,10 +31,23 @@ export function createClient() {
     console.log('[Supabase Server] Using service role key:', process.env.SUPABASE_SERVICE_ROLE_KEY?.substring(0, 20) + '...')
   }
 
-  // Mock user mode: Use service role key to bypass RLS
-  const supabaseKey = USE_MOCK_USER
-    ? process.env.SUPABASE_SERVICE_ROLE_KEY!
-    : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  // ----------------------------------------------------------------------
+  // Choose the appropriate Supabase key.
+  // In mock-user mode we *prefer* the service-role key because it bypasses
+  // RLS, but the key may be missing in a fresh dev environment.
+  // Falling back to the anon key prevents the client from being created
+  // with `undefined`, which caused the 500 error.
+  // ----------------------------------------------------------------------
+  const supabaseKey = (() => {
+    if (USE_MOCK_USER) {
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (serviceKey) return serviceKey;
+      console.warn(
+        '[Supabase Server] ⚠️ Mock mode enabled but SUPABASE_SERVICE_ROLE_KEY is missing – falling back to anon key.'
+      );
+    }
+    return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  })()
 
   const client = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -47,13 +70,25 @@ export function createClient() {
             // Be more aggressive in filtering - any cookie that looks like a malformed JWT
             const parts = value.split('.')
             if (parts.length !== 3) {
-              console.log(`[Supabase] Filtering invalid JWT cookie: ${name} (${parts.length} parts, expected 3)`)
+              console.warn(`[Supabase] Detected invalid JWT cookie: ${name} (${parts.length} parts, expected 3) - returning undefined`)
+              // Try to delete the invalid cookie
+              try {
+                cookieStore.set({ name, value: '', expires: new Date(0), path: '/' })
+              } catch (e) {
+                // Ignore - might be in read-only context
+              }
               return undefined
             }
             // Additional validation: each part should be base64-like (but be less strict)
             const looksValid = parts.every(part => part.length > 0 && /^[A-Za-z0-9_-]+$/.test(part))
             if (!looksValid) {
-              console.log(`[Supabase] Filtering malformed JWT cookie: ${name} (invalid base64 part)`)
+              console.warn(`[Supabase] Detected malformed JWT cookie: ${name} (invalid base64 part) - returning undefined`)
+              // Try to delete the invalid cookie
+              try {
+                cookieStore.set({ name, value: '', expires: new Date(0), path: '/' })
+              } catch (e) {
+                // Ignore - might be in read-only context
+              }
               return undefined
             }
           }
@@ -82,9 +117,13 @@ export function createClient() {
     }
   )
 
-  // Mock user mode: Override auth methods to return mock user
-  if (USE_MOCK_USER) {
-    const originalAuth = client.auth
+  // ----------------------------------------------------------------------
+  // Mock-user overrides – only apply when we actually have a service-role key.
+  // If the key is missing we simply use the normal anon client; the warning
+  // above already informs the developer.
+  // ----------------------------------------------------------------------
+  if (USE_MOCK_USER && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const originalAuth = client.auth;
     const mockUser: User = {
       id: MOCK_USER_ID,
       email: 'dev@test.com',
@@ -92,37 +131,28 @@ export function createClient() {
       app_metadata: {},
       user_metadata: {},
       aud: 'authenticated',
-      role: 'authenticated',
-    } as User
+      role: 'service_role',
+    } as User;
 
     const mockSession = {
-      access_token: 'mock-token',
-      refresh_token: 'mock-refresh',
+      access_token: process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      refresh_token: process.env.SUPABASE_SERVICE_ROLE_KEY!,
       expires_in: 3600,
       token_type: 'bearer',
       user: mockUser,
-    }
+    };
 
-    // In dev mode, always return mock user to avoid JWT parsing errors
-    // This prevents errors when cookies contain invalid JWT tokens
     client.auth = {
       ...originalAuth,
-      getUser: async () => {
-        // Always return mock user in dev mode
-        // This prevents JWT parsing errors from invalid cookies
-        return {
-          data: { user: mockUser },
-          error: null,
-        }
-      },
+      getUser: async () => ({
+        data: { user: mockUser },
+        error: null,
+      }),
       getSession: async () => {
-        // Always return mock session in dev mode
-        return {
-          data: { session: mockSession },
-          error: null,
-        }
+        console.log('[Supabase Server] Returning mock session with service role token');
+        return { data: { session: mockSession }, error: null };
       },
-    } as any
+    } as any;
   }
 
   return client

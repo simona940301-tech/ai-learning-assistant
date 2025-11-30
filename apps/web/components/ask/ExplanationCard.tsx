@@ -130,7 +130,8 @@ const ExplanationCard = ({
         transition={{ duration: 0.35, delay: 0.12 }}
         className="mt-6 space-y-3"
       >
-        <h3 className="text-xs uppercase tracking-[0.3em] text-white/40">🔍 解題步驟</h3>
+        {/* 使用通用標題「詳解」，避免硬編碼「解題步驟」（新格式可能只有「題意說明」而沒有「解題步驟」） */}
+        <h3 className="text-xs uppercase tracking-[0.3em] text-white/40">🔍 詳解</h3>
         <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed text-[#E2EAF2]">
           {steps.map((step, index) => (
             <li key={index}>{step}</li>

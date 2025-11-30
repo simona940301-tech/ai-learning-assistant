@@ -6,7 +6,7 @@
  * 2. Machine JSON with character spans for alignment verification
  */
 
-import { chatCompletionJSON } from '@/lib/openai'
+import { chatCompletion } from '@/lib/gemini'
 
 export interface AiMachineBlock {
   qno?: string
@@ -266,17 +266,13 @@ Return the two outputs now.`
 
   try {
     // Call OpenAI API
-    const response = await chatCompletionJSON({
-      model: 'gpt-4o-mini',
-      messages: [
+    const output = await chatCompletion(
+      [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: USER_PROMPT },
       ],
-      temperature: 0,
-      max_tokens: 4000,
-    })
-
-    const output = response.content || ''
+      { model: 'gpt-4o-mini', temperature: 0, maxOutputTokens: 4000 },
+    )
     const { humanMarkdown, machineJson } = parseAiOutput(output)
 
     if (!machineJson) {
@@ -326,17 +322,13 @@ ${allErrors.join('\n')}
 
 Please fix the span values to match the RAW INPUT exactly. Do not rewrite the text, only adjust the numeric spans.`
 
-      const retryResponse = await chatCompletionJSON({
-        model: 'gpt-4o-mini',
-        messages: [
+      const retryOutput = await chatCompletion(
+        [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: retryPrompt },
         ],
-        temperature: 0,
-        max_tokens: 4000,
-      })
-
-      const retryOutput = retryResponse.content || ''
+        { model: 'gpt-4o-mini', temperature: 0, maxOutputTokens: 4000 },
+      )
       const retryParsed = parseAiOutput(retryOutput)
 
       if (retryParsed.machineJson) {
@@ -388,7 +380,6 @@ Please fix the span values to match the RAW INPUT exactly. Do not rewrite the te
     }
   }
 }
-
 
 
 

@@ -22,11 +22,10 @@ export interface Annotation {
     // For sticky
     x?: number
     y?: number
-    width?: number
     height?: number
     content?: string
     collapsed?: boolean
-    color?: 'yellow' | 'blue' | 'green'
+    stickyColor?: 'yellow' | 'blue' | 'green'
     backgroundColor?: string
     refHighlightId?: string
   }

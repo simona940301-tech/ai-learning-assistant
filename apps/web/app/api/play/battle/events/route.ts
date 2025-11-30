@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 // 強制動態渲染
 export const dynamic = 'force-dynamic'
-import { createClient } from '@/lib/supabase/server'
+import { getSupabaseClient } from '@/lib/api/auth'
+import { enqueueChickMessage } from '@/packages/server/chick'
 
 /**
  * POST /api/play/battle/events
@@ -57,6 +58,7 @@ export async function POST(req: NextRequest) {
       is_correct_array,
       final_scores,
       server_timestamp,
+      metadata,
     } = body
 
     // 驗證必填字段
@@ -89,7 +91,7 @@ export async function POST(req: NextRequest) {
     // ============================================
     // 3. 寫入 battle_events 表
     // ============================================
-    const supabase = createClient()
+    const supabase = getSupabaseClient(req)
 
     const { data: event, error: insertError } = await supabase
       .from('battle_events')
@@ -103,7 +105,7 @@ export async function POST(req: NextRequest) {
         final_scores: final_scores || { player1: 0, player2: 0 },
         server_timestamp: server_timestamp || Date.now(),
         processed: false,
-        metadata: {},
+        metadata: metadata || {},
       })
       .select()
       .single()
@@ -120,7 +122,62 @@ export async function POST(req: NextRequest) {
     }
 
     // ============================================
-    // 4. 返回成功響應
+    // 4. Chick hook (IQ/Fatigue + message)
+    // ============================================
+    try {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('chick_iq, chick_fatigue, chick_fatigue_battle_counter, chick_emotion_state')
+        .eq('id', user_id)
+        .single()
+
+      if (profileError) {
+        console.error('[Chick Hook][battle_end] Failed to load profile:', profileError)
+      } else {
+        const currentIq = profile?.chick_iq ?? 5
+        const currentFatigue = profile?.chick_fatigue ?? 0
+        const currentCounter = profile?.chick_fatigue_battle_counter ?? 0
+        const emotionState = profile?.chick_emotion_state ?? 'normal'
+
+        const nextIq = Math.min(currentIq + 1, 10)
+        let nextCounter = currentCounter + 1
+        let nextFatigue = currentFatigue
+        let fatigueIncreased = false
+
+        if (nextCounter >= 5) {
+          nextFatigue = Math.min(currentFatigue + 1, 3)
+          nextCounter = 0
+          fatigueIncreased = true
+        }
+
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({
+            chick_iq: nextIq,
+            chick_fatigue: nextFatigue,
+            chick_fatigue_battle_counter: nextCounter,
+          })
+          .eq('id', user_id)
+
+        if (updateError) {
+          console.error('[Chick Hook][battle_end] Failed to update profile:', updateError)
+        } else {
+          const stateSnapshot = { iq: nextIq, fatigue: nextFatigue, emotionState }
+          const candidateType = fatigueIncreased ? 'S2' : 'S1'
+          await enqueueChickMessage({
+            userId: user_id,
+            candidates: [{ type: candidateType, stateSnapshot }],
+            client: supabase,
+            defaultSnapshot: stateSnapshot,
+          })
+        }
+      }
+    } catch (hookError) {
+      console.error('[Chick Hook][battle_end] Unexpected error:', hookError)
+    }
+
+    // ============================================
+    // 5. 返回成功響應
     // ============================================
     return NextResponse.json({
       success: true,
@@ -147,7 +204,7 @@ export async function POST(req: NextRequest) {
  */
 export async function GET(req: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = getSupabaseClient(req)
 
     // 檢查認證（用戶只能查看自己的事件）
     const {
@@ -199,4 +256,3 @@ export async function GET(req: NextRequest) {
     )
   }
 }
-

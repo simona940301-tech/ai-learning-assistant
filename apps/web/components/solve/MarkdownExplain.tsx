@@ -57,7 +57,7 @@ export function MarkdownExplain({ markdown }: MarkdownExplainProps) {
             if (text.includes('📝 題目')) {
               return (
                 <div ref={stemRef} className="mb-6">
-                  <h2 className="text-lg font-semibold text-zinc-100 mb-3">
+                  <h2 className="text-lg font-semibold text-[#4B3425] mb-3">
                     {children}
                   </h2>
                 </div>
@@ -67,7 +67,7 @@ export function MarkdownExplain({ markdown }: MarkdownExplainProps) {
             // 選項區：灰底獨立顯示（支援兩種 emoji）
             if (text.includes('🔡 選項') || text.includes('🔘 選項')) {
               return (
-                <h2 className="text-base font-medium text-zinc-300 mt-6 mb-2">
+                <h2 className="text-base font-medium text-[#5C4033] mt-6 mb-2">
                   {children}
                 </h2>
               )
@@ -77,7 +77,7 @@ export function MarkdownExplain({ markdown }: MarkdownExplainProps) {
             if (text.includes('✅ 答案')) {
               return (
                 <div className="mt-6 mb-3">
-                  <h2 className="text-lg font-semibold text-emerald-300 mb-3">
+                  <h2 className="text-lg font-semibold text-[#4B3425] mb-3">
                     {children}
                   </h2>
                 </div>
@@ -86,7 +86,7 @@ export function MarkdownExplain({ markdown }: MarkdownExplainProps) {
 
             // 其他標題
             return (
-              <h2 className="text-lg font-semibold text-zinc-100 mt-6 mb-3">
+              <h2 className="text-lg font-semibold text-[#4B3425] mt-6 mb-3">
                 {children}
               </h2>
             )
@@ -103,7 +103,7 @@ export function MarkdownExplain({ markdown }: MarkdownExplainProps) {
               )
             }
             return (
-              <h3 className="text-base font-medium text-zinc-300 mt-4 mb-2">
+              <h3 className="text-base font-medium text-[#5C4033] mt-4 mb-2">
                 {children}
               </h3>
             )
@@ -114,7 +114,7 @@ export function MarkdownExplain({ markdown }: MarkdownExplainProps) {
             const childrenText = String(children)
             const currentIndex = markdown.indexOf(childrenText)
             const beforeText = markdown.substring(0, currentIndex)
-            
+
             // 檢查段落前是否有 data-anchor 註釋
             const anchorMatch = beforeText.match(/<!--\s*data-anchor=["']([^"']+)["']\s*-->\s*$/m)
             const dataAnchor = anchorMatch?.[1] || (node?.properties?.dataAnchor as string | undefined)
@@ -122,7 +122,7 @@ export function MarkdownExplain({ markdown }: MarkdownExplainProps) {
 
             // 判斷當前段落屬於哪個區塊
             const lastHeading = beforeText.match(/## ([^\n]+)\n[^#]*$/)?.[1]
-            
+
             const isInStem = lastHeading?.includes('📝 題目')
             const isInAnswer = lastHeading?.includes('✅ 答案')
             const isInOptions = lastHeading?.includes('🔡 選項') || lastHeading?.includes('🔘 選項')
@@ -135,25 +135,25 @@ export function MarkdownExplain({ markdown }: MarkdownExplainProps) {
               const answerLineMatch = childrenText.match(/^(\(?\d+\)?\s*)?\**([A-E])\**\s*[—–-]\s*(.+)$/i)
               if (answerLineMatch) {
                 return (
-                  <p className="text-sm text-emerald-300 font-medium leading-relaxed mb-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
+                  <p className="text-sm text-[#4B3425] font-medium leading-relaxed mb-2 px-3 py-2 rounded-lg bg-[#F9FAFB] border border-[#E5E7EB]">
                     {children}
                   </p>
                 )
               }
-              
+
               // 檢查是否為簡單格式：A — text 或 **A** — text
               const simpleAnswerMatch = childrenText.match(/^\**([A-E])\**\s*[—–-]\s*(.+)$/i)
               if (simpleAnswerMatch) {
                 return (
-                  <p className="text-sm text-emerald-300 font-medium leading-relaxed mb-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
+                  <p className="text-sm text-[#4B3425] font-medium leading-relaxed mb-2 px-3 py-2 rounded-lg bg-[#F9FAFB] border border-[#E5E7EB]">
                     {children}
                   </p>
                 )
               }
-              
+
               // 如果不符合格式，也顯示為答案區樣式（可能是其他格式）
               return (
-                <p className="text-sm text-emerald-300 leading-relaxed mb-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
+                <p className="text-sm text-[#4B3425] leading-relaxed mb-2 px-3 py-2 rounded-lg bg-[#F9FAFB] border border-[#E5E7EB]">
                   {children}
                 </p>
               )
@@ -164,7 +164,7 @@ export function MarkdownExplain({ markdown }: MarkdownExplainProps) {
               // 檢查是否包含多個選項（用正則表達式分割）
               const optionPattern = /\(([A-E])\)\s*([^\(]+?)(?=\s*\([A-E]\)|$)/gi
               const options = Array.from(childrenText.matchAll(optionPattern))
-              
+
               if (options.length > 0) {
                 // 如果找到多個選項，分別渲染
                 return (
@@ -175,7 +175,7 @@ export function MarkdownExplain({ markdown }: MarkdownExplainProps) {
                       return (
                         <div
                           key={`${key}-${idx}`}
-                          className="text-sm text-zinc-300 leading-relaxed px-3 py-2 rounded-lg bg-zinc-900/40 border border-zinc-800/30"
+                          className="text-sm text-[#5C4033] leading-relaxed px-3 py-2 rounded-lg bg-[#F9FAFB] border border-[#E5E7EB]"
                         >
                           ({key}) {text}
                         </div>
@@ -184,20 +184,20 @@ export function MarkdownExplain({ markdown }: MarkdownExplainProps) {
                   </div>
                 )
               }
-              
+
               // 單個選項格式：(A) text
               const optionMatch = childrenText.match(/^\(([A-E])\)\s*(.+)$/i)
               if (optionMatch) {
                 return (
-                  <div className="text-sm text-zinc-300 leading-relaxed mb-2 px-3 py-2 rounded-lg bg-zinc-900/40 border border-zinc-800/30">
+                  <div className="text-sm text--[#5C4033] leading-relaxed mb-2 px-3 py-2 rounded-lg bg-[#F9FAFB] border border-[#E5E7EB]">
                     {children}
                   </div>
                 )
               }
-              
+
               // 如果不是標準格式，也顯示為選項樣式
               return (
-                <div className="text-sm text-zinc-300 leading-relaxed mb-2 px-3 py-2 rounded-lg bg-zinc-900/40 border border-zinc-800/30">
+                <div className="text-sm text-[#5C4033] leading-relaxed mb-2 px-3 py-2 rounded-lg bg-[#F9FAFB] border border-[#E5E7EB]">
                   {children}
                 </div>
               )
@@ -212,7 +212,7 @@ export function MarkdownExplain({ markdown }: MarkdownExplainProps) {
               if (cleanText.length > 100) {
                 return (
                   <div className="mb-3">
-                    <p className="text-sm text-zinc-300 leading-relaxed inline">
+                    <p className="text-sm text-[#5C4033] leading-relaxed inline">
                       {cleanText.substring(0, 100)}...
                     </p>
                     <button
@@ -225,18 +225,17 @@ export function MarkdownExplain({ markdown }: MarkdownExplainProps) {
                 )
               }
             }
-            
+
             // 題目區：移除 HTML 註釋（不顯示註釋）
             if (isInStem) {
               let displayText = String(children)
               displayText = displayText.replace(/<!--[\s\S]*?-->/g, '') // 移除 HTML 註釋
-              
+
               return (
                 <p
                   data-anchor={dataAnchor}
-                  className={`text-sm text-zinc-300 leading-relaxed mb-3 transition-colors duration-300 ${
-                    isHighlighted ? 'bg-yellow-500/20 rounded px-2 py-1' : ''
-                  }`}
+                  className={`text-sm text-[#5C4033] leading-relaxed mb-3 transition-colors duration-300 ${isHighlighted ? 'bg-yellow-500/20 rounded px-2 py-1' : ''
+                    }`}
                 >
                   {displayText}
                   {shouldCollapseStem && isStemExpanded && (
@@ -256,14 +255,14 @@ export function MarkdownExplain({ markdown }: MarkdownExplainProps) {
               // 檢查是否為「其他選項：」開頭的段落
               if (childrenText.startsWith('其他選項：') || childrenText.startsWith('其他選項:')) {
                 return (
-                  <p className="text-sm text-zinc-400 leading-relaxed mb-4 ml-4 pl-4 border-l-2 border-zinc-700/50">
+                  <p className="text-sm text-[#5C4033] leading-relaxed mb-4 ml-4 pl-4 border-l-2 border-[#E5E7EB]">
                     {children}
                   </p>
                 )
               }
               // 一般詳解段落：稍微突出
               return (
-                <p className="text-sm text-zinc-200 leading-relaxed mb-3">
+                <p className="text-sm text-[#4B3425] leading-relaxed mb-3">
                   {children}
                 </p>
               )
@@ -273,9 +272,8 @@ export function MarkdownExplain({ markdown }: MarkdownExplainProps) {
             return (
               <p
                 data-anchor={dataAnchor}
-                className={`text-sm text-zinc-300 leading-relaxed mb-3 transition-colors duration-300 ${
-                  isHighlighted ? 'bg-yellow-500/20 rounded px-2 py-1' : ''
-                }`}
+                className={`text-sm text-[#5C4033] leading-relaxed mb-3 transition-colors duration-300 ${isHighlighted ? 'bg-yellow-500/20 rounded px-2 py-1' : ''
+                  }`}
               >
                 {children}
               </p>
@@ -293,7 +291,7 @@ export function MarkdownExplain({ markdown }: MarkdownExplainProps) {
             </ol>
           ),
           li: ({ children }) => (
-            <li className="text-sm text-zinc-300 leading-relaxed">
+            <li className="text-sm text-[#5C4033] leading-relaxed">
               {children}
             </li>
           ),
@@ -307,9 +305,8 @@ export function MarkdownExplain({ markdown }: MarkdownExplainProps) {
             return (
               <blockquote
                 onClick={() => dataRef && handleQuoteClick(dataRef)}
-                className={`border-l-4 border-blue-500/50 pl-4 py-2 my-3 bg-blue-500/10 rounded-r ${
-                  dataRef ? 'cursor-pointer hover:bg-blue-500/20 transition-colors' : ''
-                }`}
+                className={`border-l-4 border-blue-500/50 pl-4 py-2 my-3 bg-blue-500/10 rounded-r ${dataRef ? 'cursor-pointer hover:bg-blue-500/20 transition-colors' : ''
+                  }`}
                 data-ref={dataRef}
               >
                 <div className="text-sm text-blue-200/90 italic">
@@ -324,25 +321,25 @@ export function MarkdownExplain({ markdown }: MarkdownExplainProps) {
           },
           // strong: 粗體（答案、關鍵詞）
           strong: ({ children }) => (
-            <strong className="font-semibold text-emerald-300">
+            <strong className="font-semibold text-[#4B3425]">
               {children}
             </strong>
           ),
           // em: 斜體（補充說明）
           em: ({ children }) => (
-            <em className="italic text-zinc-400">
+            <em className="italic text-[#5C4033]">
               {children}
             </em>
           ),
           // code: 行內程式碼（保留原樣）
           code: ({ children }) => (
-            <code className="px-1.5 py-0.5 rounded bg-zinc-800/50 text-zinc-200 text-xs font-mono">
+            <code className="px-1.5 py-0.5 rounded bg-[#F9FAFB] text-[#4B3425] text-xs font-mono">
               {children}
             </code>
           ),
           // hr: 分隔線
           hr: () => (
-            <hr className="my-6 border-zinc-800/50" />
+            <hr className="my-6 border-[#E5E7EB]" />
           ),
         }}
       >

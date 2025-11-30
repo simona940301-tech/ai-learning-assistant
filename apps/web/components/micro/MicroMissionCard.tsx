@@ -155,7 +155,7 @@ export function MicroMissionCard() {
         <h2 className="text-xl font-bold text-gray-900 mb-4">每日任務</h2>
         <button
           onClick={handleStartClick}
-          className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+          className="w-full px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90"
         >
           開始練習
         </button>
@@ -182,10 +182,10 @@ export function MicroMissionCard() {
 
   return (
     <>
-      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg shadow-md p-6 relative overflow-hidden">
+      <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg shadow-md p-6 relative overflow-hidden">
         {/* Decorative background pattern */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-100 rounded-full opacity-20 -mr-16 -mt-16"></div>
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-indigo-100 rounded-full opacity-20 -ml-12 -mb-12"></div>
+        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-100 rounded-full opacity-20 -mr-16 -mt-16"></div>
+        <div className="absolute bottom-0 left-0 w-24 h-24 bg-orange-100 rounded-full opacity-20 -ml-12 -mb-12"></div>
 
         <div className="relative z-10">
           {/* Header */}
@@ -223,7 +223,7 @@ export function MicroMissionCard() {
             <div className="mb-4 space-y-2">
               {/* Remaining questions */}
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-blue-600">
+                <span className="text-3xl font-bold text-amber-600">
                   {remainingQuestions}
                 </span>
                 <span className="text-sm text-gray-600">
@@ -249,7 +249,7 @@ export function MicroMissionCard() {
                 <div className="mt-3">
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      className="bg-amber-500 h-2 rounded-full transition-all duration-300"
                       style={{
                         width: `${(mission.totalAnswered / mission.questionCount) * 100}%`,
                       }}
@@ -267,18 +267,17 @@ export function MicroMissionCard() {
           <button
             onClick={handleStartClick}
             disabled={isCompleted}
-            className={`w-full px-6 py-3 rounded-lg font-medium transition-colors ${
-              isCompleted
+            className={`w-full px-6 py-3 rounded-lg font-medium transition-colors ${isCompleted
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95'
-            }`}
+                : 'bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95'
+              }`}
             aria-label={isInProgress ? t('micro.continue') : t('micro.start')}
           >
             {isCompleted
               ? '明天再來'
               : isInProgress
-              ? t('micro.continue')
-              : t('micro.start')}
+                ? t('micro.continue')
+                : t('micro.start')}
           </button>
         </div>
 

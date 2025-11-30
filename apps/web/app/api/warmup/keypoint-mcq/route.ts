@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server'
+import { getSupabaseClient } from '@/lib/api/auth'
 import { QuizGenerationService } from '@/lib/services/quiz-generation-service'
 import { KeypointRepo } from '@/lib/dal/keypoint-repo'
 import { SessionRepo } from '@/lib/dal/session-repo'
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Step 2: 創建依賴（依賴注入）
-    const db = createClient()
+    const db = getSupabaseClient(request)
     const keypointRepo = new KeypointRepo(db)
     const sessionRepo = new SessionRepo(db)
 

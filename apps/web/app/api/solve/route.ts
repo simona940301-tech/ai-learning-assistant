@@ -4,12 +4,13 @@ export const maxDuration = 30
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server'
+import { getSupabaseClient, getApiUser } from '@/lib/api/auth'
 import { SolveService } from '@/lib/services/solve-service'
 import { KeypointRepo } from '@/lib/dal/keypoint-repo'
 import { QuestionRepo } from '@/lib/dal/question-repo'
 import { SessionRepo } from '@/lib/dal/session-repo'
-import { ok, fail, ERROR_CODES } from '@/lib/utils/api-response-builder'
+import { Api } from '@/lib/api/response'
+import { ApiErrorCode } from '@/lib/types/api'
 
 const SolveRequestSchema = z
   .object({
@@ -35,6 +36,20 @@ export async function POST(request: NextRequest) {
   try {
     console.log('[solve][stage=parse] Starting request')
 
+    // Step 0: Authentication check - required for all AI endpoints
+    const { user, errorType } = await getApiUser(request)
+
+    if (!user) {
+      const message =
+        errorType === 'invalid-jwt'
+          ? '登入狀態失效，請重新登入或清除 Cookies 後再試。'
+          : errorType === 'unauthenticated'
+            ? 'Authentication required'
+            : 'Authentication error occurred'
+
+      return Api.unauthorized(message)
+    }
+
     // Step 1: 解析和驗證請求
     const body = await request.json()
     const validated = SolveRequestSchema.parse(body)
@@ -47,7 +62,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Step 2: 創建依賴（依賴注入）
-    const db = createClient()
+    const db = getSupabaseClient(request)
     const keypointRepo = new KeypointRepo(db)
     const questionRepo = new QuestionRepo(db)
     const sessionRepo = new SessionRepo(db)
@@ -64,29 +79,27 @@ export async function POST(request: NextRequest) {
     })
 
     // Step 5: 返回成功響應
-    return NextResponse.json(ok(result))
+    return Api.success(result)
   } catch (error) {
     console.error('[solve][stage=fatal]', error)
 
     // 驗證錯誤處理
     if (error instanceof z.ZodError) {
-      return NextResponse.json(fail(ERROR_CODES.VALIDATION_ERROR, 'Invalid request'), {
-        status: 400,
-      })
+      return Api.badRequest('Invalid request', error.errors)
     }
 
     // 業務錯誤映射
     const errorMessage = error instanceof Error ? error.message : 'internal_error'
-    const statusMap: Record<string, number> = {
-      SESSION_NOT_FOUND: 404,
-      SUBJECT_REQUIRED: 400,
-      SUBJECT_NOT_FOUND: 404,
-      KEYPOINTS_NOT_READY: 400,
+
+    // Map legacy error codes to ApiErrorCode
+    if (errorMessage === 'SESSION_NOT_FOUND' || errorMessage === 'SUBJECT_NOT_FOUND') {
+      return Api.notFound(errorMessage)
     }
 
-    const status = statusMap[errorMessage] || 500
-    const displayMessage = status === 500 ? 'Internal server error' : errorMessage
+    if (errorMessage === 'SUBJECT_REQUIRED' || errorMessage === 'KEYPOINTS_NOT_READY') {
+      return Api.badRequest(errorMessage)
+    }
 
-    return NextResponse.json(fail(errorMessage, displayMessage), { status })
+    return Api.serverError(errorMessage)
   }
 }

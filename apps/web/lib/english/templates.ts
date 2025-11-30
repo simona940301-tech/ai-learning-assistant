@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid'
-import { chatCompletionJSON } from '@/lib/openai'
+import { chatCompletionJSON } from '@/lib/gemini'
 import type { ExplainCard, EnglishRoute, EnglishQuestionInput } from '@/lib/contracts/explain'
 import type { OptionKey } from '@/lib/explain-normalizer'
 

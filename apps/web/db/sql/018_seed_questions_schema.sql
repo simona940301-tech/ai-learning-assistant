@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS seed_questions (
   
   -- 元數據
   has_explanation BOOLEAN DEFAULT FALSE, -- 是否有詳解
+  explanation_file_url TEXT, -- 詳解檔案 URL（TXT/PDF）
   usage_count INTEGER DEFAULT 0, -- 使用次數（用於統計）
   avg_time_spent_seconds INTEGER, -- 平均答題時間（秒）
   correct_rate DECIMAL(5, 4), -- 正確率（0.0000-1.0000）

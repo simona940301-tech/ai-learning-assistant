@@ -2,7 +2,8 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { ZodError } from 'zod'
-import { createClient } from '@/lib/supabase/server'
+import { getApiUser } from '@/lib/api/auth'
+import { getSupabaseClient } from '@/lib/api/auth'
 import { AnswerService } from '@/lib/services/answer-service'
 import { OptionRepo } from '@/lib/dal/option-repo'
 import { QuestionRepo } from '@/lib/dal/question-repo'
@@ -21,6 +22,28 @@ import {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Authentication check
+    const { user, errorType } = await getApiUser(request)
+
+    if (!user) {
+      const message =
+        errorType === 'invalid-jwt'
+          ? '登入狀態失效，請重新登入或清除 Cookies 後再試。'
+          : errorType === 'unauthenticated'
+          ? 'Authentication required'
+          : 'Authentication error occurred'
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'UNAUTHORIZED',
+          message,
+          errorType,
+        },
+        { status: 401 }
+      )
+    }
+
     console.log('[tutor/answer][stage=parse] Starting request')
 
     // Step 1: 解析和驗證請求
@@ -33,7 +56,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Step 2: 創建依賴（依賴注入）
-    const db = createClient()
+    const db = getSupabaseClient(request)
     const optionRepo = new OptionRepo(db)
     const questionRepo = new QuestionRepo(db)
     const conceptRepo = new ConceptRepo(db)
@@ -67,4 +90,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(fail(ERROR_CODES.INTERNAL_ERROR, errorMessage), { status: 500 })
   }
 }
-

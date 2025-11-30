@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -19,11 +23,34 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"],
-      "@plms/shared": ["../../packages/shared"],
-      "@plms/shared/*": ["../../packages/shared/*"]
+      "@/*": [
+        "./*"
+      ],
+      "@/packages/*": [
+        "../../packages/*"
+      ],
+      "@plms/shared": [
+        "../../packages/shared"
+      ],
+      "@plms/shared/*": [
+        "../../packages/shared/*"
+      ]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "./components/solve/**/*",
+    "tests/**/*",
+    "scripts/**/*"
+  ]
 }

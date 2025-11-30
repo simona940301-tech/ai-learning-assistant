@@ -5,7 +5,7 @@ import { trackAPICall, trackError } from '@/lib/heartbeat'
 import type { ContractV2Response } from '@/lib/contract-v2'
 export const dynamic = 'force-dynamic'
 
-import { createClient, createClientWithAccessToken } from '@/lib/supabase/server'
+import { getSupabaseClient, getApiUser } from '@/lib/api/auth'
 
 // Schema for saving from Contract v2 response
 const SaveFromContractSchema = z.object({
@@ -40,56 +40,30 @@ const SaveLegacySchema = z.object({
   note_md: z.string().min(1),
 })
 
-async function resolveUserContext(req: NextRequest) {
-  const authHeader = req.headers.get('authorization')
-  if (authHeader?.startsWith('Bearer ')) {
-    const token = authHeader.slice('Bearer '.length).trim()
-    if (!token) {
-      return { userId: null, requiresAuth: true }
-    }
-    try {
-      const supabase = createClientWithAccessToken(token)
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser()
-      if (error || !user) {
-        return { userId: null, requiresAuth: true }
-      }
-      return { userId: user.id, requiresAuth: true }
-    } catch (error) {
-      console.error('[Backpack Save API] Failed to create Supabase client from Authorization header:', error)
-      return { userId: null, requiresAuth: true }
-    }
-  }
-
-  try {
-    const supabase = createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (user) {
-      return { userId: user.id, requiresAuth: false }
-    }
-  } catch {
-    // Ignore cookie-based auth errors; fall back to request payload
-  }
-
-  return { userId: null, requiresAuth: false }
-}
-
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
 
   try {
-    const authContext = await resolveUserContext(request)
-    if (authContext.requiresAuth && !authContext.userId) {
+    // SECURITY FIX: Always require authentication
+    // Previous implementation had conditional auth which was insecure
+    const { user, errorType } = await getApiUser(request)
+
+    if (!user) {
+      const message =
+        errorType === 'invalid-jwt'
+          ? '登入狀態失效，請重新登入或清除 Cookies 後再試。'
+          : errorType === 'unauthenticated'
+          ? 'Authentication required'
+          : 'Authentication error occurred'
+
+      trackError(`Backpack save unauthorized: ${errorType}`)
       return NextResponse.json(
         {
           error: 'UNAUTHORIZED',
-          message: 'Authentication required',
+          message,
+          errorType,
         },
-        { status: 401 },
+        { status: 401 }
       )
     }
 
@@ -99,7 +73,8 @@ export async function POST(request: NextRequest) {
     const contractParse = SaveFromContractSchema.safeParse(body)
     if (contractParse.success) {
       const { user_id, contract_response } = contractParse.data
-      const finalUserId = authContext.userId ?? user_id
+      // SECURITY: Always use authenticated user ID, ignore client-provided user_id
+      const finalUserId = user.id
 
       // Extract data from Contract v2 response
       const question = contract_response.question?.stem || 'No question provided'
@@ -143,14 +118,28 @@ export async function POST(request: NextRequest) {
     const legacyParse = SaveLegacySchema.safeParse(body)
     if (legacyParse.success) {
       const { user_id, question, canonical_skill, note_md } = legacyParse.data
-      const finalUserId = authContext.userId ?? user_id
+      // SECURITY: Always use authenticated user ID, ignore client-provided user_id
+      const finalUserId = user.id
 
-      const data = await saveBackpackNote({
-        user_id: finalUserId,
-        question,
-        canonical_skill,
-        note_md,
-      })
+      // Save to notebook_entries (not backpack_notes)
+      const supabase = getSupabaseClient(request)
+      const { data, error } = await supabase
+        .from('notebook_entries')
+        .insert({
+          user_id: finalUserId,
+          title: question,
+          content_md: note_md,
+          source_type: 'summary', // RAG analysis summary
+          tags: [canonical_skill],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single()
+
+      if (error) {
+        throw new Error(`Failed to save to notebook: ${error.message}`)
+      }
 
       const latency = Date.now() - startTime
       trackAPICall('/api/backpack/save', latency, true)

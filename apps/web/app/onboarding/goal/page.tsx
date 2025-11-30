@@ -7,113 +7,184 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card } from '@/components/ui/card'
 import { motion } from 'framer-motion'
-import { Search, GraduationCap, ChevronRight } from 'lucide-react'
+import { Search, ChevronDown, X } from 'lucide-react'
 import { universities, searchUniversities, searchDepartments, type University, type Department } from '@/lib/taiwan-universities'
 import { supabaseBrowserClient } from '@/lib/supabase'
+
+/**
+ * STEP 1 — 目標設定 (極簡單頁表單)
+ */
+
+const GRADES = [
+  { value: '高一', label: '高一' },
+  { value: '高二', label: '高二' },
+  { value: '高三', label: '高三' },
+]
 
 export default function OnboardingGoalPage() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
+
+  // University & Department
   const [universitySearch, setUniversitySearch] = useState('')
   const [departmentSearch, setDepartmentSearch] = useState('')
   const [selectedUniversity, setSelectedUniversity] = useState<University | null>(null)
   const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null)
-  const [customUniversity, setCustomUniversity] = useState('')
   const [customDepartment, setCustomDepartment] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [skipLoading, setSkipLoading] = useState(false)
-  const [formError, setFormError] = useState<string | null>(null)
-  const [requirements, setRequirements] = useState<any>(null)
-  const [loadingRequirements, setLoadingRequirements] = useState(false)
+  const [isExploring, setIsExploring] = useState(false)
+  const [showUniversityDropdown, setShowUniversityDropdown] = useState(true)
+  const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false)
 
-  // If not logged in, redirect to login
+  // Grade & Proficiency
+  const [selectedGrade, setSelectedGrade] = useState<string | null>(null)
+  const [mockExamLevel, setMockExamLevel] = useState(8)
+
+  // UI State
+  const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/onboarding')
+    // 🎯 修復：不等待 authLoading，允許匿名訪問
+    // 如果已登入，檢查 session（但不阻塞頁面渲染）
+    if (user && !authLoading) {
+      const checkSession = async () => {
+        const { data: sessionData, error: sessionError } = await supabaseBrowserClient.auth.getSession()
+        if (sessionError || !sessionData?.session) {
+          console.warn('[OnboardingGoal] No valid session, but allowing anonymous mode')
+          // 不 redirect，允許匿名模式繼續
+        }
+      }
+      checkSession()
     }
+    // 如果未登入，允許匿名模式，不 redirect
   }, [user, authLoading, router])
 
+  useEffect(() => {
+    // 🎯 修復：只在有 user 且認證載入完成時才創建 session，但不阻塞頁面渲染
+    async function fetchOrCreateSession() {
+      if (!user) return
+      try {
+        const { data: existingSession } = await supabaseBrowserClient
+          .from('onboarding_sessions')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('status', 'in_progress')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (existingSession) {
+          setSessionId(existingSession.id)
+        } else {
+          const { data: newSession } = await supabaseBrowserClient
+            .from('onboarding_sessions')
+            .insert({
+              user_id: user.id,
+              status: 'in_progress',
+              current_step: 1,
+            })
+            .select('id')
+            .single()
+
+          if (newSession) {
+            setSessionId(newSession.id)
+          }
+        }
+      } catch (error) {
+        console.error('[OnboardingGoal] Failed to fetch/create session:', error)
+        // 🎯 允許匿名模式繼續，即使 session 創建失敗
+      }
+    }
+
+    // 只在有 user 且認證載入完成時才創建 session，但不阻塞渲染
+    if (user && !authLoading) {
+      fetchOrCreateSession()
+    }
+    // 如果沒有 user，允許匿名模式繼續
+  }, [user, authLoading])
+
   const filteredUniversities = useMemo(
-    () => (universitySearch ? searchUniversities(universitySearch) : universities),
+    () => (universitySearch ? searchUniversities(universitySearch) : universities.slice(0, 10)),
     [universitySearch],
   )
 
   const filteredDepartments = useMemo(() => {
-    if (!selectedUniversity) {
-      return []
-    }
-
+    if (!selectedUniversity) return []
     return departmentSearch
       ? searchDepartments(selectedUniversity.id, departmentSearch)
-      : selectedUniversity.departments
+      : selectedUniversity.departments.slice(0, 10)
   }, [selectedUniversity, departmentSearch])
 
   const handleUniversitySelect = (university: University) => {
     setSelectedUniversity(university)
     setSelectedDepartment(null)
     setDepartmentSearch('')
-    setCustomUniversity('')
     setCustomDepartment('')
+    setIsExploring(false)
+    setShowUniversityDropdown(false)
+    setShowDepartmentDropdown(true)
     setFormError(null)
   }
 
   const handleDepartmentSelect = (department: Department) => {
     setSelectedDepartment(department)
     setCustomDepartment('')
+    setShowDepartmentDropdown(false)
     setFormError(null)
   }
 
-  const handleCustomUniversity = () => {
-    if (customUniversity.trim()) {
-      setSelectedUniversity({
-        id: 'custom',
-        name: customUniversity.trim(),
-        departments: [{ id: 'custom', name: '自訂科系' }],
-      })
-      setSelectedDepartment(null)
-      setDepartmentSearch('')
-      setCustomDepartment('')
-      setFormError(null)
-    }
-  }
-
-  const handleCustomDepartment = () => {
-    if (customDepartment.trim() && selectedUniversity) {
-      setSelectedDepartment({
-        id: 'custom',
-        name: customDepartment.trim(),
-      })
-      setFormError(null)
-    }
+  const handleExploring = () => {
+    setIsExploring(true)
+    setSelectedUniversity(null)
+    setSelectedDepartment(null)
+    setShowUniversityDropdown(false)
+    setShowDepartmentDropdown(false)
+    setFormError(null)
   }
 
   const handleContinue = async () => {
+    // 允許匿名模式：將資料儲存到 localStorage
+    const goalData = {
+      target_university: isExploring ? '摸索中' : (selectedUniversity?.name || ''),
+      target_department: isExploring ? '摸索中' : (customDepartment.trim() || selectedDepartment?.name || ''),
+      is_exploring: isExploring,
+      current_grade: selectedGrade,
+      mock_exam_level: mockExamLevel,
+    }
+
     if (!user) {
-      setFormError('請先登入')
-      router.push('/onboarding')
+      // 匿名模式：儲存到 localStorage
+      const stored = localStorage.getItem('onboarding_anonymous_data')
+      let anonymousData: any = {}
+      
+      if (stored) {
+        try {
+          anonymousData = JSON.parse(stored)
+        } catch (e) {
+          console.error('[OnboardingGoal] Failed to parse stored data:', e)
+        }
+      }
+      
+      anonymousData.goalData = goalData
+      localStorage.setItem('onboarding_anonymous_data', JSON.stringify(anonymousData))
+      
+      // 導向 challenge 頁面
+      router.push('/onboarding/challenge')
       return
     }
 
-    if (!selectedUniversity) {
-      setFormError('請選擇或輸入大學名稱')
+    if (!selectedGrade) {
+      setFormError('請選擇年級')
       return
     }
 
-    const finalUniversity = (customUniversity.trim() || selectedUniversity.name).trim()
-    if (!finalUniversity) {
-      setFormError('請輸入大學名稱')
+    if (!isExploring && !selectedUniversity) {
+      setFormError('請選擇大學或點選「我還在摸索方向」')
       return
     }
-
-    const needsCustomDepartment = selectedUniversity.id === 'other' || selectedUniversity.id === 'custom'
-    const finalDepartment = needsCustomDepartment
-      ? customDepartment.trim()
-      : customDepartment.trim() || selectedDepartment?.name || ''
-
-    if (!finalDepartment) {
+    if (!isExploring && !selectedDepartment && !customDepartment) {
       setFormError('請選擇或輸入科系')
       return
     }
@@ -121,456 +192,282 @@ export default function OnboardingGoalPage() {
     setSaving(true)
     setFormError(null)
 
-    const { error } = await supabaseBrowserClient
-      .from('profiles')
-      .update({
-        target_university: finalUniversity,
-        target_department: finalDepartment,
-        onboarding_completed: true,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', user.id)
-
-    if (error) {
-      console.error('[OnboardingGoal] Failed to update profile:', error)
-      setFormError('儲存失敗，請稍後再試')
-    } else {
-      router.push('/play')
-      router.refresh()
-    }
-
-    setSaving(false)
-  }
-
-  const handleSkip = async () => {
-    if (!user) {
-      return
-    }
-
-    setSkipLoading(true)
-    setFormError(null)
-
-    const { error } = await supabaseBrowserClient
-      .from('profiles')
-      .update({
-        onboarding_completed: true,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', user.id)
-
-    if (error) {
-      console.error('[OnboardingGoal] Failed to skip onboarding:', error)
-      setFormError('暫時無法跳過，請稍後再試')
-    } else {
-      router.push('/play')
-      router.refresh()
-    }
-
-    setSkipLoading(false)
-  }
-
-  const canContinue = useMemo(() => {
-    if (!selectedUniversity) {
-      return false
-    }
-
-    if (selectedUniversity.id === 'other' || selectedUniversity.id === 'custom') {
-      return Boolean(customDepartment.trim())
-    }
-
-    return Boolean(selectedDepartment || customDepartment.trim())
-  }, [selectedUniversity, selectedDepartment, customDepartment])
-
-  // 當選擇科系後，查詢門檻
-  useEffect(() => {
-    const fetchRequirements = async () => {
-      if (!selectedUniversity || !selectedDepartment) {
-        setRequirements(null)
-        return
+    try {
+      if (sessionId) {
+        await supabaseBrowserClient
+          .from('onboarding_sessions')
+          .update({
+            target_university: isExploring ? '摸索中' : (selectedUniversity?.name || ''),
+            target_department: isExploring ? '摸索中' : (customDepartment.trim() || selectedDepartment?.name || ''),
+            is_exploring: isExploring,
+            current_grade: selectedGrade,
+            mock_exam_level: mockExamLevel,
+            current_step: 1,
+          })
+          .eq('id', sessionId)
       }
 
-      // 只查詢資料庫中的科系（不查詢自訂科系）
-      if (selectedUniversity.id === 'other' || selectedUniversity.id === 'custom' || selectedDepartment.id === 'custom') {
-        setRequirements(null)
-        return
-      }
+      await supabaseBrowserClient
+        .from('profiles')
+        .update({
+          target_university: isExploring ? '摸索中' : (selectedUniversity?.name || ''),
+          target_department: isExploring ? '摸索中' : (customDepartment.trim() || selectedDepartment?.name || ''),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id)
 
-      setLoadingRequirements(true)
-      try {
-        const response = await fetch(
-          `/api/departments/requirements?university_name=${encodeURIComponent(selectedUniversity.name)}&department_name=${encodeURIComponent(selectedDepartment.name)}`
-        )
-        const { data } = await response.json()
-        setRequirements(data)
-      } catch (error) {
-        console.error('Failed to fetch requirements:', error)
-        setRequirements(null)
-      } finally {
-        setLoadingRequirements(false)
-      }
+      router.push('/onboarding/challenge')
+    } catch (error) {
+      console.error('[OnboardingGoal] Failed to save:', error)
+      setFormError('儲存失敗,請稍後再試')
+      setSaving(false)
     }
-
-    fetchRequirements()
-  }, [selectedUniversity, selectedDepartment])
-
-  if (authLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-center">
-          <div className="mb-4 text-4xl animate-spin">⏳</div>
-          <p className="text-muted-foreground">載入中...</p>
-        </div>
-      </div>
-    )
   }
 
-  if (!user) {
-    return null
+  const getLevelLabel = (level: number): string => {
+    if (level <= 4) return '基礎'
+    if (level <= 9) return '中等'
+    if (level <= 12) return '良好'
+    return '優秀'
   }
+
+  // 🎯 修復：onboarding 頁面不應該等待認證狀態，允許匿名訪問
+  // 即使 authLoading 為 true，也顯示表單內容，讓用戶可以先開始填寫
+  // if (authLoading) {
+  //   return (
+  //     <div className="flex min-h-screen items-center justify-center bg-background">
+  //       <div className="text-sm text-muted-foreground">載入中...</div>
+  //     </div>
+  //   )
+  // }
+
+  // 允許匿名訪問，不需要檢查 user
+
+  const canContinue = selectedGrade && (isExploring || (selectedUniversity && (selectedDepartment || customDepartment)))
 
   return (
-    <div className="flex min-h-screen">
-      {/* Left Side - Visual */}
-      <div className="hidden lg:flex lg:w-2/3 relative bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 overflow-hidden">
-        <div className="absolute inset-0 opacity-20">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48Y2lyY2xlIGN4PSIzMCIgY3k9IjMwIiByPSIyIi8+PC9nPjwvZz48L3N2Zz4=')] opacity-30" />
-        </div>
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto max-w-md px-6 py-12">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-12 text-center"
+        >
+          <h1 className="mb-2 text-2xl font-medium text-foreground">
+            快速設定
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            30秒完成
+          </p>
+        </motion.div>
 
-        <div className="relative z-10 flex flex-col justify-between p-12 text-white">
+        {/* Form */}
+        <div className="space-y-8">
+          {/* 1. 目標 */}
           <div>
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mb-8"
-            >
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                  <span className="text-xl">🎯</span>
-                </div>
-                <span className="text-2xl font-bold">PLMS</span>
+            <label className="mb-3 block text-sm font-medium text-foreground">
+              理想大學和科系
+            </label>
+
+            <div className="space-y-2">
+              {/* University */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowUniversityDropdown(!showUniversityDropdown)}
+                  className="w-full rounded-lg border border-border bg-card px-4 py-3 text-left transition-colors hover:border-primary"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-foreground">
+                      {selectedUniversity?.name || '選擇大學'}
+                    </span>
+                    <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${showUniversityDropdown ? 'rotate-180' : ''}`} />
+                  </div>
+                </button>
+
+                {showUniversityDropdown && (
+                  <div className="absolute z-10 mt-1 w-full rounded-lg border border-border bg-card shadow-lg">
+                    <div className="p-2">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          type="text"
+                          placeholder="搜尋..."
+                          value={universitySearch}
+                          onChange={(e) => setUniversitySearch(e.target.value)}
+                          className="h-9 border-border pl-9 text-sm"
+                          autoFocus
+                        />
+                      </div>
+                    </div>
+                    <div className="max-h-60 overflow-y-auto">
+                      {filteredUniversities.map((uni) => (
+                        <button
+                          key={uni.id}
+                          onClick={() => handleUniversitySelect(uni)}
+                          className="w-full px-4 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted"
+                        >
+                          {uni.name}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="border-t border-border p-2">
+                      <button
+                        onClick={handleExploring}
+                        className="w-full rounded px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-muted"
+                      >
+                        我還在摸索方向
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-            </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="max-w-md"
-            >
-              <h1 className="text-5xl font-bold mb-4 leading-tight">
-                設定你的目標
-              </h1>
-              <p className="text-xl opacity-90 leading-relaxed">
-                告訴我們你想就讀的大學和科系，我們會為你量身打造學習計劃
-              </p>
-            </motion.div>
-          </div>
+              {/* Department */}
+              {selectedUniversity && (
+                <div className="relative">
+                  {!selectedDepartment && !customDepartment ? (
+                    <>
+                      <button
+                        onClick={() => setShowDepartmentDropdown(!showDepartmentDropdown)}
+                        className="w-full rounded-lg border border-border bg-card px-4 py-3 text-left transition-colors hover:border-primary"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">選擇科系</span>
+                          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${showDepartmentDropdown ? 'rotate-180' : ''}`} />
+                        </div>
+                      </button>
 
-          <div className="flex gap-2">
-            <div className="w-2 h-2 rounded-full bg-white/30" />
-            <div className="w-2 h-2 rounded-full bg-white" />
-            <div className="w-2 h-2 rounded-full bg-white/30" />
-          </div>
-        </div>
-      </div>
-
-      {/* Right Side - Form */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-background overflow-y-auto">
-        <div className="w-full max-w-2xl">
-          <div className="mb-8">
-            <h2 className="text-3xl font-bold mb-2">選擇你的目標</h2>
-            <p className="text-muted-foreground">
-              選擇或輸入你想就讀的大學和科系
-            </p>
-            <div className="mt-6 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-              {['登入', '設定目標', '開始練習'].map((label, index) => (
-                <div key={label} className="flex items-center gap-2">
-                  <div
-                    className={`h-2 w-2 rounded-full ${
-                      index <= 1 ? 'bg-foreground' : 'bg-muted'
-                    }`}
-                  />
-                  <span className={index === 1 ? 'text-foreground font-semibold' : ''}>
-                    {label}
-                  </span>
-                  {index < 2 && <div className="hidden sm:block w-8 h-px bg-border" />}
+                      {showDepartmentDropdown && (
+                        <div className="absolute z-10 mt-1 w-full rounded-lg border border-border bg-card shadow-lg">
+                          <div className="p-2">
+                            <div className="relative mb-2">
+                              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                              <Input
+                                type="text"
+                                placeholder="搜尋科系..."
+                                value={departmentSearch}
+                                onChange={(e) => setDepartmentSearch(e.target.value)}
+                                className="h-9 border-border pl-9 text-sm"
+                                autoFocus
+                              />
+                            </div>
+                            <Input
+                              type="text"
+                              placeholder="或輸入自訂科系"
+                              value={customDepartment}
+                              onChange={(e) => {
+                                setCustomDepartment(e.target.value)
+                                if (e.target.value) setShowDepartmentDropdown(false)
+                              }}
+                              className="h-9 border-border text-sm"
+                            />
+                          </div>
+                          <div className="max-h-48 overflow-y-auto">
+                            {filteredDepartments.map((dept) => (
+                              <button
+                                key={dept.id}
+                                onClick={() => handleDepartmentSelect(dept)}
+                                className="w-full px-4 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted"
+                              >
+                                {dept.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-between rounded-lg border border-border bg-muted px-4 py-3">
+                      <span className="text-sm text-foreground">
+                        {customDepartment || selectedDepartment?.name}
+                      </span>
+                      <button
+                        onClick={() => {
+                          setSelectedDepartment(null)
+                          setCustomDepartment('')
+                          setShowDepartmentDropdown(true)
+                        }}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
+              )}
+            </div>
+          </div>
+
+          {/* 2. 年級 */}
+          <div>
+            <label className="mb-3 block text-sm font-medium text-foreground">
+              年級
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {GRADES.map((grade) => (
+                <button
+                  key={grade.value}
+                  onClick={() => setSelectedGrade(grade.value)}
+                  className={`rounded-lg border px-4 py-3 text-sm font-medium transition-all ${
+                    selectedGrade === grade.value
+                      ? 'border-foreground bg-foreground text-background'
+                      : 'border-border bg-card text-foreground hover:border-primary'
+                  }`}
+                >
+                  {grade.label}
+                </button>
               ))}
             </div>
           </div>
 
-          <div className="space-y-6">
-            {/* 大學選擇 */}
-            <div className="space-y-3">
-              <Label htmlFor="university" className="text-lg font-semibold">
-                大學名稱
-              </Label>
-              
-              {/* 搜尋輸入 */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input
-                  id="university"
-                  type="text"
-                  placeholder="搜尋大學名稱..."
-                  value={universitySearch}
-                  onChange={(e) => setUniversitySearch(e.target.value)}
-                  className="h-11 pl-10"
-                />
+          {/* 3. 模考程度 */}
+          <div>
+            <label className="mb-3 block text-sm font-medium text-foreground">
+              模考程度
+            </label>
+            <div className="rounded-lg border border-border bg-card p-6">
+              <div className="mb-4 text-center">
+                <div className="text-4xl font-bold text-foreground">{mockExamLevel}</div>
+                <div className="mt-1 text-sm text-muted-foreground">{getLevelLabel(mockExamLevel)}</div>
               </div>
-
-              {/* 自訂大學輸入 */}
-              {!selectedUniversity && (
-                <div className="flex gap-2">
-                  <Input
-                    type="text"
-                    placeholder="或輸入自訂大學名稱"
-                    value={customUniversity}
-                    onChange={(e) => setCustomUniversity(e.target.value)}
-                    className="h-11"
-                  />
-                  <Button
-                    onClick={handleCustomUniversity}
-                    disabled={!customUniversity.trim()}
-                    className="h-11"
-                  >
-                    確認
-                  </Button>
-                </div>
-              )}
-
-              {/* 大學列表 */}
-              {!selectedUniversity && (
-                <Card className="max-h-64 overflow-y-auto p-2">
-                  <div className="space-y-1">
-                    {filteredUniversities.map((uni) => (
-                      <button
-                        key={uni.id}
-                        onClick={() => handleUniversitySelect(uni)}
-                        className="w-full text-left px-4 py-3 rounded-lg hover:bg-accent transition-colors flex items-center justify-between"
-                      >
-                        <div className="flex items-center gap-3">
-                          <GraduationCap className="h-5 w-5 text-muted-foreground" />
-                          <span>{uni.name}</span>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      </button>
-                    ))}
-                  </div>
-                </Card>
-              )}
-
-              {/* 已選擇的大學 */}
-              {selectedUniversity && (
-                <Card className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <GraduationCap className="h-5 w-5 text-primary" />
-                      <span className="font-medium">{selectedUniversity.name}</span>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedUniversity(null)
-                        setSelectedDepartment(null)
-                        setUniversitySearch('')
-                        setDepartmentSearch('')
-                      }}
-                    >
-                      重新選擇
-                    </Button>
-                  </div>
-                </Card>
-              )}
-            </div>
-
-            {/* 科系選擇 */}
-            {selectedUniversity && selectedUniversity.id !== 'other' && (
-              <div className="space-y-3">
-                <Label htmlFor="department" className="text-lg font-semibold">
-                  科系名稱
-                </Label>
-
-                {/* 搜尋輸入 */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <Input
-                    id="department"
-                    type="text"
-                    placeholder="搜尋科系名稱..."
-                    value={departmentSearch}
-                    onChange={(e) => setDepartmentSearch(e.target.value)}
-                    className="h-11 pl-10"
-                  />
-                </div>
-
-                {/* 自訂科系輸入 */}
-                {!selectedDepartment && (
-                  <div className="flex gap-2">
-                    <Input
-                      type="text"
-                      placeholder="或輸入自訂科系名稱"
-                      value={customDepartment}
-                      onChange={(e) => setCustomDepartment(e.target.value)}
-                      className="h-11"
-                    />
-                    <Button
-                      onClick={handleCustomDepartment}
-                      disabled={!customDepartment.trim()}
-                      className="h-11"
-                    >
-                      確認
-                    </Button>
-                  </div>
-                )}
-
-                {/* 科系列表 */}
-                {!selectedDepartment && !customDepartment && (
-                  <Card className="max-h-64 overflow-y-auto p-2">
-                    <div className="space-y-1">
-                      {filteredDepartments.map((dept) => (
-                        <button
-                          key={dept.id}
-                          onClick={() => handleDepartmentSelect(dept)}
-                          className="w-full text-left px-4 py-3 rounded-lg hover:bg-accent transition-colors flex items-center justify-between"
-                        >
-                          <span>{dept.name}</span>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                        </button>
-                      ))}
-                    </div>
-                  </Card>
-                )}
-
-                {/* 已選擇的科系 */}
-                {(selectedDepartment || customDepartment) && (
-                  <Card className="p-4">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">
-                        {customDepartment || selectedDepartment?.name}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedDepartment(null)
-                          setCustomDepartment('')
-                          setDepartmentSearch('')
-                        }}
-                      >
-                        重新選擇
-                      </Button>
-                    </div>
-                  </Card>
-                )}
+              <input
+                type="range"
+                min="1"
+                max="15"
+                value={mockExamLevel}
+                onChange={(e) => setMockExamLevel(parseInt(e.target.value))}
+                className="w-full"
+                style={{
+                  accentColor: 'hsl(var(--foreground))'
+                }}
+              />
+              <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+                <span>1</span>
+                <span>15</span>
               </div>
-            )}
-
-            {/* 其他大學的自訂科系 */}
-            {selectedUniversity?.id === 'other' && (
-              <div className="space-y-3">
-                <Label htmlFor="custom-dept" className="text-lg font-semibold">
-                  科系名稱
-                </Label>
-                <Input
-                  id="custom-dept"
-                  type="text"
-                  placeholder="輸入科系名稱"
-                  value={customDepartment}
-                  onChange={(e) => setCustomDepartment(e.target.value)}
-                  className="h-11"
-                />
-              </div>
-            )}
-
-            {/* 顯示門檻資訊 */}
-            {selectedDepartment && selectedDepartment.id !== 'custom' && (
-              <div className="mt-6">
-                {loadingRequirements ? (
-                  <Card className="p-4">
-                    <div className="text-center text-muted-foreground">載入門檻資訊中...</div>
-                  </Card>
-                ) : requirements ? (
-                  <Card className="p-4 border-primary/20">
-                    <h3 className="font-semibold mb-3 text-lg">入學門檻</h3>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      {requirements.score_chinese && (
-                        <div>
-                          <span className="text-muted-foreground">國文：</span>
-                          <span className="font-medium">{requirements.requirement_chinese} ({requirements.score_chinese}級分)</span>
-                        </div>
-                      )}
-                      {requirements.score_english && (
-                        <div>
-                          <span className="text-muted-foreground">英文：</span>
-                          <span className="font-medium">{requirements.requirement_english} ({requirements.score_english}級分)</span>
-                        </div>
-                      )}
-                      {requirements.score_math_a && (
-                        <div>
-                          <span className="text-muted-foreground">數學A：</span>
-                          <span className="font-medium">{requirements.requirement_math_a} ({requirements.score_math_a}級分)</span>
-                        </div>
-                      )}
-                      {requirements.score_math_b && (
-                        <div>
-                          <span className="text-muted-foreground">數學B：</span>
-                          <span className="font-medium">{requirements.requirement_math_b} ({requirements.score_math_b}級分)</span>
-                        </div>
-                      )}
-                      {requirements.score_social && (
-                        <div>
-                          <span className="text-muted-foreground">社會：</span>
-                          <span className="font-medium">{requirements.requirement_social} ({requirements.score_social}級分)</span>
-                        </div>
-                      )}
-                      {requirements.score_natural && (
-                        <div>
-                          <span className="text-muted-foreground">自然：</span>
-                          <span className="font-medium">{requirements.requirement_natural} ({requirements.score_natural}級分)</span>
-                        </div>
-                      )}
-                      {requirements.score_english_listening && (
-                        <div>
-                          <span className="text-muted-foreground">英聽：</span>
-                          <span className="font-medium">{requirements.score_english_listening}</span>
-                        </div>
-                      )}
-                      {requirements.admission_quota && (
-                        <div className="col-span-2 pt-2 border-t">
-                          <span className="text-muted-foreground">招生名額：</span>
-                          <span className="font-medium">{requirements.admission_quota} 人</span>
-                        </div>
-                      )}
-                    </div>
-                  </Card>
-                ) : null}
-              </div>
-            )}
-
-            {/* 繼續按鈕 */}
-            <div className="pt-4 space-y-3">
-              {formError && (
-                <p className="text-sm text-red-500">{formError}</p>
-              )}
-              <Button
-                onClick={handleContinue}
-                disabled={!canContinue || saving}
-                className="w-full h-11 bg-black text-white hover:bg-black/90"
-              >
-                {saving ? '儲存中...' : '繼續'}
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={handleSkip}
-                disabled={saving || skipLoading}
-                className="w-full h-11 text-muted-foreground hover:text-foreground"
-              >
-                {skipLoading ? '處理中...' : '稍後再設定'}
-              </Button>
             </div>
           </div>
+
+          {/* Error */}
+          {formError && (
+            <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
+              {formError}
+            </div>
+          )}
+
+          {/* Submit */}
+          <Button
+            onClick={handleContinue}
+            disabled={!canContinue || saving}
+            className="h-12 w-full rounded-lg bg-foreground text-sm font-medium text-background hover:opacity-90 disabled:opacity-50"
+          >
+            {saving ? '儲存中...' : '下一步'}
+          </Button>
+
+          <p className="text-center text-xs text-muted-foreground">
+            步驟 1 / 3
+          </p>
         </div>
       </div>
     </div>

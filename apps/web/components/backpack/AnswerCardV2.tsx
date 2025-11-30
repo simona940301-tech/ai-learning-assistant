@@ -7,8 +7,15 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { track } from '@/lib/telemetry'
-import type { Citation } from '@/hooks/useScopedAskV2'
 import ReactMarkdown from 'react-markdown'
+
+interface Citation {
+  page_index: number
+  text?: string
+  score?: number
+  start?: number
+  end?: number
+}
 
 interface AnswerCardV2Props {
   streamingText: string
@@ -127,4 +134,3 @@ export function AnswerCardV2({
     </motion.div>
   )
 }
-

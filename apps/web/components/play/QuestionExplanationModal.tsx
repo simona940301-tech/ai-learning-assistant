@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -32,13 +32,7 @@ export function QuestionExplanationModal({
   const [data, setData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (isOpen && questionId) {
-      loadExplanation()
-    }
-  }, [isOpen, questionId])
-
-  const loadExplanation = async () => {
+  const loadExplanation = useCallback(async () => {
     setLoading(true)
     setError(null)
 
@@ -56,7 +50,13 @@ export function QuestionExplanationModal({
     } finally {
       setLoading(false)
     }
-  }
+  }, [questionId])
+
+  useEffect(() => {
+    if (isOpen && questionId) {
+      loadExplanation()
+    }
+  }, [isOpen, questionId, loadExplanation])
 
   if (!isOpen) return null
 

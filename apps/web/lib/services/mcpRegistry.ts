@@ -16,7 +16,7 @@ import { generate_parents_weekly } from './mcp/parents'
 
 type McpActionArgs = Record<string, unknown>
 type McpActionResult = { ok: boolean; [key: string]: unknown }
-type McpActionHandler = (args: McpActionArgs) => Promise<McpActionResult>
+type McpActionHandler = (args: any) => Promise<McpActionResult>
 
 const mcpActions: Record<string, McpActionHandler> = {
   get_global_ask_context,
@@ -45,5 +45,4 @@ export async function runMcpAction(action: string, args: McpActionArgs) {
 
   return handler(args)
 }
-
 

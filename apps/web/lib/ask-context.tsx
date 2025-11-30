@@ -1,7 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useCallback } from 'react'
-import { AttachedFile, TaskType, SourceMode, BackpackFile } from './types'
+import { AttachedFile, TaskType, SourceMode, BackpackFile, FileAnalysis } from './types'
 
 interface AskContextType {
   attachedFiles: AttachedFile[]
@@ -13,6 +13,8 @@ interface AskContextType {
   setSourceMode: (mode: SourceMode) => void
   importFromBackpack: (files: BackpackFile[], type: TaskType) => void
   clearAll: () => void
+  currentAnalysis: FileAnalysis | null
+  setCurrentAnalysis: (analysis: FileAnalysis | null) => void
 }
 
 const AskContext = createContext<AskContextType | undefined>(undefined)
@@ -21,6 +23,7 @@ export function AskProvider({ children }: { children: React.ReactNode }) {
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
   const [taskType, setTaskType] = useState<TaskType>('summary')
   const [sourceMode, setSourceMode] = useState<SourceMode>('backpack')
+  const [currentAnalysis, setCurrentAnalysis] = useState<FileAnalysis | null>(null)
 
   const addFiles = useCallback((files: AttachedFile[]) => {
     setAttachedFiles(prev => [...prev, ...files])
@@ -45,6 +48,7 @@ export function AskProvider({ children }: { children: React.ReactNode }) {
 
   const clearAll = useCallback(() => {
     setAttachedFiles([])
+    setCurrentAnalysis(null)
   }, [])
 
   return (
@@ -59,6 +63,8 @@ export function AskProvider({ children }: { children: React.ReactNode }) {
         setSourceMode,
         importFromBackpack,
         clearAll,
+        currentAnalysis,
+        setCurrentAnalysis,
       }}
     >
       {children}

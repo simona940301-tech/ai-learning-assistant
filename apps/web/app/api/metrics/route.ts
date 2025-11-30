@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getSupabaseClient } from '@/lib/api/auth'
 import { withErrorHandler, createErrorResponse, ErrorCodes } from '@/lib/middleware/error-handler'
 
 /**
@@ -9,7 +9,7 @@ import { withErrorHandler, createErrorResponse, ErrorCodes } from '@/lib/middlew
  */
 export const GET = withErrorHandler(async (req: NextRequest) => {
   try {
-    const supabase = createClient()
+    const supabase = getSupabaseClient(req)
 
     // 檢查認證（可選，可以設置為公開或需要認證）
     const {
@@ -64,4 +64,3 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     )
   }
 })
-

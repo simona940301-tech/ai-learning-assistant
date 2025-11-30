@@ -1,4 +1,4 @@
-import { chatCompletionJSON } from '@/lib/openai'
+import { chatCompletionJSON } from '@/lib/gemini'
 import { ExplainResultSchema, type ExplainResult, type SolveSubject } from '@/lib/solve-types'
 import { z } from 'zod'
 

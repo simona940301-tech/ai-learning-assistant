@@ -36,7 +36,6 @@ export function getRedisClient(): RedisClientType | null {
       url: redisUrl,
       password: redisPassword,
       socket: {
-        tls: isUpstash, // ✅ Upstash 需要 TLS
         reconnectStrategy: (retries) => {
           if (retries > 10) {
             console.error('[Redis] Max reconnection attempts reached')
@@ -44,6 +43,9 @@ export function getRedisClient(): RedisClientType | null {
           }
           return Math.min(retries * 100, 3000)
         },
+        ...(isUpstash && {
+          tls: true,
+        }),
       },
     }) as RedisClientType
 

@@ -6,21 +6,17 @@ import { track } from '@/lib/telemetry'
 import { X } from 'lucide-react'
 import { StickyNoteLayer } from './StickyNoteLayer'
 
-// Dynamic import react-konva to avoid SSR issues
-let ReactKonva: any = null
-let konvaLoadPromise: Promise<any> | null = null
-
-async function loadKonva() {
-  if (ReactKonva) return ReactKonva
-  if (konvaLoadPromise) return konvaLoadPromise
-  
-  konvaLoadPromise = import('react-konva').then((module) => {
-    ReactKonva = module
-    return module
-  })
-  
-  return konvaLoadPromise
-}
+// Lazy load Konva (heavy library, only load when needed)
+// NOTE: react-konva is not currently installed. Uncomment when needed.
+// let konvaLoadPromise: Promise<any> | null = null
+// function loadKonva() {
+//   if (!konvaLoadPromise) {
+//     konvaLoadPromise = import('react-konva').then((module) => {
+//       return module
+//     })
+//   }
+//   return konvaLoadPromise
+// }
 
 interface AnnotationLayerProps {
   pageNumber: number
@@ -58,29 +54,14 @@ export function AnnotationLayer({
   const stageRef = useRef<any>(null)
   const isDrawingTool = tool === 'pen' || tool === 'marker'
   const isInteractiveTool = tool === 'pen' || tool === 'marker' || tool === 'eraser'
-  
+
   // Load react-konva dynamically - MUST be before any conditional returns
+  // NOTE: Disabled until react-konva is installed
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    
-    loadKonva().then((module) => {
-      if (module) {
-        setKonvaComponents({
-          Stage: module.Stage,
-          Layer: module.Layer,
-          Line: module.Line,
-          Rect: module.Rect,
-          Text: module.Text,
-          Group: module.Group,
-          Circle: module.Circle,
-        })
-        setKonvaLoaded(true)
-      }
-    }).catch((err) => {
-      console.error('[AnnotationLayer] Failed to load react-konva:', err)
-    })
+    // Annotation layer is disabled until react-konva is installed
+    console.warn('[AnnotationLayer] react-konva not installed, annotation features disabled')
   }, [])
-  
+
   // Handle mouse/touch events for drawing - MUST be before conditional return
   const handleMouseDown = useCallback(
     async (e: any) => {
@@ -90,15 +71,15 @@ export function AnnotationLayer({
       if (tool !== 'sticky') {
         e.evt?.preventDefault?.()
       }
-      
+
       // Sticky notes are handled in handleMouseUp
       if (tool === 'sticky') return
-      
+
       // Eraser: delete annotation on click
       if (tool === 'eraser') {
         const stage = e.target.getStage()
         const pos = stage.getPointerPosition()
-        
+
         // Find annotation at click position
         const clickedAnnotation = annotations.find((ann) => {
           if (ann.annotation_type === 'pen' || ann.annotation_type === 'marker') {
@@ -123,14 +104,14 @@ export function AnnotationLayer({
           }
           return false
         })
-        
+
         if (clickedAnnotation) {
           // Call DELETE API
           try {
             const response = await fetch(`/api/backpack/annotations?id=${clickedAnnotation.id}`, {
               method: 'DELETE',
             })
-            
+
             if (response.ok) {
               onAnnotationDelete(clickedAnnotation.id)
               track('backpack.reader.annot.delete', {
@@ -144,13 +125,13 @@ export function AnnotationLayer({
         }
         return
       }
-      
+
       if (tool !== 'pen' && tool !== 'marker') return
-      
+
       setIsDrawing(true)
       const pos = e.target.getStage().getPointerPosition()
       setCurrentPath([pos.x, pos.y])
-      
+
       track('backpack.reader.annot.start', {
         type: tool,
         page: pageNumber,
@@ -158,27 +139,27 @@ export function AnnotationLayer({
     },
     [tool, pageNumber, annotations, onAnnotationDelete]
   )
-  
+
   const handleMouseMove = useCallback(
     (e: any) => {
       if (!isDrawing || (tool !== 'pen' && tool !== 'marker')) return
-      
+
       // 防止頁面滾動
       e.evt?.preventDefault?.()
-      
+
       const stage = e.target.getStage()
       const point = stage.getPointerPosition()
       setCurrentPath((prev) => [...prev, point.x, point.y])
     },
     [isDrawing, tool]
   )
-  
+
   const handleMouseUp = useCallback(async (e?: any) => {
     // Sticky notes are handled by StickyNoteLayer, skip here
     if (tool === 'sticky') {
       return
     }
-    
+
     if (!isDrawing || currentPath.length < 4) {
       setIsDrawing(false)
       setCurrentPath([])
@@ -190,7 +171,7 @@ export function AnnotationLayer({
       setCurrentPath([])
       return
     }
-    
+
     // Create annotation for pen/marker
     const annotation: Annotation = {
       id: crypto.randomUUID(),
@@ -205,7 +186,7 @@ export function AnnotationLayer({
       },
       created_at: new Date().toISOString(),
     }
-    
+
     // Save to API
     try {
       const response = await fetch('/api/backpack/annotations', {
@@ -218,7 +199,7 @@ export function AnnotationLayer({
           data: annotation.data,
         }),
       })
-      
+
       if (response.ok) {
         const { annotation: saved } = await response.json()
         onAnnotationCreate(saved)
@@ -226,24 +207,24 @@ export function AnnotationLayer({
     } catch (err) {
       console.error('[AnnotationLayer] Failed to save annotation:', err)
     }
-    
+
     track('backpack.reader.annot.create', {
       type: tool,
       page: pageNumber,
     })
-    
+
     setIsDrawing(false)
     setCurrentPath([])
   }, [isDrawing, currentPath, tool, pageNumber, fileId, onAnnotationCreate, color, strokeWidth])
 
-  
+
   // Render annotations
   const renderAnnotations = useCallback(() => {
     if (!konvaComponents) return []
-    
+
     const elements: React.ReactNode[] = []
     const { Line, Rect, Text, Group, Circle } = konvaComponents
-    
+
     for (const ann of annotations) {
       switch (ann.annotation_type) {
         case 'pen':
@@ -266,27 +247,27 @@ export function AnnotationLayer({
             )
           }
           break
-          
+
         case 'sticky':
           // Sticky notes are handled by StickyNoteLayer, skip here
           break
-          
+
         case 'text-highlight':
           // Text highlights are rendered via CSS, not Konva
           break
       }
     }
-    
+
     return elements
   }, [annotations, konvaComponents, tool, pageNumber, onAnnotationDelete, onAnnotationUpdate])
-  
+
   // Don't render if Konva is not loaded - AFTER all hooks
   if (!konvaLoaded || !konvaComponents) {
     return null
   }
-  
+
   const { Stage, Layer, Line } = konvaComponents
-  
+
   return (
     <>
       {/* Konva Layer - 用於繪圖（筆刷、螢光筆、橡皮擦） */}
@@ -310,25 +291,25 @@ export function AnnotationLayer({
           onTouchMove={handleMouseMove}
           onTouchEnd={handleMouseUp}
         >
-        <Layer>
-          {renderAnnotations()}
-          {isDrawing && currentPath.length > 0 && tool && (
-            <Line
-              points={currentPath}
-              stroke={color}
-              strokeWidth={strokeWidth}
-              opacity={tool === 'marker' ? 0.4 : 1}
-              tension={0.5}
-              lineCap="round"
-              lineJoin="round"
-              globalCompositeOperation={
-                tool === 'marker' ? 'multiply' : 'source-over'
-              }
-            />
-          )}
-        </Layer>
-      </Stage>
-    </div>
+          <Layer>
+            {renderAnnotations()}
+            {isDrawing && currentPath.length > 0 && tool && (
+              <Line
+                points={currentPath}
+                stroke={color}
+                strokeWidth={strokeWidth}
+                opacity={tool === 'marker' ? 0.4 : 1}
+                tension={0.5}
+                lineCap="round"
+                lineJoin="round"
+                globalCompositeOperation={
+                  tool === 'marker' ? 'multiply' : 'source-over'
+                }
+              />
+            )}
+          </Layer>
+        </Stage>
+      </div>
 
       {/* Sticky Note Layer - 始終顯示所有便利貼（雙層渲染系統） */}
       <StickyNoteLayer

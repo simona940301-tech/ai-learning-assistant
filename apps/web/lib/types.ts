@@ -4,6 +4,8 @@ export type Subject = 'chinese' | 'english' | 'social' | 'science' | 'math'
 
 export type FileType = 'text' | 'pdf' | 'image'
 
+export type Difficulty = 'easy' | 'medium' | 'hard' | 'expert'
+
 export type SourceMode = 'backpack' | 'backpack_academic'
 
 export type TaskType = 'summary' | 'solve'
@@ -30,6 +32,10 @@ export interface BackpackFile {
   // Derived relationship
   derived_from?: string[]
   version_history?: VersionHistoryEntry[]
+  // Notebook entry fields
+  source_type?: 'summary' | 'qa' | 'manual'
+  tags?: string[]
+  is_notebook_entry?: boolean
 }
 
 export interface VersionHistoryEntry {
@@ -235,4 +241,61 @@ export interface ExplainViewModel {
   evidenceBlocks?: string[] // reading: ≤3 sentences
   discourseRole?: string // discourse: 轉承/例證/結論
   mixAnswerExtra?: string // hybrid: non-MC complement
+}
+
+// ============================================
+// Elite RAG Types
+// ============================================
+
+export interface CoreConcept {
+  name: string
+  explanation: string
+  importance: number
+  pageRefs: number[]
+}
+
+export interface KeyInsight {
+  insight: string
+  evidence: string
+  pageRefs: number[]
+}
+
+export interface SuggestedQuestion {
+  question: string
+  difficulty: number
+  topic: string
+}
+
+export interface ExamQuestion {
+  questionText: string
+  questionType: string
+  options?: { label: string; text: string; isCorrect: boolean }[]
+  correctAnswer: string
+  explanation: string
+  difficulty: number
+  topicTags: string[]
+  sourcePages: number[]
+  confidenceScore: number
+}
+
+export type AnalysisStatus = 'pending' | 'processing' | 'preview_ready' | 'analysis_ready' | 'prediction_ready' | 'failed'
+
+export interface FileAnalysis {
+  id: string
+  status: AnalysisStatus
+  processingTimeMs: number
+  // Layer 1
+  quickSummary?: string
+  detectedSubject?: string
+  detectedTopics?: string[]
+  // Layer 2
+  coreConcepts?: CoreConcept[]
+  keyInsights?: KeyInsight[]
+  suggestedQuestions?: SuggestedQuestion[]
+  structuredNotes?: string
+  // Layer 3
+  examPredictions?: ExamQuestion[]
+  weakPoints?: { concept: string; reason: string; practiceSuggestion: string }[]
+  studyRoadmap?: { phase: string; topics: string[]; estimatedHours: number }[]
+  errorMessage?: string
 }

@@ -1,0 +1,1391 @@
+'use client'
+
+import { useState, useEffect, useCallback, useRef } from 'react'
+import dynamic from 'next/dynamic'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { FileText, Image as ImageIcon, File, X, MoreVertical, CheckSquare, Square, Trash2, Edit2, FolderPlus, BookOpen, ChevronDown, ChevronUp, RotateCcw, Package } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import { NoteCanvasV2 } from '@/components/backpack/NoteCanvasV2'
+import { ErrorLabelBadge, type ErrorLabelResponse } from '@/components/backpack/ErrorLabelBadge'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+// Dynamic import BackpackReader to avoid SSR issues with pdf.js
+const BackpackReader = dynamic(
+  () => import('@/components/backpack/BackpackReader').then((mod) => {
+    if (!mod?.BackpackReader) {
+      throw new Error('BackpackReader component not found')
+    }
+    return { default: mod.BackpackReader }
+  }).catch((err) => {
+    // Return error component instead of throwing
+    return {
+      default: () => (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <div className="text-4xl mb-2">⚠️</div>
+            <div className="text-sm text-destructive">無法載入 PDF 閱讀器</div>
+          </div>
+        </div>
+      ),
+    }
+  }),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <div className="text-4xl mb-2 animate-pulse">📄</div>
+          <div className="text-sm text-muted-foreground">載入 PDF 閱讀器...</div>
+        </div>
+      </div>
+    ),
+  }
+)
+const OfficeDocumentViewer = dynamic(
+  () => import('@/components/backpack/OfficeDocumentViewer').then((mod) => {
+    if (!mod?.OfficeDocumentViewer) {
+      throw new Error('OfficeDocumentViewer component not found')
+    }
+    return { default: mod.OfficeDocumentViewer }
+  }).catch(() => ({
+    default: () => (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <div className="text-4xl mb-2">⚠️</div>
+          <div className="text-sm text-destructive">無法載入文件檢視器</div>
+        </div>
+      </div>
+    ),
+  })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <div className="text-4xl mb-2 animate-pulse">📑</div>
+          <div className="text-sm text-muted-foreground">載入文件檢視器...</div>
+        </div>
+      </div>
+    ),
+  }
+)
+import { BackpackUploader } from '@/components/backpack/BackpackUploader'
+import { OFFICE_DOCUMENT_MIME_TYPES } from '@/constants/document-mime'
+
+interface FileRecord {
+  id: string
+  title: string
+  type: 'pdf' | 'image' | 'document' | 'text'
+  storage_path: string
+  mime: string
+  page_count: number
+  created_at: string
+  updated_at: string
+}
+
+interface WrongbookNote {
+  id: string
+  question: string
+  canonical_skill: string
+  note_md: string
+  folder: string
+  tags: string[]
+  created_at: string
+}
+
+function getRelativeTime(dateString: string): string {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
+
+  if (diffInDays === 0) return '今天'
+  if (diffInDays === 1) return '昨天'
+  if (diffInDays < 7) return `${diffInDays} 天前`
+  if (diffInDays < 30) return `${Math.floor(diffInDays / 7)} 週前`
+  return `${Math.floor(diffInDays / 30)} 月前`
+}
+
+/**
+ * 清理 markdown，只保留詳解部分
+ * - 移除題目（已在題目行單獨顯示）
+ * - 移除選項列表（避免重複）
+ * - 保留答案、選項解析、解題技巧等核心詳解內容
+ */
+function cleanMarkdownForDisplay(markdown: string): string {
+  if (!markdown || !markdown.trim()) return ''
+
+  let cleaned = markdown.trim()
+
+  // 移除對話上下文標記
+  cleaned = cleaned.replace(/【對話上下文】\s*/g, '')
+  cleaned = cleaned.replace(/【當前問題】\s*/g, '')
+
+  // 移除題目區塊（## 📝 題目）
+  cleaned = cleaned.replace(/##\s*(?:📝|題目)\s*\n+[\s\S]*?(?=\n##|$)/g, '')
+
+  // 移除選項列表區塊（## 🔘 選項），但保留選項解析（## 選項解析）
+  cleaned = cleaned.replace(/##\s*(?:🔡|🔘)\s*選項\s*\n+[\s\S]*?(?=\n##|$)/g, '')
+
+  // 移除題幹區塊（## 題幹 或 ## Passage）- 題幹在展開時單獨顯示
+  cleaned = cleaned.replace(/##\s*(?:題幹|Passage)\s*\n+[\s\S]*?(?=\n##|$)/g, '')
+
+  // 移除第 X 題標記
+  cleaned = cleaned.replace(/##\s*第\s*\d+\s*題\s*\n+/g, '')
+
+  // 移除狀態標記
+  cleaned = cleaned.replace(/A:\s*詳解已生成\s*\n?/gi, '')
+  cleaned = cleaned.replace(/詳解已生成\s*\n?/gi, '')
+
+  // 移除 Q: / A: 標記
+  cleaned = cleaned.replace(/^Q:\s*/gm, '')
+  cleaned = cleaned.replace(/^A:\s*/gm, '')
+
+  // 移除連續的選項行（非列表格式）
+  // 例如: "(A) option1\n(B) option2\n(C) option3"
+  const lines = cleaned.split('\n')
+  const cleanedLines: string[] = []
+  let skipNextEmptyLines = 0
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const trimmedLine = line.trim()
+
+    // 跳過空行計數
+    if (!trimmedLine) {
+      if (skipNextEmptyLines > 0) {
+        skipNextEmptyLines--
+        continue
+      }
+      // 避免連續空行
+      if (cleanedLines.length > 0 && cleanedLines[cleanedLines.length - 1].trim()) {
+        cleanedLines.push('')
+      }
+      continue
+    }
+
+    // 保留選項解析（列表格式，以 - 開頭，包含選項標記）
+    // 例如："- **(A)**: 解析內容"
+    if (trimmedLine.startsWith('-') || trimmedLine.startsWith('*')) {
+      cleanedLines.push(line)
+      continue
+    }
+
+    // 保留標題（以 ## 開頭）
+    if (trimmedLine.startsWith('##')) {
+      cleanedLines.push(line)
+      continue
+    }
+
+    // 跳過單獨的選項行（非列表格式）
+    // 例如："(A) option text"
+    if (/^\([A-E]\)\s+/.test(trimmedLine)) {
+      skipNextEmptyLines = 1 // 跳過選項後的一個空行
+      continue
+    }
+
+    // 保留其他內容（答案、詳解等）
+    cleanedLines.push(line)
+  }
+
+  cleaned = cleanedLines.join('\n')
+
+  // 移除多餘空行
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim()
+
+  // 如果清理後內容為空或太短，返回空字符串
+  if (cleaned.length < 10) {
+    return ''
+  }
+
+  return cleaned
+}
+
+type ViewerKind = 'pdf' | 'image' | 'document' | 'text'
+
+function getFileKind(mime: string): ViewerKind {
+  if (!mime) return 'text'
+  if (mime === 'application/pdf') return 'pdf'
+  if (mime.startsWith('image/')) return 'image'
+  if (OFFICE_DOCUMENT_MIME_TYPES.has(mime)) return 'document'
+  return 'text'
+}
+
+export function BackpackContentV2() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const [files, setFiles] = useState<FileRecord[]>([])
+  const [currentFileId, setCurrentFileId] = useState<string | null>(null)
+  const [loadingFiles, setLoadingFiles] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set())
+  const [isSelectionMode, setIsSelectionMode] = useState(false)
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false)
+  const [fileToRename, setFileToRename] = useState<FileRecord | null>(null)
+  const [newFileName, setNewFileName] = useState('')
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [fileToDelete, setFileToDelete] = useState<FileRecord | null>(null)
+  const [showWrongbook, setShowWrongbook] = useState(false)
+  const [wrongbookNotes, setWrongbookNotes] = useState<WrongbookNote[]>([])
+  const [loadingWrongbook, setLoadingWrongbook] = useState(false)
+  const [expandedNoteId, setExpandedNoteId] = useState<string | null>(null)
+  const [selectedNoteIds, setSelectedNoteIds] = useState<Set<string>>(new Set())
+  const [expandedPassageIds, setExpandedPassageIds] = useState<Set<string>>(new Set())
+  const [errorLabels, setErrorLabels] = useState<Map<string, ErrorLabelResponse>>(new Map())
+  const [loadingLabels, setLoadingLabels] = useState<Set<string>>(new Set())
+  const [isWrongbookEditMode, setIsWrongbookEditMode] = useState(false)
+  // 使用 ref 追蹤正在生成的 note id，避免無限循環
+  const generatingLabelsRef = useRef<Set<string>>(new Set())
+
+  // Load files from Supabase
+  const loadFiles = useCallback(async () => {
+    try {
+      setLoadingFiles(true)
+      setError(null)
+      
+      console.log('[BackpackContentV2] Fetching files from API...')
+      const response = await fetch('/api/backpack/files', {
+        method: 'GET',
+      })
+
+      console.log('[BackpackContentV2] API response status:', response.status)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('[BackpackContentV2] API error:', errorData)
+        const errorMessage = errorData.details || errorData.error || `無法載入檔案列表 (${response.status})`
+        setError(errorMessage)
+        setFiles([])
+        setLoadingFiles(false)
+        return
+      }
+
+      const data = await response.json()
+      console.log('[BackpackContentV2] API response data:', data)
+      
+      const fileData = data.files || []
+      console.log('[BackpackContentV2] Parsed file data:', fileData)
+
+      const fileRecords: FileRecord[] =
+        fileData?.map((f: any) => {
+          // 優先使用 display_name（原始文件名），如果沒有則使用 fallback
+          let displayName = f.display_name
+          
+          if (!displayName || displayName.trim() === '') {
+            // Fallback: 從 storage_path 提取文件名（舊數據的兼容處理）
+            // 新上傳的文件應該都有 display_name，這個邏輯主要用於舊數據
+            const pathParts = f.storage_path.split('/')
+            const filenameWithTimestamp = pathParts[pathParts.length - 1] || 'untitled'
+            // 移除 timestamp 和 hash prefix: {timestamp}-{hash}-file{extension}
+            const parts = filenameWithTimestamp.split('-')
+            if (parts.length > 2) {
+              // 格式：{timestamp}-{hash}-file{extension}
+              displayName = parts.slice(2).join('-') // 取 "file{extension}"
+            } else {
+              displayName = filenameWithTimestamp
+            }
+          }
+          
+          // 最終 fallback
+          if (!displayName || displayName.trim() === '') {
+            displayName = 'untitled'
+          }
+          
+          const derivedType = getFileKind(f.mime)
+          return {
+            id: f.id,
+            title: displayName,
+            type: derivedType as FileRecord['type'],
+            storage_path: f.storage_path,
+            mime: f.mime,
+            page_count: f.page_count || 0,
+            created_at: f.created_at,
+            updated_at: f.updated_at,
+          }
+        }) || []
+
+      console.log('[BackpackContentV2] Processed file records:', fileRecords)
+      setFiles(fileRecords)
+      setError(null)
+    } catch (error) {
+      console.error('[BackpackContentV2] Error loading files:', error)
+      setError(error instanceof Error ? error.message : '載入檔案列表時發生錯誤')
+      setFiles([])
+    } finally {
+      console.log('[BackpackContentV2] Setting loadingFiles to false')
+      setLoadingFiles(false)
+    }
+  }, [])
+
+  // Load wrongbook notes
+  const loadWrongbook = useCallback(async () => {
+    try {
+      setLoadingWrongbook(true)
+      const response = await fetch('/api/backpack/wrongbook', {
+        method: 'GET',
+      })
+
+      if (!response.ok) {
+        throw new Error('無法載入錯題本')
+      }
+
+      const data = await response.json()
+      setWrongbookNotes(data.notes || [])
+    } catch (error) {
+      console.error('[BackpackContentV2] Error loading wrongbook:', error)
+      setWrongbookNotes([])
+    } finally {
+      setLoadingWrongbook(false)
+    }
+  }, [])
+
+  // Load files on mount
+  useEffect(() => {
+    loadFiles()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Load wrongbook when showing wrongbook view
+  useEffect(() => {
+    if (showWrongbook) {
+      loadWrongbook()
+    }
+  }, [showWrongbook, loadWrongbook])
+
+  // Handle URL parameters for wrongbook navigation
+  useEffect(() => {
+    const wrongbookParam = searchParams?.get('wrongbook')
+    const noteParam = searchParams?.get('note')
+    
+    if (wrongbookParam === 'true') {
+      setShowWrongbook(true)
+      setIsWrongbookEditMode(false)
+      setSelectedNoteIds(new Set())
+      
+      // If note ID is provided, expand it after wrongbook loads
+      if (noteParam && !loadingWrongbook && wrongbookNotes.length > 0) {
+        // Check if the note exists
+        const noteExists = wrongbookNotes.some(n => n.id === noteParam)
+        if (noteExists) {
+          setExpandedNoteId(noteParam)
+          // Scroll to the note after a short delay
+          setTimeout(() => {
+            const element = document.querySelector(`[data-note-id="${noteParam}"]`)
+            if (element) {
+              element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            }
+          }, 300)
+        }
+      }
+    }
+  }, [searchParams, loadingWrongbook, wrongbookNotes])
+
+  // Read file from URL query - only when searchParams changes, not when files change
+  useEffect(() => {
+    const fileParam = searchParams?.get('file')
+    if (fileParam && files.length > 0) {
+      const file = files.find((f) => f.id === fileParam)
+      if (file && currentFileId !== fileParam) {
+        setCurrentFileId(fileParam)
+      }
+    } else if (!fileParam && currentFileId) {
+      setCurrentFileId(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
+  const handleCloseFile = () => {
+    setCurrentFileId(null)
+    router.push('/backpack', { scroll: false })
+  }
+
+  // File management handlers
+  const toggleSelectionMode = () => {
+    setIsSelectionMode(!isSelectionMode)
+    setSelectedFiles(new Set())
+  }
+
+  const toggleFileSelection = (fileId: string) => {
+    const newSelected = new Set(selectedFiles)
+    if (newSelected.has(fileId)) {
+      newSelected.delete(fileId)
+    } else {
+      newSelected.add(fileId)
+    }
+    setSelectedFiles(newSelected)
+  }
+
+  const handleRename = (file: FileRecord) => {
+    setFileToRename(file)
+    setNewFileName(file.title)
+    setRenameDialogOpen(true)
+  }
+
+  const handleRenameSubmit = async () => {
+    if (!fileToRename || !newFileName.trim()) return
+
+    try {
+      const response = await fetch(`/api/backpack/file/${fileToRename.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ displayName: newFileName.trim() }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.details || errorData.error || '重新命名失敗')
+      }
+
+      // Close dialog first
+      setRenameDialogOpen(false)
+      const updatedFileName = newFileName.trim()
+      setFileToRename(null)
+      setNewFileName('')
+      
+      // Update local state immediately for better UX
+      setFiles((prevFiles) =>
+        prevFiles.map((f) =>
+          f.id === fileToRename.id ? { ...f, title: updatedFileName } : f
+        )
+      )
+      
+      // Reload files in background to sync with server
+      setTimeout(() => {
+        loadFiles()
+      }, 100)
+    } catch (error) {
+      console.error('[BackpackContentV2] Rename error:', error)
+      const errorMessage = error instanceof Error ? error.message : '重新命名失敗，請稍後再試'
+      alert(errorMessage)
+    }
+  }
+
+  const handleDelete = (file: FileRecord) => {
+    setFileToDelete(file)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteSubmit = async () => {
+    if (!fileToDelete) return
+
+    try {
+      const response = await fetch(`/api/backpack/file/${fileToDelete.id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error('刪除失敗')
+      }
+
+      setDeleteDialogOpen(false)
+      setFileToDelete(null)
+      loadFiles()
+    } catch (error) {
+      console.error('[BackpackContentV2] Delete error:', error)
+      alert('刪除失敗，請稍後再試')
+    }
+  }
+
+  const handleBatchDelete = async () => {
+    if (selectedFiles.size === 0) return
+
+    try {
+      const response = await fetch('/api/backpack/files/batch', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileIds: Array.from(selectedFiles) }),
+      })
+
+      if (!response.ok) {
+        throw new Error('批量刪除失敗')
+      }
+
+      setSelectedFiles(new Set())
+      setIsSelectionMode(false)
+      loadFiles()
+    } catch (error) {
+      console.error('[BackpackContentV2] Batch delete error:', error)
+      alert('批量刪除失敗，請稍後再試')
+    }
+  }
+
+  // Wrongbook selection handlers
+  const toggleNoteSelection = (noteId: string) => {
+    const newSelected = new Set(selectedNoteIds)
+    if (newSelected.has(noteId)) {
+      newSelected.delete(noteId)
+    } else {
+      newSelected.add(noteId)
+    }
+    setSelectedNoteIds(newSelected)
+  }
+
+  const handleBatchDeleteNotes = async () => {
+    if (selectedNoteIds.size === 0) return
+
+    try {
+      const response = await fetch('/api/backpack/wrongbook/batch', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ noteIds: Array.from(selectedNoteIds) }),
+      })
+
+      if (!response.ok) {
+        throw new Error('批量刪除失敗')
+      }
+
+      setSelectedNoteIds(new Set())
+      loadWrongbook()
+    } catch (error) {
+      console.error('[BackpackContentV2] Batch delete notes error:', error)
+      alert('批量刪除失敗，請稍後再試')
+    }
+  }
+
+  const handleRetrySimilar = (note: WrongbookNote) => {
+    // Track event
+    if (typeof window !== 'undefined' && (window as any).plausible) {
+      ;(window as any).plausible('wrongbook.retry_similar', {
+        props: {
+          note_id: note.id,
+          canonical_skill: note.canonical_skill,
+        },
+      })
+    }
+    
+    // Navigate to ask page with question
+    router.push(`/ask?question=${encodeURIComponent(note.question)}`)
+  }
+
+  const togglePassageExpansion = (noteId: string) => {
+    const newExpanded = new Set(expandedPassageIds)
+    if (newExpanded.has(noteId)) {
+      newExpanded.delete(noteId)
+    } else {
+      newExpanded.add(noteId)
+    }
+    setExpandedPassageIds(newExpanded)
+  }
+
+  /**
+   * 解析 note_md，提取題目、選項、答案等資訊
+   */
+  const parseNoteContent = useCallback((noteMd: string) => {
+    // 提取題目
+    const questionMatch = noteMd.match(/##\s*(?:📝|題目)\s*\n+\s*([^\n]+)/)
+    const question = questionMatch ? questionMatch[1].trim() : ''
+
+    // 提取選項
+    const optionsMatch = noteMd.match(/##\s*(?:🔡|🔘|選項)\s*\n+([\s\S]*?)(?=\n##|$)/)
+    const options = optionsMatch
+      ? optionsMatch[1]
+          .split('\n')
+          .filter((line) => line.trim())
+          .map((line) => {
+            // 移除選項標記，保留內容
+            return line.trim().replace(/^[\(（]?[A-E][\)）]?\s*\.?\s*/, '').trim()
+          })
+          .filter((opt) => opt.length > 0)
+      : []
+
+    // 提取答案
+    const answerMatch = noteMd.match(/##\s*(?:✅|答案)\s*\n+([\s\S]*?)(?=\n##|$)/)
+    let answer = answerMatch ? answerMatch[1].trim() : ''
+    answer = answer.replace(/\*\*/g, '').replace(/^答案[：:]\s*/i, '').trim()
+
+    // 提取 passage（題幹）
+    // 匹配題幹標題後的所有內容，直到下一個二級標題或結尾
+    const passageMatch = noteMd.match(/##\s*(?:題幹|Passage)\s*\n+([\s\S]*?)(?=\n##|$)/)
+    const passage = passageMatch ? passageMatch[1].trim() : undefined
+
+    return {
+      question: question || '',
+      options,
+      answer: answer || '',
+      passage,
+    }
+  }, [])
+
+  /**
+   * 非同步生成錯因標籤（背景生成，不阻塞 UI）
+   */
+  const generateErrorLabels = useCallback(async (note: WrongbookNote) => {
+    // 如果已經在生成或已有標籤，跳過
+    if (loadingLabels.has(note.id) || errorLabels.has(note.id)) return
+
+    setLoadingLabels((prev) => new Set([...prev, note.id]))
+
+    try {
+      // 解析 note_md
+      const parsed = parseNoteContent(note.note_md)
+
+      // 如果資訊不足，跳過
+      if (!parsed.question || !parsed.answer) {
+        return
+      }
+
+      const response = await fetch('/api/backpack/wrongbook/labels', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question_id: note.id,
+          question_text: parsed.question,
+          options: parsed.options,
+          correct_answer: parsed.answer,
+          user_answer: '', // 目前沒有保存用戶作答，未來可擴展
+          passage: parsed.passage,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to generate labels')
+      }
+
+      const data: ErrorLabelResponse = await response.json()
+
+      // 只保存有效的標籤
+      if (data.predicted_labels && data.predicted_labels.length > 0) {
+        setErrorLabels((prev) => new Map([...prev, [note.id, data]]))
+
+        // Track event
+        if (typeof window !== 'undefined' && (window as any).plausible) {
+          ;(window as any).plausible('wrongbook.label_generate', {
+            props: {
+              note_id: note.id,
+              canonical_skill: note.canonical_skill,
+              label_count: data.predicted_labels.length,
+              primary_label: data.primary_label,
+              confidence_avg:
+                data.predicted_labels.reduce((sum, l) => sum + l.confidence, 0) /
+                data.predicted_labels.length,
+            },
+          })
+        }
+      }
+    } catch (error) {
+      console.error('[ErrorLabel] Generation failed:', error)
+      // 靜默失敗，不影響用戶體驗
+    } finally {
+      setLoadingLabels((prev) => {
+        const next = new Set(prev)
+        next.delete(note.id)
+        return next
+      })
+    }
+  }, [loadingLabels, errorLabels, parseNoteContent])
+
+  /**
+   * 刪除單題
+   */
+  const handleDeleteSingle = useCallback(async (note: WrongbookNote) => {
+    if (!confirm('確定要刪除此題嗎？')) return
+
+    const hadLabels = errorLabels.has(note.id)
+
+    // Track event
+    if (typeof window !== 'undefined' && (window as any).plausible) {
+      ;(window as any).plausible('wrongbook.delete_single', {
+        props: {
+          note_id: note.id,
+          canonical_skill: note.canonical_skill,
+          had_labels: hadLabels,
+        },
+      })
+    }
+
+    try {
+      const response = await fetch(`/api/backpack/wrongbook/${note.id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error('刪除失敗')
+      }
+
+      // 從狀態中移除
+      setWrongbookNotes((prev) => prev.filter((n) => n.id !== note.id))
+      setErrorLabels((prev) => {
+        const next = new Map(prev)
+        next.delete(note.id)
+        return next
+      })
+    } catch (error) {
+      console.error('[BackpackContentV2] Delete single note error:', error)
+      alert('刪除失敗，請稍後再試')
+    }
+  }, [errorLabels])
+
+  /**
+   * 加入訓練包（空殼實現）
+   */
+  const handleAddToPack = useCallback((note: WrongbookNote) => {
+    // Track event
+    if (typeof window !== 'undefined' && (window as any).plausible) {
+      ;(window as any).plausible('wrongbook.add_to_pack', {
+        props: {
+          note_id: note.id,
+          canonical_skill: note.canonical_skill,
+          question_preview: note.question.substring(0, 50),
+        },
+      })
+    }
+
+    // TODO: 實現加入訓練包邏輯
+    alert('加入訓練包功能開發中')
+  }, [])
+
+  // 當展開詳解時，自動觸發錯因標籤生成（非同步）
+  useEffect(() => {
+    if (expandedNoteId) {
+      const note = wrongbookNotes.find((n) => n.id === expandedNoteId)
+      if (note && !generatingLabelsRef.current.has(note.id) && !errorLabels.has(note.id)) {
+        generatingLabelsRef.current.add(note.id)
+        generateErrorLabels(note).catch((err) => {
+          console.error('[BackpackContentV2] Error generating labels:', err)
+          generatingLabelsRef.current.delete(note.id)
+        }).finally(() => {
+          // 生成完成後從 ref 中移除
+          generatingLabelsRef.current.delete(note.id)
+        })
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandedNoteId, wrongbookNotes])
+
+  const handleFileClick = (fileId: string, e?: React.MouseEvent) => {
+    // Prevent default click behavior when clicking on dropdown menu
+    if ((e?.target as HTMLElement)?.closest('[role="menu"], button')) {
+      return
+    }
+    
+    if (isSelectionMode) {
+      e?.stopPropagation()
+      toggleFileSelection(fileId)
+    } else {
+      setCurrentFileId(fileId)
+      router.push(`/backpack?file=${fileId}`, { scroll: false })
+    }
+  }
+
+  const currentFile = currentFileId ? files.find((f) => f.id === currentFileId) : null
+
+  const fileForViewer = currentFile
+    ? {
+        id: currentFile.id,
+        kind: getFileKind(currentFile.mime),
+      }
+    : null
+
+  return (
+    <div className="h-full w-full flex flex-col overflow-hidden">
+      {/* Main Content */}
+      <div className="flex-1 min-h-0 overflow-hidden">
+        {currentFile ? (
+          <div className="h-full flex flex-col">
+            {/* Viewer Header - 極簡設計，最小高度 */}
+            <div className="flex items-center justify-between px-3 py-1.5 border-b bg-background/95 backdrop-blur-sm flex-shrink-0 h-9">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                {currentFile.type === 'pdf' && <File className="h-3.5 w-3.5 opacity-60 flex-shrink-0" />}
+                {currentFile.type === 'image' && <ImageIcon className="h-3.5 w-3.5 opacity-60 flex-shrink-0" />}
+                {currentFile.type === 'text' && <FileText className="h-3.5 w-3.5 opacity-60 flex-shrink-0" />}
+                {currentFile.type === 'document' && <FileText className="h-3.5 w-3.5 opacity-60 flex-shrink-0" />}
+                <span className="text-xs font-medium truncate">{currentFile.title}</span>
+              </div>
+              <Button variant="ghost" size="sm" onClick={handleCloseFile} className="h-6 w-6 p-0 flex-shrink-0">
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            {/* Viewer */}
+            <div className="flex-1 min-h-0 overflow-hidden">
+              {currentFile.type === 'pdf' ? (
+                <BackpackReader
+                  fileId={currentFile.id}
+                  fileUrl={`/api/backpack/file/${currentFile.id}`}
+                  fileName={currentFile.title}
+                  onClose={handleCloseFile}
+                />
+              ) : currentFile.type === 'document' ? (
+                <OfficeDocumentViewer
+                  fileId={currentFile.id}
+                  fileUrl={`/api/backpack/file/${currentFile.id}`}
+                  fileName={currentFile.title}
+                  mime={currentFile.mime}
+                />
+              ) : (
+                <NoteCanvasV2
+                  file={fileForViewer}
+                />
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="h-full overflow-y-auto p-4 pb-20">
+            {/* Header with selection mode toggle */}
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold">{showWrongbook ? '錯題本' : '背包'}</h1>
+                <p className="text-sm opacity-60 mt-1">
+                  {showWrongbook 
+                    ? (loadingWrongbook ? '載入中...' : `已保存 ${wrongbookNotes.length} 道錯題`)
+                    : (loadingFiles ? '載入中...' : error ? '載入失敗' : `已保存 ${files.length} 個項目`)
+                  }
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {showWrongbook ? (
+                  <>
+                    {isWrongbookEditMode ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setIsWrongbookEditMode(false)
+                          setSelectedNoteIds(new Set()) // 清空選取狀態
+                        }}
+                      >
+                        取消
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsWrongbookEditMode(true)}
+                      >
+                        <Edit2 className="h-4 w-4 mr-1" />
+                        編輯
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setShowWrongbook(false)
+                        setIsWrongbookEditMode(false)
+                        setSelectedNoteIds(new Set()) // 清空選取狀態
+                      }}
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      返回
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setShowWrongbook(true)
+                        setIsWrongbookEditMode(false) // 重置編輯模式
+                        setSelectedNoteIds(new Set()) // 清空選取狀態
+                      }}
+                    >
+                      <BookOpen className="h-4 w-4 mr-1" />
+                      錯題本
+                    </Button>
+                    {isSelectionMode && selectedFiles.size > 0 && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleBatchDelete}
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        刪除 ({selectedFiles.size})
+                      </Button>
+                    )}
+                    <Button
+                      variant={isSelectionMode ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={toggleSelectionMode}
+                    >
+                      {isSelectionMode ? (
+                        <>
+                          <CheckSquare className="h-4 w-4 mr-1" />
+                          取消選取
+                        </>
+                      ) : (
+                        <>
+                          <Square className="h-4 w-4 mr-1" />
+                          選取檔案
+                        </>
+                      )}
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Wrongbook View */}
+            {showWrongbook ? (
+              <>
+                {loadingWrongbook ? (
+                  <div className="mb-4 p-4 bg-muted/30 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                      <p className="text-sm text-muted-foreground">正在載入錯題本...</p>
+                    </div>
+                  </div>
+                ) : wrongbookNotes.length === 0 ? (
+                  <div className="mb-4 p-8 bg-muted/30 rounded-lg text-center">
+                    <BookOpen className="h-12 w-12 mx-auto mb-3 opacity-40" />
+                    <p className="text-sm text-muted-foreground">還沒有錯題</p>
+                    <p className="text-xs text-muted-foreground mt-1">在解題頁面將錯題存入錯題本後，會顯示在這裡</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 pb-20">
+                    {wrongbookNotes.map((note) => {
+                      const isExpanded = expandedNoteId === note.id
+                      const hasExplanation = note.note_md && note.note_md.trim().length > 0
+                      const isSelected = selectedNoteIds.has(note.id)
+                      const isPassageExpanded = expandedPassageIds.has(note.id)
+                      const labelData = errorLabels.get(note.id)
+                      const isLoadingLabel = loadingLabels.has(note.id)
+                      
+                      // 檢測是否為閱讀題（包含 passage 或題幹）
+                      const hasPassage = note.note_md?.includes('## 題幹') || note.note_md?.includes('## Passage')
+                      // 匹配題幹標題後的所有內容，直到下一個二級標題或結尾
+                      const passageMatch = note.note_md?.match(/##\s*(?:題幹|Passage)\s*\n+([\s\S]*?)(?=\n##|$)/)
+                      const passageText = passageMatch ? passageMatch[1].trim() : ''
+                      
+                      return (
+                        <Card 
+                          key={note.id} 
+                          data-note-id={note.id}
+                          className={`overflow-hidden transition-all duration-200 ${
+                            isExpanded 
+                              ? 'border-primary/30 bg-muted/30 shadow-lg' 
+                              : 'hover:bg-muted/50 hover:border-border/50'
+                          } ${isSelected ? 'ring-2 ring-primary/50' : ''}`}
+                        >
+                          {/* 收合態：左 checkbox（僅編輯模式），中題目+右側資訊，右展開按鈕 */}
+                          <div className="flex items-center gap-3 p-4">
+                            {/* 左：Checkbox（僅在編輯模式下顯示） */}
+                            {isWrongbookEditMode && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  toggleNoteSelection(note.id)
+                                }}
+                                className="flex-shrink-0"
+                              >
+                                {isSelected ? (
+                                  <CheckSquare className="h-5 w-5 text-primary" />
+                                ) : (
+                                  <Square className="h-5 w-5 text-muted-foreground opacity-40 hover:opacity-60 transition-opacity" />
+                                )}
+                              </button>
+                            )}
+                            
+                            {/* 中：題目（單行，可橫向滾動） */}
+                            <div 
+                              className={`flex-1 min-w-0 ${hasExplanation ? 'cursor-pointer' : 'cursor-default'}`}
+                              onClick={() => hasExplanation && setExpandedNoteId(isExpanded ? null : note.id)}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="flex-1 min-w-0 overflow-x-auto -mx-2 px-2">
+                                  <p className="text-sm font-medium text-foreground leading-relaxed whitespace-nowrap">
+                                    {note.question}
+                                  </p>
+                                </div>
+                                
+                                {/* 右側：語言/科目 chips + 日期 */}
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
+                                    {note.canonical_skill}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {getRelativeTime(note.created_at)}
+                                  </span>
+                                </div>
+                                
+                                {/* 右：展開按鈕 */}
+                                {hasExplanation && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setExpandedNoteId(isExpanded ? null : note.id)
+                                    }}
+                                    className={`flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all duration-200 ${
+                                      isExpanded
+                                        ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                                        : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+                                    }`}
+                                  >
+                                    {isExpanded ? (
+                                      <ChevronUp className="h-3.5 w-3.5" />
+                                    ) : (
+                                      <ChevronDown className="h-3.5 w-3.5" />
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* 展開態：A. 來源題目區 → B. 詳解區 → C. 動作列 → D. 錯因標籤 */}
+                          {hasExplanation && isExpanded && (
+                            <div className="border-t border-border/50 bg-muted/20">
+                              {/* A. 來源題目區（閱讀題才顯示 passage） */}
+                              {hasPassage && passageText && (
+                                <div className="px-4 pt-3 pb-2">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      togglePassageExpansion(note.id)
+                                    }}
+                                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                  >
+                                    {isPassageExpanded ? (
+                                      <>
+                                        <ChevronUp className="h-3 w-3" />
+                                        <span>收合題幹</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <ChevronDown className="h-3 w-3" />
+                                        <span>展開題幹</span>
+                                      </>
+                                    )}
+                                  </button>
+                                  {isPassageExpanded && (
+                                    <div className="mt-2 p-3 bg-muted/40 rounded-md text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap break-words">
+                                      {passageText}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              
+                              {/* B. 詳解區：直接渲染 markdown（不重複題目選項） */}
+                              <div className="px-4 pt-4">
+                                {(() => {
+                                  const cleanedContent = cleanMarkdownForDisplay(note.note_md)
+                                  if (!cleanedContent || cleanedContent.trim().length === 0) {
+                                    return (
+                                      <div className="text-sm text-muted-foreground italic">
+                                        此題目暫無詳解內容
+                                      </div>
+                                    )
+                                  }
+                                  return (
+                                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                                      <ReactMarkdown
+                                        components={{
+                                          h2: ({ node, ...props }) => (
+                                            <h2 className="text-base font-semibold text-foreground mt-4 mb-2" {...props} />
+                                          ),
+                                          h3: ({ node, ...props }) => (
+                                            <h3 className="text-sm font-medium text-foreground mt-3 mb-1.5" {...props} />
+                                          ),
+                                          p: ({ node, ...props }) => (
+                                            <p className="text-sm text-foreground/90 leading-relaxed my-2" {...props} />
+                                          ),
+                                          ul: ({ node, ...props }) => (
+                                            <ul className="space-y-1.5 my-2 list-disc pl-5" {...props} />
+                                          ),
+                                          li: ({ node, ...props }) => (
+                                            <li className="text-sm text-foreground/80 leading-relaxed" {...props} />
+                                          ),
+                                          strong: ({ node, ...props }) => (
+                                            <strong className="font-semibold text-foreground" {...props} />
+                                          ),
+                                        }}
+                                      >
+                                        {cleanedContent}
+                                      </ReactMarkdown>
+                                    </div>
+                                  )
+                                })()}
+                              </div>
+                              
+                              {/* C. 動作列：三個 CTA */}
+                              <div className="px-4 pt-4 pb-3 border-t border-border/30 mt-4">
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleRetrySimilar(note)}
+                                    className="flex-1"
+                                  >
+                                    <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                                    再測相似題型
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleAddToPack(note)}
+                                    className="flex-1"
+                                  >
+                                    <Package className="h-3.5 w-3.5 mr-1.5" />
+                                    加入訓練包
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDeleteSingle(note)}
+                                    className="flex-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                                    刪除此題
+                                  </Button>
+                                </div>
+                              </div>
+                              
+                              {/* D. 錯因標籤（AI） */}
+                              <div className="px-4 pb-4 pt-0 border-t border-border/30">
+                                {labelData ? (
+                                  <ErrorLabelBadge
+                                    labels={labelData.predicted_labels}
+                                    primaryLabel={labelData.primary_label}
+                                    whySummary={labelData.why_summary}
+                                    nextAction={labelData.next_action}
+                                    onExpand={(code) => {
+                                      if (typeof window !== 'undefined' && (window as any).plausible) {
+                                        ;(window as any).plausible('wrongbook.label_expand', {
+                                          props: {
+                                            note_id: note.id,
+                                            label_code: code,
+                                            label_name: labelData.predicted_labels.find((l) => l.code === code)?.name,
+                                          },
+                                        })
+                                      }
+                                    }}
+                                  />
+                                ) : isLoadingLabel ? (
+                                  <ErrorLabelBadge
+                                    labels={[]}
+                                    primaryLabel={null}
+                                    whySummary=""
+                                    nextAction=""
+                                    isLoading={true}
+                                  />
+                                ) : null}
+                              </div>
+                            </div>
+                          )}
+                        </Card>
+                      )
+                    })}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Error Message */}
+                {error && (
+                  <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                    <p className="text-sm text-destructive font-medium">載入失敗</p>
+                    <p className="text-sm text-destructive mt-1">{error}</p>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => loadFiles()} 
+                      className="mt-2"
+                    >
+                      重試
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      請檢查瀏覽器控制台以獲取詳細錯誤訊息
+                    </p>
+                  </div>
+                )}
+
+                {/* Loading State */}
+                {loadingFiles && !error && (
+                  <div className="mb-4 p-4 bg-muted/30 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                      <p className="text-sm text-muted-foreground">正在載入檔案列表...</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Upload Section */}
+                <div className="mb-4">
+                  <BackpackUploader
+                    onUploadComplete={(fileId) => {
+                      loadFiles()
+                    }}
+                  />
+                </div>
+
+                {/* File List */}
+                {!loadingFiles && (
+                  <div className="space-y-2">
+                {files.map((file) => (
+                  <Card
+                    key={file.id}
+                    className={`p-3 transition-colors ${
+                      isSelectionMode
+                        ? selectedFiles.has(file.id)
+                          ? 'bg-primary/10 border-primary cursor-pointer'
+                          : 'cursor-pointer hover:bg-muted/50'
+                        : 'cursor-pointer hover:bg-muted/50'
+                    }`}
+                    onClick={(e) => handleFileClick(file.id, e)}
+                  >
+                    <div className="flex items-start gap-3">
+                      {isSelectionMode && (
+                        <div className="pt-1 flex-shrink-0">
+                          {selectedFiles.has(file.id) ? (
+                            <CheckSquare className="h-5 w-5 text-primary" />
+                          ) : (
+                            <Square className="h-5 w-5 opacity-40" />
+                          )}
+                        </div>
+                      )}
+                      <div className="rounded-lg bg-muted p-2 flex-shrink-0">
+                        {file.type === 'text' && <FileText className="h-5 w-5" />}
+                        {file.type === 'pdf' && <File className="h-5 w-5" />}
+                        {file.type === 'image' && <ImageIcon className="h-5 w-5" />}
+                        {file.type === 'document' && <FileText className="h-5 w-5" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium truncate">{file.title}</h3>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          {getRelativeTime(file.created_at)}
+                          {file.type === 'pdf' && file.page_count > 0 && ` · ${file.page_count} 頁`}
+                        </p>
+                      </div>
+                      {!isSelectionMode && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 flex-shrink-0">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleRename(file) }}>
+                              <Edit2 className="h-4 w-4 mr-2" />
+                              重新命名
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDelete(file)
+                              }}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              刪除
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </div>
+                  </Card>
+                ))}
+                {files.length === 0 && !error && (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <div className="text-4xl mb-2">📚</div>
+                    <div className="text-sm">還沒有檔案</div>
+                    <div className="text-xs mt-2 opacity-60">上傳你的第一個檔案開始使用</div>
+                  </div>
+                )}
+              </div>
+            )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* 錯題本批量刪除浮動 CTA */}
+      {showWrongbook && selectedNoteIds.size > 0 && (
+        <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-[60]">
+          <Button
+            variant="destructive"
+            size="lg"
+            onClick={handleBatchDeleteNotes}
+            className="shadow-lg pointer-events-auto"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            刪除選取的 {selectedNoteIds.size} 題
+          </Button>
+        </div>
+      )}
+
+      {/* Rename Dialog */}
+      <Dialog open={renameDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          setRenameDialogOpen(false)
+          setFileToRename(null)
+          setNewFileName('')
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>重新命名檔案</DialogTitle>
+            <DialogDescription>輸入新的檔案名稱</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="fileName">檔案名稱</Label>
+            <Input
+              id="fileName"
+              value={newFileName}
+              onChange={(e) => setNewFileName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  handleRenameSubmit()
+                }
+                if (e.key === 'Escape') {
+                  setRenameDialogOpen(false)
+                  setFileToRename(null)
+                  setNewFileName('')
+                }
+              }}
+              className="mt-2"
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setRenameDialogOpen(false)
+              setFileToRename(null)
+              setNewFileName('')
+            }}>
+              取消
+            </Button>
+            <Button onClick={handleRenameSubmit} disabled={!newFileName.trim()}>
+              確定
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>確認刪除</DialogTitle>
+            <DialogDescription>
+              確定要刪除「{fileToDelete?.title}」嗎？此操作無法復原。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+              取消
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteSubmit}>
+              刪除
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}

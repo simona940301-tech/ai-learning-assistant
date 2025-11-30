@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getSupabaseClient } from '@/lib/api/auth'
 
 /**
  * POST /api/play/questions/seed
@@ -17,10 +17,35 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { subject, difficulty, numQuestions = 10, excludeIds = [] } = body
 
-    const supabase = createClient()
+    const supabase = getSupabaseClient(req)
+
+    // Check for internal API key to bypass RLS/Auth if needed
+    const internalApiKey = req.headers.get('x-internal-api-key')
+    const envInternalApiKey = process.env.INTERNAL_API_KEY
+
+    let adminSupabase = supabase
+    if (internalApiKey && envInternalApiKey && internalApiKey === envInternalApiKey) {
+      console.log('[Seed Questions] Using internal API key for admin access')
+      // Create admin client with service role key
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      if (serviceRoleKey && supabaseUrl) {
+        const { createClient } = await import('@supabase/supabase-js')
+        adminSupabase = createClient(supabaseUrl, serviceRoleKey, {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+            detectSessionInUrl: false,
+          }
+        })
+      }
+    }
+
+    // Use adminSupabase for queries if available, otherwise fallback to user supabase
+    const db = adminSupabase
 
     // Build query
-    let query = supabase
+    let query = db
       .from('seed_questions')
       .select('*')
 

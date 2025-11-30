@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getSupabaseClient } from '@/lib/api/auth'
 import { z } from 'zod'
 
 /**
@@ -31,7 +31,7 @@ const UpdateEloRequestSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = getSupabaseClient(req)
 
     // Parse and validate request
     const body = await req.json()
@@ -202,4 +202,3 @@ export async function POST(req: NextRequest) {
     )
   }
 }
-

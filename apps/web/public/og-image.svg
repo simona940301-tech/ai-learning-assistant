@@ -1,0 +1,95 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FAF6E9;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#FFF8E1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FFEFD5;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#FFB01A;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FF8C00;stop-opacity:1" />
+    </linearGradient>
+
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#FFB01A" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bgGradient)"/>
+
+  <!-- Decorative elements -->
+  <circle cx="150" cy="150" r="80" fill="#FFB01A" opacity="0.1"/>
+  <circle cx="1050" cy="480" r="120" fill="#FF8C00" opacity="0.08"/>
+  <circle cx="1100" cy="200" r="60" fill="#FFA500" opacity="0.15"/>
+
+  <!-- Main content container -->
+  <g transform="translate(100, 100)">
+    <!-- Logo/Icon area -->
+    <g transform="translate(0, 50)">
+      <!-- Book icon -->
+      <rect x="0" y="0" width="80" height="60" rx="8" fill="url(#accentGradient)" filter="url(#shadow)"/>
+      <rect x="8" y="8" width="64" height="44" rx="4" fill="#FAF6E9"/>
+      <line x1="16" y1="20" x2="56" y2="20" stroke="#FFB01A" stroke-width="2"/>
+      <line x1="16" y1="28" x2="56" y2="28" stroke="#FFB01A" stroke-width="2"/>
+      <line x1="16" y1="36" x2="56" y2="36" stroke="#FFB01A" stroke-width="2"/>
+    </g>
+
+    <!-- Main text -->
+    <g transform="translate(120, 0)">
+      <!-- Title -->
+      <text x="0" y="60" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="#2C2C2C">
+        PLMS
+      </text>
+      <text x="0" y="100" font-family="Arial, sans-serif" font-size="24" fill="#666666">
+        AI 智慧學習輔助系統
+      </text>
+
+      <!-- Description -->
+      <text x="0" y="150" font-family="Arial, sans-serif" font-size="18" fill="#666666" font-weight="300">
+        運用 AI 技術打造的個人化學習管理系統
+      </text>
+      <text x="0" y="180" font-family="Arial, sans-serif" font-size="18" fill="#666666" font-weight="300">
+        提供智能題目解析、錯題本管理、戰鬥模式練習
+      </text>
+
+      <!-- Features -->
+      <g transform="translate(0, 220)">
+        <circle cx="12" cy="12" r="8" fill="#FFB01A"/>
+        <text x="32" y="18" font-family="Arial, sans-serif" font-size="16" fill="#2C2C2C">
+          智能題目解析
+        </text>
+
+        <circle cx="12" cy="50" r="8" fill="#FFB01A"/>
+        <text x="32" y="56" font-family="Arial, sans-serif" font-size="16" fill="#2C2C2C">
+          個人化學習路徑
+        </text>
+
+        <circle cx="12" cy="88" r="8" fill="#FFB01A"/>
+        <text x="32" y="94" font-family="Arial, sans-serif" font-size="16" fill="#2C2C2C">
+          互動式戰鬥練習
+        </text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Bottom branding -->
+  <g transform="translate(100, 550)">
+    <text font-family="Arial, sans-serif" font-size="14" fill="#999999">
+      www.plms.app
+    </text>
+  </g>
+</svg>
+
+
+
+
+
+
+
+
+
+
+

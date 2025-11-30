@@ -37,7 +37,7 @@ export const playBattleEndpoints: ApiEndpoint[] = [
     path: '/api/play/user/status',
     method: 'GET',
     summary: '獲取用戶狀態',
-    description: '獲取用戶的精力值和錢包餘額',
+    description: '獲取用戶的羽毛和錢包餘額',
     tags: ['User'],
     responses: {
       200: {
@@ -57,8 +57,8 @@ export const playBattleEndpoints: ApiEndpoint[] = [
   {
     path: '/api/play/user/energy/consume',
     method: 'POST',
-    summary: '消耗精力值',
-    description: '原子性消耗 1 點精力值',
+    summary: '消耗羽毛',
+    description: '原子性消耗 1 點羽毛',
     tags: ['User'],
     responses: {
       200: {
@@ -71,7 +71,7 @@ export const playBattleEndpoints: ApiEndpoint[] = [
           },
         },
       },
-      403: { description: '精力值已耗盡' },
+      403: { description: '羽毛已耗盡' },
     },
   },
   {

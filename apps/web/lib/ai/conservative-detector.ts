@@ -2,7 +2,7 @@
  * Conservative Mode Detector
  * Self-diagnoses question type without external classification
  */
-import { chatCompletionJSON } from '@/lib/openai'
+import { chatCompletionJSON } from '@/lib/gemini'
 import type { ConservativeQuestionType } from './conservative-types'
 
 export async function detectConservativeType(inputText: string): Promise<ConservativeQuestionType> {

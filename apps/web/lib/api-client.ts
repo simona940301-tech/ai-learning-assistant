@@ -1,3 +1,5 @@
+import { supabaseBrowserClient } from '@/lib/supabase'
+
 /**
  * Centralized API client with endpoint guards
  * Blocks legacy warmup endpoints and enforces solver-only flow
@@ -20,6 +22,9 @@ const ALLOWED_ENDPOINTS = [
   /^\/api\/heartbeat/,
   /^\/api\/label\//,
   /^\/api\/health/,
+  /^\/api\/explain/,
+  /^\/api\/mcp\//,
+  /^\/api\/rag\//,
 ]
 
 // Blocked legacy endpoints
@@ -27,6 +32,14 @@ const BLOCKED_ENDPOINTS = [/^\/api\/warmup\//]
 
 // Debug flag (only log in debug mode)
 const DEBUG = process.env.NEXT_PUBLIC_DEBUG_API_GUARD === 'true'
+const MAX_API_RETRIES = 2
+const RETRYABLE_STATUS = new Set([500, 502, 503, 504])
+const RETRY_BASE_DELAY_MS = 200
+
+let cachedAccessToken: string | null = null
+let cachedAccessTokenExpiresAt = 0
+let pendingTokenPromise: Promise<string | null> | null = null
+let sessionWarningLogged = false
 
 /**
  * Check if an endpoint is allowed
@@ -60,26 +73,21 @@ export function installGlobalFetchGuard(): void {
 
   // Override window.fetch with guard logic
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === 'string' ? input : input.toString()
+    const request = new Request(input, init)
+    let path: string
 
-    // Extract path from full URL
-    let path = url
     try {
-      const urlObj = new URL(url, window.location.origin)
+      const urlObj = new URL(request.url, window.location.origin)
       path = urlObj.pathname
     } catch {
-      // If not a valid URL, treat as path
-      path = url
+      path = typeof input === 'string' ? input : request.url
     }
 
-    // Only guard /api/* calls
     if (!path.startsWith('/api/')) {
-      // Pass through non-API calls directly to native fetch
-      return window.__PLMS_NATIVE_FETCH__!(input as any, init)
+      return nativeFetch(request)
     }
 
-    // Check if explicitly blocked
-    if (BLOCKED_ENDPOINTS.some((pattern) => pattern.test(path))) {
+    if (BLOCKED_ENDPOINTS.some(pattern => pattern.test(path))) {
       if (DEBUG) console.warn('[API Guard] ❌ Blocked legacy warmup:', path)
       return new Response(
         JSON.stringify({
@@ -93,16 +101,14 @@ export function installGlobalFetchGuard(): void {
       )
     }
 
-    // Check if in whitelist
-    if (ALLOWED_ENDPOINTS.some((pattern) => pattern.test(path))) {
+    if (isEndpointAllowed(path)) {
       if (DEBUG) console.log('[API Guard] ✅ Allowed:', path)
-      // Call NATIVE fetch directly (no recursion!)
-      return window.__PLMS_NATIVE_FETCH__!(input as any, init)
+    } else if (DEBUG) {
+      console.warn('[API Guard] ⚠️  Unknown endpoint (allowing):', path)
     }
 
-    // Not in whitelist, but allow by default (log warning in debug)
-    if (DEBUG) console.warn('[API Guard] ⚠️  Unknown endpoint (allowing):', path)
-    return window.__PLMS_NATIVE_FETCH__!(input as any, init)
+    const authedRequest = await withAuthorizationHeader(request)
+    return fetchWithRetry(authedRequest, path, nativeFetch)
   }
 
   window.__PLMS_FETCH_GUARD_INSTALLED__ = true
@@ -119,6 +125,118 @@ export function uninstallGlobalFetchGuard(): void {
     window.__PLMS_FETCH_GUARD_INSTALLED__ = false
     console.log('✅ [API Guard] Fetch guard uninstalled')
   }
+}
+
+async function withAuthorizationHeader(request: Request): Promise<Request> {
+  const headers = new Headers(request.headers)
+
+  if (!headers.has('Authorization')) {
+    const token = await getAccessToken()
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`)
+    }
+  }
+
+  return new Request(request, { headers })
+}
+
+async function getAccessToken(): Promise<string | null> {
+  if (typeof window === 'undefined') return null
+
+  const now = Date.now()
+  if (cachedAccessToken && cachedAccessTokenExpiresAt > now) {
+    return cachedAccessToken
+  }
+  if (pendingTokenPromise) {
+    return pendingTokenPromise
+  }
+
+  pendingTokenPromise = (async () => {
+    try {
+      const { data, error } = await supabaseBrowserClient.auth.getSession()
+      if (error) {
+        if (!sessionWarningLogged) {
+          console.warn('[API Guard] Unable to read Supabase session:', error.message)
+          sessionWarningLogged = true
+        }
+        cachedAccessToken = null
+        cachedAccessTokenExpiresAt = 0
+        return null
+      }
+
+      const session = data?.session
+      cachedAccessToken = session?.access_token ?? null
+      cachedAccessTokenExpiresAt = session?.expires_at
+        ? session.expires_at * 1000 - 5_000
+        : 0
+      return cachedAccessToken
+    } catch (error) {
+      if (!sessionWarningLogged) {
+        console.warn('[API Guard] Unable to resolve Supabase session:', error)
+        sessionWarningLogged = true
+      }
+      cachedAccessToken = null
+      cachedAccessTokenExpiresAt = 0
+      return null
+    } finally {
+      pendingTokenPromise = null
+    }
+  })()
+
+  return pendingTokenPromise
+}
+
+async function fetchWithRetry(request: Request, path: string, nativeFetch: typeof fetch) {
+  const canRetry = request.method === 'GET'
+  const requestVariants = [request]
+
+  if (canRetry) {
+    for (let i = 0; i < MAX_API_RETRIES; i++) {
+      requestVariants.push(request.clone())
+    }
+  }
+
+  for (let attempt = 0; attempt < requestVariants.length; attempt++) {
+    const currentRequest = requestVariants[attempt]
+    try {
+      const response = await nativeFetch(currentRequest)
+      if (
+        canRetry &&
+        attempt < MAX_API_RETRIES &&
+        shouldRetryResponse(response)
+      ) {
+        if (DEBUG) {
+          console.warn(
+            `[API Guard] Retry ${attempt + 1} for ${path} (${response.status})`
+          )
+        }
+        await waitFor((attempt + 1) * RETRY_BASE_DELAY_MS)
+        continue
+      }
+      return response
+    } catch (error) {
+      if (!canRetry || attempt >= MAX_API_RETRIES) {
+        throw error
+      }
+      if (DEBUG) {
+        console.warn(`[API Guard] Network error for ${path}, retrying...`, error)
+      }
+      await waitFor((attempt + 1) * RETRY_BASE_DELAY_MS)
+    }
+  }
+
+  // Should never reach here, but fall back to one more attempt
+  return nativeFetch(request)
+}
+
+function shouldRetryResponse(response: Response) {
+  return RETRYABLE_STATUS.has(response.status)
+}
+
+function waitFor(ms: number) {
+  return new Promise(resolve => {
+    setTimeout(resolve, ms)
+  })
 }
 
 /**

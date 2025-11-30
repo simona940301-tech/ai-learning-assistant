@@ -25,6 +25,13 @@ export interface ContractV2Response {
       label: string
     }>
   }
+  explanation?: {
+    summary: string
+    steps: string[]
+    checks?: string[]
+    error_hints?: string[]
+    extensions?: string[]
+  }
   alternatives?: Array<{
     subject: Subject
     confidence: number
@@ -82,6 +89,40 @@ export function createDetectResponse(
     confidence: Math.max(0, Math.min(1, confidence)),
     ...(options?.alternatives && { alternatives: options.alternatives }),
     ...(options?.debug && { debug: options.debug }),
+  }
+}
+
+interface SolveExplanationPayload {
+  summary: string
+  steps: string[]
+  checks: string[]
+  error_hints?: string[]
+  extensions?: string[]
+}
+
+/**
+ * Create Solve Response (Contract V2)
+ */
+export function createSolveResponse(
+  sessionId: string,
+  subject: Subject,
+  keypoint: { id: string; code: string; name: string; category?: string },
+  explanation: SolveExplanationPayload,
+  extras?: Record<string, any>,
+): ContractV2Response {
+  return {
+    session_id: sessionId,
+    subject,
+    confidence: 1,
+    keypoint,
+    explanation: {
+      summary: explanation.summary,
+      steps: explanation.steps,
+      checks: explanation.checks,
+      error_hints: explanation.error_hints,
+      extensions: explanation.extensions,
+    },
+    ...extras,
   }
 }
 

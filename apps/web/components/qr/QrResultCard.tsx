@@ -132,7 +132,7 @@ export function QrResultCard({ result, alias }: QrResultCardProps) {
 
         <div className="mt-6">
           <button
-            onClick={() => router.push('/store')}
+            onClick={() => router.push('/store-shop')}
             className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
           >
             {t('qr.seeRecommendations')}
@@ -168,7 +168,7 @@ export function QrResultCard({ result, alias }: QrResultCardProps) {
           <div className="ml-4">
             <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full">
               {pack.confidenceBadge === 'high' && '高信心度'}
-              {pack.confidenceBadge === 'medium' && '中信心度'}
+              {pack.confidenceBadge === 'mid' && '中信心度'}
               {pack.confidenceBadge === 'low' && '低信心度'}
             </span>
           </div>
@@ -224,7 +224,7 @@ export function QrResultCard({ result, alias }: QrResultCardProps) {
             </button>
 
             <button
-              onClick={() => router.push('/store')}
+              onClick={() => router.push('/store-shop')}
               className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
             >
               {t('qr.seeRecommendations')}

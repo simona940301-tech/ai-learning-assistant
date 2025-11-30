@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -41,11 +41,7 @@ export function UGCReviewModal({ onClose }: UGCReviewModalProps) {
   const [reviewingId, setReviewingId] = useState<string | null>(null)
   const [reviewNote, setReviewNote] = useState('')
 
-  useEffect(() => {
-    loadQuestions()
-  }, [filterStatus])
-
-  const loadQuestions = async () => {
+  const loadQuestions = useCallback(async () => {
     setIsLoading(true)
     try {
       const response = await fetch(`/api/play/ugc/review/list?status=${filterStatus}`, {
@@ -69,7 +65,11 @@ export function UGCReviewModal({ onClose }: UGCReviewModalProps) {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [filterStatus, onClose])
+
+  useEffect(() => {
+    loadQuestions()
+  }, [loadQuestions])
 
   const handleReview = async (questionId: string, action: 'APPROVE' | 'REJECT') => {
     setReviewingId(questionId)

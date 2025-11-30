@@ -86,10 +86,7 @@ export interface ExplainBaseVM {
     zh?: string
   }
   options?: OptionVM[]
-  answer?: {
-    label: string
-    text: string
-  }
+  answer?: OptionVM
   vocab?: VocabItemVM[]
 }
 
@@ -2324,8 +2321,10 @@ export function presentExplainCard(card: ExplainCard | null): ExplainVM | null {
 /**
  * Convert API response to QuestionSetVM
  * 將 API response 映射為 QuestionSetVM（若是單題也能包成一題）
+ * @param resp API response
+ * @param inputText 原始輸入文本，作為 stem 的 fallback
  */
-export function toQuestionSetVM(resp: any): QuestionSetVM {
+export function toQuestionSetVM(resp: any, inputText?: string): QuestionSetVM {
   if (resp?.type === 'E0_QUESTION_SET') {
     // 服務端已組好，僅做 kind 正規化與驗證
     const normalized = {
@@ -2333,10 +2332,13 @@ export function toQuestionSetVM(resp: any): QuestionSetVM {
       questions: (resp.questions ?? []).map((q: any, i: number) => {
         const canonicalKind = toCanonicalKind(q.kind) ?? toCanonicalKind(q.original_kind) ?? 'vocab'
         
+        // 簡化：允許空字串，不強制驗證
+        const stem = q.stem ?? q.question_text ?? q.question?.text ?? inputText ?? ''
+        
         return {
           qid: q.qid ?? i + 1,
           kind: canonicalKind,
-          stem: q.stem ?? q.question_text ?? q.question?.text ?? '',
+          stem: stem.trim() || inputText || '', // 允許空字串
           choices: q.choices ?? q.options?.map((opt: any) => String(opt?.text ?? opt)) ?? [],
           answer: q.answer_text ?? q.answer ?? '',
           answer_label: q.answer_label ?? q.answerLabel,
@@ -2347,7 +2349,14 @@ export function toQuestionSetVM(resp: any): QuestionSetVM {
       }),
     }
     
-    return QuestionSetVMSchema.parse(normalized)
+    // 使用 safeParse 避免驗證失敗
+    const parsed = QuestionSetVMSchema.safeParse(normalized)
+    if (parsed.success) {
+      return parsed.data
+    } else {
+      console.warn('[toQuestionSetVM] Schema validation failed, using loose format:', parsed.error)
+      return normalized as QuestionSetVM
+    }
   }
   
   // 單題 → 包成一題題組（保守兜底）
@@ -2364,12 +2373,15 @@ export function toQuestionSetVM(resp: any): QuestionSetVM {
   const answerText = p?.answer_text ?? p?.answer ?? ''
   const answerLabel = p?.answer_label ?? p?.answerLabel
   
+  // 簡化：直接使用 inputText 作為 stem，不強制驗證
+  const stem = p?.question?.text ?? p?.stem ?? p?.question_text ?? resp?.prompt ?? inputText ?? ''
+  
   const one: E0Question = {
     qid: 1,
     kind,
-    stem: p?.question?.text ?? p?.stem ?? p?.question_text ?? resp?.prompt ?? '',
-    choices: choicesArray.length >= 2 ? choicesArray : ['A', 'B', 'C', 'D'], // Fallback
-    answer: answerText,
+    stem: stem.trim() || inputText || '', // 允許空字串
+    choices: choicesArray, // 不強制 fallback
+    answer: answerText || '',
     answer_label: answerLabel,
     one_line_reason: p?.one_line_reason ?? p?.reasoning ?? p?.reason ?? resp?.briefReason ?? '',
     distractor_rejects: p?.distractor_rejects ?? p?.distractorRejects ?? [],
@@ -2380,9 +2392,22 @@ export function toQuestionSetVM(resp: any): QuestionSetVM {
     },
   }
   
-  return QuestionSetVMSchema.parse({
+  // 使用 safeParse 避免驗證失敗
+  const parsed = QuestionSetVMSchema.safeParse({
     type: 'E0_QUESTION_SET',
     source_context: resp?.source_context ?? 'N/A',
     questions: [one],
   })
+  
+  if (parsed.success) {
+    return parsed.data
+  } else {
+    // 驗證失敗時返回寬鬆版本
+    console.warn('[toQuestionSetVM] Schema validation failed, using loose format:', parsed.error)
+    return {
+      type: 'E0_QUESTION_SET' as const,
+      source_context: resp?.source_context ?? 'N/A',
+      questions: [one],
+    }
+  }
 }

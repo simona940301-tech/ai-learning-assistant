@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { chatCompletionJSON } from '@/lib/openai'
+import { NextRequest } from 'next/server'
+import { getApiUser } from '@/lib/api/auth'
+import { chatCompletionJSON } from '@/lib/gemini'
+import { Api } from '@/lib/api/response'
 
 interface SolveRequestBody {
   question: string
@@ -19,12 +21,25 @@ interface SolveResponseBody {
 
 export async function POST(request: NextRequest) {
   try {
+    const { user, errorType } = await getApiUser(request)
+
+    if (!user) {
+      const message =
+        errorType === 'invalid-jwt'
+          ? '登入狀態失效，請重新登入或清除 Cookies 後再試。'
+          : errorType === 'unauthenticated'
+            ? 'Authentication required'
+            : 'Authentication error occurred'
+
+      return Api.unauthorized(message)
+    }
+
     const { question, judge }: SolveRequestBody = await request.json()
     if (!question?.trim()) {
-      return NextResponse.json({ error: 'question is required' }, { status: 400 })
+      return Api.badRequest('question is required')
     }
     if (!judge) {
-      return NextResponse.json({ error: 'judge result is required' }, { status: 400 })
+      return Api.badRequest('judge result is required')
     }
 
     const prompt = [
@@ -46,12 +61,14 @@ export async function POST(request: NextRequest) {
         },
         { role: 'user', content: prompt },
       ],
-      { model: 'gpt-4o-mini', temperature: 0.25 }
+      { model: 'gemini-1.5-flash', temperature: 0.25 }
     )
 
-    return NextResponse.json(result)
+    return Api.success(result)
   } catch (error) {
     console.error('Solve API error', error)
-    return NextResponse.json({ error: (error as Error).message }, { status: 500 })
+    return Api.serverError(
+      error instanceof Error ? error.message : undefined
+    )
   }
 }

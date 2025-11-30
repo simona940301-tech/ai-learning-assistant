@@ -1,0 +1,115 @@
+'use client'
+
+import { motion } from 'framer-motion'
+import { FileText, File, Image as ImageIcon, Check } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import type { BackpackFile } from '@/lib/types'
+
+interface ContentCardProps {
+  item: BackpackFile & { is_notebook_entry?: boolean; source_type?: string }
+  onClick: () => void
+  onImportToAsk?: (type: 'summary' | 'solve') => void
+  getRelativeTime: (date: string) => string
+  subjectName: string
+  isEditMode?: boolean
+  isSelected?: boolean
+  onToggleSelect?: () => void
+}
+
+export function ContentCard({
+  item,
+  onClick,
+  onImportToAsk,
+  getRelativeTime,
+  subjectName,
+  isEditMode = false,
+  isSelected = false,
+  onToggleSelect,
+}: ContentCardProps) {
+  const getFileIcon = () => {
+    switch (item.type) {
+      case 'pdf':
+        return File
+      case 'image':
+        return ImageIcon
+      default:
+        return FileText
+    }
+  }
+
+  const FileIcon = getFileIcon()
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileTap={{ scale: 0.98 }}
+    >
+      <div
+        onClick={isEditMode ? onToggleSelect : onClick}
+        className={cn(
+          'flex items-start gap-3 p-3 rounded-lg',
+          'border border-border bg-card',
+          'hover:bg-muted/50 transition-colors',
+          'cursor-pointer',
+          isEditMode && isSelected && 'border-primary bg-primary/10'
+        )}
+      >
+        {/* Left Icon / Checkbox */}
+        {isEditMode ? (
+          <div
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggleSelect?.()
+            }}
+            className={cn(
+              'flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg border-2 transition-colors',
+              isSelected
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-border bg-muted'
+            )}
+          >
+            {isSelected && <Check className="h-5 w-5" />}
+          </div>
+        ) : (
+          <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-muted">
+            <FileIcon className="h-5 w-5 text-muted-foreground" strokeWidth={1.75} />
+          </div>
+        )}
+
+        {/* Right Content */}
+        <div className="flex-1 min-w-0">
+          {/* Layer 1: Main Title (truncated) */}
+          <h3 className="font-semibold text-base text-foreground mb-2 line-clamp-1">
+            {item.title}
+          </h3>
+
+          {/* Layer 2: Info Band - Date and Subject */}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
+            <span>{subjectName}</span>
+            <span>•</span>
+            <span>{getRelativeTime(item.updated_at)}</span>
+          </div>
+
+          {/* Layer 3: Ask CTA (only in normal mode) */}
+          {!isEditMode && (
+            <div className="flex items-center justify-end">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (onImportToAsk) {
+                    onImportToAsk('solve')
+                  }
+                }}
+                className="text-xs px-3 py-1.5 rounded-full border border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+              >
+                提問
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+

@@ -1,21 +1,24 @@
 'use client'
 
+import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { usePlay } from '@/lib/play-context'
-import { FileText, List, Sparkles } from 'lucide-react'
+import { FileText, List, Sparkles, Library } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { UGCSubmissionForm, UGCFormData } from './UGCSubmissionForm'
 import { ContractBrowseModal } from './ContractBrowseModal'
 import { ContractCreateModal } from './ContractCreateModal'
+import { MyQuestionsModal } from './MyQuestionsModal'
 
 interface UGCContractModalProps {
   onClose: () => void
 }
 
 export function UGCContractModal({ onClose }: UGCContractModalProps) {
-  const { ugcContractMode, setUGCContractMode, consumeEnergy } = usePlay()
+  const { consumeEnergy } = usePlay()
+  const [ugcContractMode, setUGCContractMode] = useState<'CREATE_CONTRACT' | 'BROWSE_CONTRACTS' | 'CONTENT_CREATION' | 'MY_QUESTIONS' | null>(null)
 
   const modes = [
     {
@@ -34,9 +37,16 @@ export function UGCContractModal({ onClose }: UGCContractModalProps) {
     },
     {
       id: 'CONTENT_CREATION' as const,
-      title: '內容創作中心',
-      description: '提交 UGC 題目',
+      title: '創建自訂題目',
+      description: '貢獻你的題目到社群',
       icon: FileText,
+      requiresEnergy: false,
+    },
+    {
+      id: 'MY_QUESTIONS' as const,
+      title: '我的自創題目',
+      description: '管理你創建的題目',
+      icon: Library,
       requiresEnergy: false,
     },
   ]
@@ -48,7 +58,7 @@ export function UGCContractModal({ onClose }: UGCContractModalProps) {
     if (mode.requiresEnergy) {
       const result = await consumeEnergy()
       if (!result.success) {
-        alert('精力值不足！')
+        alert('羽毛不足！')
         return
       }
     }
@@ -57,7 +67,7 @@ export function UGCContractModal({ onClose }: UGCContractModalProps) {
   }
 
   const handleUGCSubmit = async (data: UGCFormData) => {
-    const response = await fetch('/api/play/ugc/submit', {
+    const response = await fetch('/api/play/ugc-questions/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -66,8 +76,10 @@ export function UGCContractModal({ onClose }: UGCContractModalProps) {
 
     if (!response.ok) {
       const error = await response.json()
-      throw new Error(error.error || '提交失敗')
+      throw new Error(error.message || '提交失敗')
     }
+
+    return await response.json()
   }
 
   if (ugcContractMode === 'CONTENT_CREATION') {
@@ -78,6 +90,17 @@ export function UGCContractModal({ onClose }: UGCContractModalProps) {
           onClose()
         }}
         onSubmit={handleUGCSubmit}
+      />
+    )
+  }
+
+  if (ugcContractMode === 'MY_QUESTIONS') {
+    return (
+      <MyQuestionsModal
+        onClose={() => {
+          setUGCContractMode(null)
+          onClose()
+        }}
       />
     )
   }
@@ -112,7 +135,7 @@ export function UGCContractModal({ onClose }: UGCContractModalProps) {
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>內容貢獻與合約</DialogTitle>
-          <DialogDescription>選擇創建挑戰合約、瀏覽合約或提交 UGC 題目</DialogDescription>
+          <DialogDescription>創建題目、管理題目、瀏覽合約或發起挑戰</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3 py-4">
@@ -152,4 +175,3 @@ export function UGCContractModal({ onClose }: UGCContractModalProps) {
     </Dialog>
   )
 }
-

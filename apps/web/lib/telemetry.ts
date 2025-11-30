@@ -7,6 +7,11 @@
 
 import type { ReadingTelemetryEvent } from './reading/types'
 
+type GenericTelemetryEvent = {
+  type: string
+  data?: Record<string, any>
+}
+
 const IS_DEV = process.env.NODE_ENV !== 'production'
 const ENABLE_TELEMETRY = IS_DEV || process.env.NEXT_PUBLIC_ENABLE_TELEMETRY === 'true'
 
@@ -15,14 +20,19 @@ const ENABLE_TELEMETRY = IS_DEV || process.env.NEXT_PUBLIC_ENABLE_TELEMETRY === 
  *
  * @param event - Telemetry event with type and data
  */
-export function track(event: ReadingTelemetryEvent): void {
+export function track(event: ReadingTelemetryEvent | string, data?: Record<string, any>): void {
   if (!ENABLE_TELEMETRY) return
 
-  const { type, data } = event
+  const payload: GenericTelemetryEvent =
+    typeof event === 'string'
+      ? { type: event, data: data ?? {} }
+      : { type: event.type, data: event.data }
+
+  const { type, data: eventData } = payload
 
   // Console logging in development
   if (IS_DEV) {
-    console.log(`[telemetry] ${type}`, data)
+    console.log(`[telemetry] ${type}`, eventData)
   }
 
   // TODO: Replace with real analytics service

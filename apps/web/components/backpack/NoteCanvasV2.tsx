@@ -1,6 +1,8 @@
 'use client'
 
 import { useRef, useState, useEffect } from 'react'
+import { Card } from '@/components/ui/card'
+import Image from 'next/image'
 
 interface NoteCanvasV2Props {
   file: { id: string; kind: 'pdf' | 'image' | 'text' | 'document' } | null
@@ -23,13 +25,13 @@ export function NoteCanvasV2({ file }: NoteCanvasV2Props) {
       try {
         setLoading(true)
         setError(null)
-        
+
         if (!file?.id) return
         const response = await fetch(`/api/backpack/file/${file.id}`)
         if (!response.ok) {
           throw new Error('Failed to get file URL')
         }
-        
+
         const { url } = await response.json()
         setFileUrl(url)
       } catch (err) {
@@ -80,7 +82,7 @@ export function NoteCanvasV2({ file }: NoteCanvasV2Props) {
     return (
       <div ref={containerRef} className="h-full overflow-auto p-4">
         <div className="max-w-4xl mx-auto">
-          <img src={fileUrl} alt="Uploaded image" className="max-w-full h-auto rounded-lg shadow-lg" />
+          <Image src={fileUrl} alt="Uploaded image" className="max-w-full h-auto rounded-lg shadow-lg" width={800} height={600} />
         </div>
       </div>
     )

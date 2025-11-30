@@ -1,20 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createClientWithAccessToken } from '@/lib/supabase/server'
-
-function getSupabaseClient(req: NextRequest) {
-  const authHeader = req.headers.get('authorization')
-  if (authHeader?.startsWith('Bearer ')) {
-    const token = authHeader.slice('Bearer '.length).trim()
-    if (token) {
-      try {
-        return createClientWithAccessToken(token)
-      } catch (error) {
-        console.error('[Backpack API] Failed to create Supabase client from Authorization header:', error)
-      }
-    }
-  }
-  return createClient()
-}
+import { getSupabaseClient, isMockModeEnabled } from '@/lib/api/auth'
+import { getCurrentUser } from '@/lib/auth/getCurrentUser'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,114 +12,137 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(req: NextRequest) {
   try {
-    // Log environment for debugging
-    const isDev = process.env.NODE_ENV === 'development'
-    console.log(`[Backpack API] Environment: ${process.env.NODE_ENV}, DEV_MODE: ${isDev}`)
+    const mockMode = isMockModeEnabled()
+    const { user, errorType } = await getCurrentUser()
 
-    // Check if we're in mock mode (development)
-    const USE_MOCK_USER = process.env.NODE_ENV === 'development' || process.env.PREVIEW_FORCE_MOCK === 'true'
-
-    if (USE_MOCK_USER) {
-      // In mock mode, return empty backpack for now
-      // This avoids RLS issues with service role
-      console.log('[Backpack API] Mock mode: returning empty backpack')
-      return NextResponse.json({
-        success: true,
-        items: [],
-        count: 0,
-      })
-    }
-
-    let supabase
-    try {
-      supabase = getSupabaseClient(req)
-    } catch (error) {
-      // If client creation fails (e.g., due to JWT parsing), return 401
-      console.error('[Backpack API] Failed to create Supabase client:', error)
+    if (!user) {
+      const message =
+        errorType === 'invalid-jwt'
+          ? '登入狀態失效，請重新登入或清除 Cookies 後再試。'
+          : 'Authentication required'
       return NextResponse.json(
         {
           error: 'UNAUTHORIZED',
-          message: 'Authentication required',
+          message,
+          errorType,
         },
         { status: 401 }
       )
     }
 
-    // Check authentication
-    let user
-    let authError
+    const supabase = getSupabaseClient(req)
 
-    try {
-      const authResult = await supabase.auth.getUser()
-      user = authResult.data?.user
-      authError = authResult.error
-    } catch (error) {
-      // Handle JWT parsing errors or other auth errors
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      console.error('[Backpack API] Auth error:', errorMessage)
-
-      // Check if it's a JWT parsing error
-      if (errorMessage.includes('JWT') || errorMessage.includes('token')) {
-        // Return 401 for JWT errors
-        return NextResponse.json(
-          {
-            error: 'UNAUTHORIZED',
-            message: 'Authentication required',
-          },
-          { status: 401 }
-        )
-      }
-
-      authError = error instanceof Error ? error : new Error('Authentication failed')
-    }
-
-    if (authError || !user) {
-      return NextResponse.json(
-        {
-          error: 'UNAUTHORIZED',
-          message: 'Authentication required',
-        },
-        { status: 401 }
-      )
-    }
-
-    // Get query parameters
     const { searchParams } = new URL(req.url)
     const subject = searchParams.get('subject')
     const type = searchParams.get('type')
 
-    // Build query
-    let query = supabase
+    // Fetch backpack_items
+    let backpackQuery = supabase
       .from('backpack_items')
       .select('*')
       .eq('user_id', user.id)
-      .order('updated_at', { ascending: false })
 
-    // Apply filters
     if (subject) {
-      query = query.eq('subject', subject)
+      backpackQuery = backpackQuery.eq('subject', subject)
     }
     if (type) {
-      query = query.eq('type', type)
+      backpackQuery = backpackQuery.eq('type', type)
     }
 
-    const { data, error } = await query
+    // Fetch notebook_entries
+    let notebookQuery = supabase
+      .from('notebook_entries')
+      .select('*')
+      .eq('user_id', user.id)
 
-    if (error) {
-      console.error('[Backpack API] Error fetching items:', error)
+    let backpackData = []
+    let notebookData = []
+    let backpackError = null
+    let notebookError = null
+
+    // Always try to fetch from DB, even in mock mode (since we seed the mock user)
+    const backpackResult = await backpackQuery
+    backpackData = backpackResult.data || []
+    backpackError = backpackResult.error
+
+    const notebookResult = await notebookQuery
+    notebookData = notebookResult.data || []
+    notebookError = notebookResult.error
+
+    if (backpackError) {
+      console.error('[Backpack API] Error fetching backpack items:', backpackError)
       return NextResponse.json(
         {
           error: 'DATABASE_ERROR',
-          message: error.message,
+          message: backpackError.message,
         },
         { status: 500 }
       )
     }
 
+    if (notebookError) {
+      console.warn('[Backpack API] Error fetching notebook entries:', notebookError)
+      // Don't fail the entire request if notebook fetch fails
+    }
+
+    // Transform notebook entries to BackpackFile format
+    const transformedNotebookEntries = notebookData.map((entry: any) => {
+      // Extract subject from tags (first tag that matches a subject)
+      const subjectMap: Record<string, string> = {
+        '英文': 'english',
+        '數學': 'math',
+        '國文': 'chinese',
+        '社會': 'social',
+        '自然': 'science',
+      }
+
+      let entrySubject = 'math' // default
+      if (Array.isArray(entry.tags)) {
+        for (const tag of entry.tags) {
+          if (subjectMap[tag]) {
+            entrySubject = subjectMap[tag]
+            break
+          }
+        }
+      }
+
+      // Filter by subject if specified
+      if (subject && entrySubject !== subject) {
+        return null
+      }
+
+      return {
+        id: entry.id,
+        user_id: entry.user_id,
+        subject: entrySubject,
+        type: 'text' as const,
+        title: entry.title,
+        content: entry.content_md,
+        file_url: null,
+        created_at: entry.created_at,
+        updated_at: entry.updated_at,
+        // Additional fields to identify notebook entries
+        source_type: entry.source_type,
+        tags: entry.tags,
+        is_notebook_entry: true,
+      }
+    }).filter(Boolean) // Remove null entries (filtered by subject)
+
+    // Merge and sort by updated_at
+    const allItems = [...backpackData, ...transformedNotebookEntries].sort(
+      (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+    )
+
+    const mockModeHint =
+      mockMode && allItems.length === 0
+        ? 'Mock user has no backpack data yet. Run "pnpm --filter web seed:mock-user" to seed fixtures.'
+        : undefined
+
     return NextResponse.json({
       success: true,
-      items: data || [],
-      count: data?.length || 0,
+      items: allItems,
+      count: allItems.length,
+      mockHint: mockModeHint,
     })
   } catch (error) {
     console.error('[Backpack API] Unexpected error:', error)
@@ -147,4 +156,85 @@ export async function GET(req: NextRequest) {
   }
 }
 
+/**
+ * DELETE /api/backpack
+ *
+ * Delete backpack items (notes or files)
+ * Requires authentication
+ */
+export async function DELETE(req: NextRequest) {
+  try {
+    const { user, errorType } = await getCurrentUser()
+
+    if (!user) {
+      const message =
+        errorType === 'invalid-jwt'
+          ? '登入狀態失效，請重新登入或清除 Cookies 後再試。'
+          : 'Authentication required'
+      return NextResponse.json(
+        {
+          error: 'UNAUTHORIZED',
+          message,
+          errorType,
+        },
+        { status: 401 }
+      )
+    }
+
+    const body = await req.json().catch(() => ({}))
+    const { ids } = body
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json(
+        {
+          error: 'INVALID_INPUT',
+          message: '請提供要刪除的項目 ID 列表',
+        },
+        { status: 400 }
+      )
+    }
+
+    const supabase = getSupabaseClient(req)
+
+    // 刪除 backpack_items
+    const { error: backpackError } = await supabase
+      .from('backpack_items')
+      .delete()
+      .eq('user_id', user.id)
+      .in('id', ids)
+
+    // 刪除 notebook_entries
+    const { error: notebookError } = await supabase
+      .from('notebook_entries')
+      .delete()
+      .eq('user_id', user.id)
+      .in('id', ids)
+
+    if (backpackError && notebookError) {
+      console.error('[Backpack Delete] Errors:', { backpackError, notebookError })
+      return NextResponse.json(
+        {
+          error: 'DATABASE_ERROR',
+          message: '刪除失敗',
+        },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `已刪除 ${ids.length} 項`,
+      deletedCount: ids.length,
+    })
+  } catch (error) {
+    console.error('[Backpack Delete] Unexpected error:', error)
+    return NextResponse.json(
+      {
+        error: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    )
+  }
+}
 

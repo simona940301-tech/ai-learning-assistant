@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { KeypointRecord } from '@/lib/keypoint-utils'
 // 重新導出類型以保持向後兼容
 export type { KeypointRecord } from '@/lib/keypoint-utils'
 
@@ -53,4 +54,3 @@ export class KeypointRepo {
     return data || []
   }
 }
-

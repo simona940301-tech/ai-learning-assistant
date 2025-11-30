@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>403 錯誤診斷工具</title>
+  <style>
+    body {
+      font-family: monospace;
+      padding: 20px;
+      background: #1a1a1a;
+      color: #fff;
+    }
+    .error { color: #ff6b6b; }
+    .success { color: #51cf66; }
+    .warning { color: #ffd43b; }
+    pre { background: #2d2d2d; padding: 10px; border-radius: 4px; overflow-x: auto; }
+    button {
+      background: #4c6ef5;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover { background: #364fc7; }
+  </style>
+</head>
+<body>
+  <h1>403 錯誤診斷工具</h1>
+  <button onclick="checkAPIs()">檢查 API 端點</button>
+  <button onclick="checkAuth()">檢查認證狀態</button>
+  <button onclick="checkEnv()">檢查環境變數</button>
+  <button onclick="monitorNetwork()">監控網路請求</button>
+  <div id="results"></div>
+
+  <script>
+    const results = document.getElementById('results');
+
+    function log(message, type = 'info') {
+      const div = document.createElement('div');
+      div.className = type;
+      div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      results.appendChild(div);
+      console.log(message);
+    }
+
+    async function checkAPIs() {
+      results.innerHTML = '<h2>檢查 API 端點</h2>';
+      const endpoints = [
+        '/api/play/user/status',
+        '/api/play/progression/status',
+        '/api/play/progression/chests',
+      ];
+
+      for (const endpoint of endpoints) {
+        try {
+          log(`測試 ${endpoint}...`, 'info');
+          const response = await fetch(endpoint, {
+            credentials: 'include',
+          });
+          
+          if (response.status === 403) {
+            log(`❌ ${endpoint} 返回 403 Forbidden`, 'error');
+            const text = await response.text();
+            log(`回應內容: ${text.substring(0, 200)}`, 'error');
+          } else if (response.status === 401) {
+            log(`⚠️ ${endpoint} 返回 401 Unauthorized (需要登入)`, 'warning');
+          } else if (response.ok) {
+            log(`✅ ${endpoint} 正常 (${response.status})`, 'success');
+          } else {
+            log(`⚠️ ${endpoint} 返回 ${response.status}`, 'warning');
+          }
+        } catch (error) {
+          log(`❌ ${endpoint} 請求失敗: ${error.message}`, 'error');
+        }
+      }
+    }
+
+    async function checkAuth() {
+      results.innerHTML = '<h2>檢查認證狀態</h2>';
+      
+      // 檢查 cookies
+      log('Cookies:', 'info');
+      document.cookie.split(';').forEach(cookie => {
+        const [name, value] = cookie.trim().split('=');
+        if (name.includes('supabase') || name.includes('auth') || name.includes('csrf')) {
+          log(`  ${name}: ${value ? value.substring(0, 20) + '...' : '(empty)'}`, 'info');
+        }
+      });
+
+      // 檢查 localStorage
+      log('\nLocalStorage:', 'info');
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.includes('supabase') || key.includes('auth'))) {
+          log(`  ${key}: ${localStorage.getItem(key)?.substring(0, 50)}...`, 'info');
+        }
+      }
+    }
+
+    function checkEnv() {
+      results.innerHTML = '<h2>檢查環境變數（客戶端）</h2>';
+      const envVars = [
+        'NEXT_PUBLIC_SUPABASE_URL',
+        'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+      ];
+
+      envVars.forEach(key => {
+        // 這些變數應該在 window 或 process.env 中
+        const value = window[key] || (typeof process !== 'undefined' && process.env?.[key]);
+        if (value) {
+          log(`✅ ${key}: ${value.substring(0, 30)}...`, 'success');
+        } else {
+          log(`❌ ${key}: 未設置`, 'error');
+        }
+      });
+    }
+
+    function monitorNetwork() {
+      results.innerHTML = '<h2>監控網路請求（請打開 DevTools > Network 標籤）</h2>';
+      log('請在瀏覽器 DevTools > Network 標籤中查看失敗的請求', 'warning');
+      log('尋找狀態碼為 403 的請求，並記錄其 URL', 'warning');
+      
+      // 攔截 fetch
+      const originalFetch = window.fetch;
+      window.fetch = async function(...args) {
+        const url = args[0];
+        const response = await originalFetch.apply(this, args);
+        
+        if (response.status === 403) {
+          log(`❌ 檢測到 403 請求: ${url}`, 'error');
+          const cloned = response.clone();
+          cloned.text().then(text => {
+            log(`回應內容: ${text.substring(0, 200)}`, 'error');
+          });
+        }
+        
+        return response;
+      };
+      
+      log('✅ 已啟用 fetch 攔截，所有 403 請求將被記錄', 'success');
+    }
+  </script>
+</body>
+</html>
+
+

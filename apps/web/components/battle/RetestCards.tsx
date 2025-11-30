@@ -1,8 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { RetestSuggestionPayload } from '@/lib/ws/types'
 import { SystemNoticeBanner } from './SystemNoticeBanner'
+
+type RetestSuggestionPayload = {
+  concept_id: string
+  difficulty: number
+  scheduled_at: string
+  label: string
+}
 
 type RetestAction = 'now' | '24h' | 'mute'
 
@@ -82,10 +88,10 @@ export function RetestCards({ suggestions, matchId, onAction }: Props) {
   }
 
   return (
-    <section className="w-full rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
-      <header className="mb-3 flex items-center justify-between text-sm font-medium text-slate-700">
-        <span>再測卡</span>
-        <span className="text-xs text-slate-500">間隔 24h / 7d 提醒</span>
+    <section className="w-full rounded-2xl border border-white/10 bg-[#0B1120] p-4 text-white shadow-lg">
+      <header className="mb-3 flex items-center justify-between text-sm font-semibold text-white">
+        <span>再測卡建議</span>
+        <span className="text-xs text-white/50">24h / 7d 提醒</span>
       </header>
 
       {notice && (
@@ -97,21 +103,23 @@ export function RetestCards({ suggestions, matchId, onAction }: Props) {
       <ul className="space-y-2">
         {suggestions.slice(0, 3).map((card, index) => (
           <li
-            key={card.concept_id}
-            className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3 py-2"
+            key={`${card.concept_id}-${index}`}
+            className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
           >
-            <div className="space-y-1">
+            <div>
               <div className="flex items-center gap-2">
-                <span className="rounded-full border border-slate-900 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-slate-900">
+                <span className="rounded-full border border-white/50 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-white/90">
                   {SPACING_BADGES[index] ?? 'Spacing'}
                 </span>
-                <p className="text-sm font-medium text-slate-800">{card.label || `L${card.difficulty}`}</p>
+                <p className="font-semibold text-white">{card.label || `L${card.difficulty}`}</p>
               </div>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-white/60">
                 概念 {card.concept_id} · 難度 L{card.difficulty}
               </p>
             </div>
-            <span className="text-xs text-slate-500">{new Date(card.scheduled_at).toLocaleDateString()}</span>
+            <span className="text-xs text-white/50">
+              {new Date(card.scheduled_at).toLocaleDateString()}
+            </span>
           </li>
         ))}
       </ul>
@@ -119,21 +127,21 @@ export function RetestCards({ suggestions, matchId, onAction }: Props) {
         <button
           onClick={() => handleAction('now')}
           disabled={!!pending || !matchId}
-          className="rounded-full border border-slate-900 bg-slate-900 py-2 text-white transition hover:bg-slate-800 disabled:opacity-60"
+          className="rounded-full border border-white/20 bg-white text-sm font-semibold text-slate-900 transition hover:bg-slate-200 disabled:opacity-50"
         >
           立刻再測
         </button>
         <button
           onClick={() => handleAction('24h')}
           disabled={!!pending || !matchId}
-          className="rounded-full border border-slate-300 bg-white py-2 text-slate-700 transition hover:bg-slate-100 disabled:opacity-60"
+          className="rounded-full border border-white/10 bg-white/10 text-sm font-semibold text-white transition hover:bg-white/20 disabled:opacity-50"
         >
           24h 提醒
         </button>
         <button
           onClick={() => handleAction('mute')}
           disabled={!!pending || !matchId}
-          className="rounded-full border border-slate-200 bg-slate-50 py-2 text-slate-500 transition hover:bg-slate-100 disabled:opacity-60"
+          className="rounded-full border border-white/10 bg-white/5 text-sm font-semibold text-white/70 transition hover:bg-white/10 disabled:opacity-50"
         >
           先不要
         </button>

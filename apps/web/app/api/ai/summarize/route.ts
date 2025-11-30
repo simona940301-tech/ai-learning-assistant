@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { chatCompletionJSON } from '@/lib/openai'
+import { NextRequest } from 'next/server'
+import { getApiUser } from '@/lib/api/auth'
+import { chatCompletionJSON } from '@/lib/gemini'
+import { Api } from '@/lib/api/response'
 
 interface SummarySource {
   canonical_skill: string
@@ -20,9 +22,22 @@ interface SummarizeResponseBody {
 
 export async function POST(request: NextRequest) {
   try {
+    const { user, errorType } = await getApiUser(request)
+
+    if (!user) {
+      const message =
+        errorType === 'invalid-jwt'
+          ? '登入狀態失效，請重新登入或清除 Cookies 後再試。'
+          : errorType === 'unauthenticated'
+            ? 'Authentication required'
+            : 'Authentication error occurred'
+
+      return Api.unauthorized(message)
+    }
+
     const { title, items }: SummarizeRequestBody = await request.json()
     if (!Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({ error: 'items must be a non-empty array' }, { status: 400 })
+      return Api.badRequest('items must be a non-empty array')
     }
 
     const digest = items
@@ -46,12 +61,14 @@ export async function POST(request: NextRequest) {
           ].join('\n\n'),
         },
       ],
-      { model: 'gpt-4o-mini', temperature: 0.3 }
+      { model: 'gemini-1.5-flash', temperature: 0.3 }
     )
 
-    return NextResponse.json(result)
+    return Api.success(result)
   } catch (error) {
     console.error('Summarize API error', error)
-    return NextResponse.json({ error: (error as Error).message }, { status: 500 })
+    return Api.serverError(
+      error instanceof Error ? error.message : undefined
+    )
   }
 }

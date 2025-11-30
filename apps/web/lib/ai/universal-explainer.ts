@@ -5,7 +5,7 @@
  * 目標：快速、穩定、永遠有輸出
  */
 
-import { chatCompletion, chatCompletionJSON } from '@/lib/openai'
+import { chatCompletion, chatCompletionJSON } from '@/lib/gemini'
 import { safeText } from '@/lib/safe-text'
 import { ensureExplainShape, type ExplainResult } from './explain-validator'
 import { track } from '@plms/shared/analytics'
@@ -60,6 +60,9 @@ export interface UniversalExplainResult {
     missingFields?: string[] // ✅ 缺欄位列表
     mode?: string // ✅ 路由模式
     sourceModel?: string // ✅ 使用的模型
+    title?: string
+    subject?: string
+    totalElapsedMs?: number
   }
 }
 
@@ -97,15 +100,15 @@ function truncateHeadTail(inputText: string): string {
 function detectEnglishSubject(text: string): boolean {
   const normalized = text.replace(/\s+/g, ' ').trim()
   if (!normalized) return false
-  
+
   const englishWords = normalized.match(/\b[a-z]{2,}\b/gi)?.length ?? 0
   const totalWords = normalized.split(/\s+/).filter(Boolean).length || 1
   const englishWordRatio = englishWords / totalWords
-  
+
   const englishChars = normalized.match(/[a-z]/gi)?.length ?? 0
   const totalChars = normalized.length || 1
   const englishCharRatio = englishChars / totalChars
-  
+
   // 英文含量超過 70% 判斷為英文題
   return englishWordRatio > 0.7 || englishCharRatio > 0.7
 }
@@ -148,7 +151,7 @@ export async function universalExplainer(
   const start = Date.now()
   const mode = process.env.EXPLAINER_MODE || 'llm-only'
   const lenientMode = process.env.EXPLAIN_LENIENT_UNIVERSAL !== 'false' // ✅ Feature flag，預設開啟
-  const sourceModel = 'gpt-4o-mini'
+  const sourceModel = 'gemini-2.0-flash-exp'
 
   // 移除複雜的題型檢測，像 ChatGPT 一樣直接處理
   const isEnglish = detectEnglishSubject(inputText)
@@ -163,58 +166,38 @@ export async function universalExplainer(
   })
 
   try {
-    const prompt = buildPrompt(truncatedInput, isEnglish)
+    // ✅ 簡化：直接生成 markdown，像 ChatGPT 一樣
+    const prompt = buildSimpleMarkdownPrompt(truncatedInput, isEnglish)
 
-    // 直接獲取結構化 JSON（增加輸出長度以處理複雜題目）
-    const result = await chatCompletionJSON<ExplainResult>(
+    // 直接獲取 markdown 文本（不需要 JSON 格式）
+    const result = await chatCompletion(
       [{ role: 'user', content: prompt }],
       {
-        model: 'gpt-4o-mini',
-        temperature: 0.05, // ✅ 極低溫度：最大化速度和確定性
-        maxOutputTokens: 2000, // ✅ 增加輸出長度以處理複雜題目
-        responseFormat: { type: 'json_object' },
+        model: 'gemini-2.0-flash-exp',
+        temperature: 0.3, // ✅ 適中溫度：平衡創造力和準確性
       }
     )
 
-    // 使用輕量驗證器
-    const validation = ensureExplainShape(result)
+    const markdown = result.trim()
 
-    // 簡化：只要有 fixed 就直接返回，移除複雜的條件判斷
-    if (validation.fixed) {
-      const fixedResult = validation.fixed
-
-      // 處理共用題幹格式
-      if (isSharedPayload(fixedResult)) {
-        const markdown = safeConvertToMarkdown(convertSharedPassageToMarkdown, fixedResult)
-        return {
-          markdown,
-          sharedPassage: fixedResult,
-          status: 'full',
-          meta: { elapsedMs: Date.now() - start, layer: 'universal', mode, sourceModel },
-        }
-      }
-
-      // 處理獨立題目格式
-      if (isIndependentList(fixedResult)) {
-        const markdown = safeConvertToMarkdown(convertQuestionsToMarkdown, fixedResult)
-        return {
-          markdown,
-          questions: fixedResult,
-          status: 'full',
-          meta: { elapsedMs: Date.now() - start, layer: 'universal', mode, sourceModel },
-        }
+    // ✅ 簡單驗證：只要有內容就返回
+    if (markdown && markdown.length > 10) {
+      return {
+        markdown,
+        status: 'full',
+        meta: { elapsedMs: Date.now() - start, layer: 'universal', mode, sourceModel },
       }
     }
 
-    // 簡單 fallback（不重新生成，直接返回錯誤）
+    // Fallback：如果內容太短，使用簡單格式
     return {
-      markdown: '⚠️ 無法生成詳解格式，請重試',
-      status: 'raw',
+      markdown: `## 📝 題目\n\n${truncatedInput}\n\n## 🧠 詳解\n\n${markdown || '正在生成詳解中...'}`,
+      status: markdown ? 'full' : 'minimal',
       meta: { elapsedMs: Date.now() - start, layer: 'universal', mode, sourceModel },
     }
   } catch (error) {
     console.error('[UniversalExplainer] Failed:', error)
-    
+
     // ✅ 追蹤失敗事件
     safeTrack('explain.generate.fail' as any, {
       reason: 'exception',
@@ -238,131 +221,58 @@ export async function universalExplainer(
 }
 
 /**
- * 統一的 ChatGPT 風格 Prompt（移除題型限制）
+ * ✅ 優化的 Prompt：結構清晰、快狠準，符合專案架構要求
  */
-function buildPrompt(inputText: string, isEnglish: boolean): string {
+function buildSimpleMarkdownPrompt(inputText: string, isEnglish: boolean): string {
   const content = safeText(inputText, '')
 
-  // 簡化：統一處理所有題型，像 ChatGPT 一樣
   const subjectContext = isEnglish
-    ? '這是英文題目，請提供專業的英文學習解釋。'
-    : '這是非英文題目。'
+    ? '這是一題英文考題，請從英文學習的角度來解釋。'
+    : '這是一題考題，請從學習的角度來解釋。'
 
-  return `You are a precise test prep expert. Analyze any question and provide accurate explanations.
+  return `你是專業的學測解題老師。${subjectContext}
 
-**Context:** ${subjectContext}
-**Question:** ${content}
+請用簡潔的繁體中文，為下面的題目寫出一份好讀的詳解。
 
-**Output Format (strict JSON, no markdown, no extra text):**
+【題目】
 
-**If multiple questions share the SAME passage (reading comprehension with numbered blanks like (1), (2), (3)):**
-
-{
-  "sharedPassage": "完整文章內容（保留所有原始格式，包括換行和空格，不要清理或壓縮，不含選項標記）",
-  "questions": [
-    {
-      "options": ["(A) ...", "(B) ...", "(C) ...", "(D) ..."],
-      "explanation": {
-        "answer": "(1) B — among others",
-        "reasoning": "5-8個字說明為何正確",
-        "counterpoints": {
-          "A": "具體錯誤原因（5-8字）",
-          "C": "具體錯誤原因（5-8字）",
-          "D": "具體錯誤原因（5-8字）"
-        }
-      },
-      "tips": "（可選）針對本題的具體解題技巧；若沒有就省略。"
-    }
-  ],
-  "note": "（可選）作為最頂尖的學習專家，僅在認為有重要考點需要補充時才提供，統一在題組最後顯示；若沒有重要考點則省略此字段。"
-}
-
-**If questions have INDEPENDENT stems (not sharing a passage):**
-
-Since json_object mode requires a root object (not array), wrap the array in an object:
-
-{
-  "questions": [
-    {
-      "question": "original question stem (remove option markers)",
-      "options": ["(A) ...", "(B) ...", "(C) ...", "(D) ..."],
-      "explanation": {
-        "answer": "C among others",
-        "reasoning": "5-8個字說明為何正確",
-        "counterpoints": {
-          "A": "具體錯誤原因（5-8字）",
-          "B": "具體錯誤原因（5-8字）",
-          "D": "具體錯誤原因（5-8字）"
-        }
-      },
-      "tips": "（可選）針對本題的具體解題技巧；若沒有就省略。"
-    }
-  ]
-}
-
-**Rules (CRITICAL - 必須遵守):**
-
-1. **All text in 繁體中文** (except English quotes)
-2. **Answer format:** "C" for single, "(1) B" for numbered
-3. **Long passage (>300 chars):** Use "sharedPassage" format
-4. **Single question:** Wrap in {"questions": [...]} object
-5. **NO markdown, NO extra text, ONLY JSON**`
-}
-
-/**
- * Markdown Prompt（fallback，已使用頭尾截斷）
- */
-function buildMarkdownPrompt(inputText: string): string {
-  // inputText 已經在 universalExplainer 中截斷過，這裡直接使用
-  const content = safeText(inputText, '')
-
-  return `你是世界頂尖的英語教學專家。請為以下題目生成完整詳解。
-
-**題目內容：**
 ${content}
 
----
+輸出時請使用「簡單的 Markdown」，只要有基本的標題、粗體或條列就好，不需要華麗排版。
 
-**輸出格式（嚴格遵守）：**
+**必要區塊（請按照以下順序完整輸出）：**
 
-## 📝 題目
+1. **題意說明**（必填）
+   - 標題：## 題意說明
+   - 內容：簡單說明這題在考什麼、關鍵線索是什麼、解題思路
+   - 字數：2-4 句話即可
 
-[題幹內容，不含選項標記]
+2. **正確答案**（必填）
+   - 標題：## ✅ 正確答案
+   - 格式：正確答案：(B) hatch
+     （請嚴格遵守此格式：文字「正確答案」+ 全形冒號「：」+ 選項代號如「(B)」 + 單字）
+   - 如果是多題，格式為：正確答案：(1) B — hatch, (2) C — among others
 
-## 🔡 選項
+3. **錯誤選項解析**（必填）
+   - 標題：## 錯誤選項解析
+   - 內容：依序用條列說明 (A) ~ (E)（有幾個選項就寫幾個），每個選項 1–2 句即可
+   - 格式範例：
+     - (A) humble：意為「謙遜的」，不符合描述風景的情境。
+     - (C) massive：意為「龐大的」，雖然可以形容景觀，但無法傳達生動的感受。
 
-[列出所有選項，每個選項獨立一行]
+4. **Reminder**（必填，請使用英文標題）
+   - 標題：## Reminder
+   - 內容：用 1–3 句幫學生收尾，可以是記憶小技巧、常見陷阱提醒等。內容請使用繁體中文。
+   - 格式：直接寫內容，不要用條列式，也不要加「小結：」等前綴。
 
-## ✅ 答案
-
-[列出所有答案，格式：(1) B — among others]
-
-## 🧠 詳解
-
-**不要寫開場白，直接進入核心說明**
-
-對每個空格（或單題），都要提供：
-
-1. **為什麼選正確答案**：1-2 句精準理由，說明為什麼這個選項正確
-2. **其他選項為什麼不選**：簡短說明每個錯誤選項的問題（1 句即可）
-
-## 💡 解題技巧
-
-- **理解上下文**：注意句子的整體意義和語境
-- **語法結構**：確保選擇的詞語在語法上正確，並能流暢地融入句子中
-- **詞彙搭配**：注意固定搭配和慣用語
-- **排除法**：先剔除明顯不符合語境的選項
-
----
-
-**重要原則：**
-1. **不要判斷題型**：直接分析內容，給出答案和解析
-2. **詳解要完整**：每個空格都要有詳細說明，不能省略
-3. **格式要清晰**：使用編號和粗體標記，讓結構清楚
-4. **語言要精準**：用簡潔有力的語言說明，避免冗長
-5. **直接輸出 Markdown**：不要包在程式碼區塊，不要輸出 JSON
-
-現在開始！`
+整體原則：
+- **絕對不要截斷內容**：請確保每個句子都完整結束，不要在句中斷開。
+- 所有 4 個區塊都是必填的，請完整輸出
+- 嚴格遵守上述標題格式（## 題意說明、## ✅ 正確答案、## 錯誤選項解析、## Reminder）
+- 解釋要精簡、直白，像在對國高中生講解
+- 優先確保內容正確、清楚，其次才是美觀
+- 不要輸出任何多餘的說明（例如不要解釋你在做什麼），只輸出詳解本身
+- 如果題目有多題，請為每題都提供完整解析`
 }
 
 // convertSharedPassageToMarkdown 和 convertQuestionsToMarkdown 已移至 universal-explainer-helpers.ts

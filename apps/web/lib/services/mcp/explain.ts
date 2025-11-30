@@ -1,3 +1,7 @@
+import type { UniversalExplainResult } from '@/lib/ai/universal-explainer'
+import { formatExplainResult } from './formatters'
+import { save_backpack_note } from './backpackNotes'
+
 export async function run_explain_stage(args: {
   cardId: string
   stage: string
@@ -51,16 +55,82 @@ export async function run_explain_stage(args: {
 
 export async function finalize_explain_card(args: {
   cardId: string
-  outputs: unknown
-}): Promise<{ ok: boolean; card?: unknown; error?: string }> {
+  outputs: {
+    explainResult: UniversalExplainResult
+    userId: string  // 必填：service layer 需要知道是哪個用戶
+    payload?: {
+      text?: string
+      source?: 'ask' | 'backpack' | 'unknown'
+    }
+  }
+}): Promise<{
+  ok: boolean
+  id?: string
+  error?: string
+  target?: string
+}> {
   try {
-    return {
-      ok: false,
-      error: 'NOT_IMPLEMENTED_YET:finalize_explain_card',
+    console.log('[finalize_explain_card] Starting', {
+      cardId: args.cardId,
+      hasExplainResult: !!args.outputs?.explainResult,
+      questionId: (args.outputs as any)?.questionId,
+      userId: args.outputs?.userId,
+      source: args.outputs?.payload?.source
+    })
+
+    // 1. 驗證輸入
+    if (!args.outputs?.explainResult) {
+      console.error('[finalize_explain_card] Missing explainResult')
+      return { ok: false, error: 'INVALID_INPUT: explainResult required' }
+    }
+
+    if (!args.outputs.userId) {
+      console.error('[finalize_explain_card] Missing userId')
+      return { ok: false, error: 'INVALID_INPUT: userId required' }
+    }
+
+    // 2. 格式化詳解結果
+    const formattedExplain = formatExplainResult(args.outputs.explainResult)
+    console.log('[finalize_explain_card] Formatted result', {
+      title: formattedExplain.title,
+      markdownLength: formattedExplain.markdown.length,
+      metadata: formattedExplain.metadata
+    })
+
+    // 簡化：統一存到 backpack_notes（ask page 的所有內容都存筆記本）
+    const source = args.outputs.payload?.source || 'ask'
+    console.log('[finalize_explain_card] Saving to backpack_notes', { source })
+
+    const result = await save_backpack_note({
+      userId: args.outputs.userId,
+      formattedExplain,
+      source: args.outputs.payload?.source,
+      originalPayload: args.outputs.payload
+    })
+
+    if (result.ok) {
+      console.log('[finalize_explain_card] Successfully saved to backpack_notes', { id: result.id })
+      
+      // P1-E: Send NOTE_SAVED event to Chick system
+      try {
+        const { sendNoteSavedAction } = await import('@/lib/chick/action-bus')
+        await sendNoteSavedAction({ noteId: result.id })
+      } catch (chickError) {
+        // Non-blocking: log but don't fail the save operation
+        console.warn('[finalize_explain_card] Failed to send NOTE_SAVED event:', chickError)
+      }
+      
+      return { ok: true, target: 'backpack_notes', id: result.id }
+    } else {
+      console.error('[finalize_explain_card] Failed to save to backpack_notes', result.error)
+      return { ok: false, error: `BACKPACK_FAILED: ${result.error}` }
     }
   } catch (err) {
-    console.error('MCP:finalize_explain_card', err)
-    return { ok: false, error: 'FAILED_FINALIZE_EXPLAIN_CARD' }
+    console.error('[finalize_explain_card] Critical error', err)
+    return {
+      ok: false,
+      error: `FINALIZE_FAILED: ${err instanceof Error ? err.message : 'Unknown error'}`
+    }
   }
 }
 
@@ -79,5 +149,3 @@ export async function log_explain_event(args: {
     return { ok: false, error: 'FAILED_LOG_EXPLAIN_EVENT' }
   }
 }
-
-

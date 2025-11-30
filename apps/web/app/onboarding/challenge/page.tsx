@@ -6,13 +6,13 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { BattleQuestionV3 } from '@/components/play/BattleQuestionV3'
-import type { OpponentStatus } from '@/components/play/BattleQuestionV2'
+import type { OpponentStatus } from '@/components/play/BattleQuestionV3'
 import {
   calculateBaseScore,
   calculateSpeedCoefficient,
   calculateComboCoefficient,
   calculateComboMilestoneBonus,
-} from '@/components/play/BattleQuestionV2'
+} from '@/components/play/BattleQuestionV3'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabaseBrowserClient } from '@/lib/supabase'
 import { PlayMockProvider } from '@/lib/play-context'
@@ -190,10 +190,15 @@ export default function OnboardingChallengePage() {
         const data = await response.json()
 
         if (data.success && data.questions && data.questions.length >= 7) {
+          // 先對 API 返回的題目去重（以防萬一）
+          const uniqueApiQuestions = Array.from(
+            new Map(data.questions.map((q: any) => [q.id, q])).values()
+          )
+
           // 根據難度序列分配題目
           const questionsByDifficulty: Record<number, Question[]> = {}
           uniqueDifficulties.forEach(diff => {
-            questionsByDifficulty[diff] = data.questions.filter(
+            questionsByDifficulty[diff] = uniqueApiQuestions.filter(
               (q: any) => q.difficulty_level === diff
             )
           })
@@ -208,7 +213,7 @@ export default function OnboardingChallengePage() {
             
             // 如果該難度的題目都用完了，從所有題目中選擇未選過的
             if (available.length === 0) {
-              available = data.questions.filter(
+              available = uniqueApiQuestions.filter(
                 (q: any) => !selectedQuestionIds.has(q.id)
               )
             }
@@ -216,7 +221,7 @@ export default function OnboardingChallengePage() {
             // 如果還是沒有可用題目，使用 fallback（理論上不應該發生）
             if (available.length === 0) {
               console.warn(`[Challenge] No available questions for difficulty ${diff} at index ${index}`)
-              available = data.questions
+              available = uniqueApiQuestions
             }
             
             // 隨機選擇一題

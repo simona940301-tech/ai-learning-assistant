@@ -111,6 +111,7 @@ export class ExplainService {
           layer: universal.meta?.layer,
         })
         
+        const fallbackElapsed = universal.meta?.elapsedMs ?? universal.meta?.totalElapsedMs ?? Date.now() - startTime
         const result: ExplainResponse = {
           markdown: universal.markdown || '',
           structured: universal.structured,
@@ -119,6 +120,7 @@ export class ExplainService {
           status: universal.status,
           meta: {
             ...universal.meta,
+            elapsedMs: fallbackElapsed,
             totalElapsedMs: Date.now() - startTime,
           },
         }
@@ -374,4 +376,3 @@ ${process.env.NODE_ENV === 'development' ? `\n錯誤訊息：${errorMessage}` : 
     }
   }
 }
-

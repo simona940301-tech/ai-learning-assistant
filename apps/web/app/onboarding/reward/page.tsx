@@ -197,7 +197,7 @@ export default function OnboardingRewardPage() {
               transition={{ delay: 0.3 }}
               className="text-center"
             >
-              <div className="text-4xl mb-2">🪙</div>
+              <div className="text-4xl mb-2 flex justify-center"><img src="/icon/coin.png" alt="金幣" className="w-12 h-12 object-contain" /></div>
               <div className="text-3xl font-bold text-[#FED168] mb-1">+{coinsEarned}</div>
               <div className="text-sm text-[#A68B6B]">金幣</div>
             </motion.div>
@@ -280,7 +280,7 @@ export default function OnboardingRewardPage() {
                 <Gift className="h-6 w-6 text-[#FED168]" />
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-[#5D4037]">完成後可再拿</p>
-                  <p className="text-sm text-[#8B6F47]">+50 XP + 隨機獎勵 🎁</p>
+                  <p className="text-sm text-[#8B6F47]">+50 XP + 隨機獎勵 <img src="/icon/gift.png" alt="隨機獎勵" className="w-4 h-4 inline object-contain" /></p>
                 </div>
               </div>
             </div>

@@ -5,7 +5,7 @@
  * 當 Universal Explainer 失敗時使用
  */
 
-import { chatCompletionJSON } from '@/lib/openai'
+import { chatCompletionJSON } from '@/lib/gemini'
 import { safeText, safeMatch, safeMatchAll, safeTrim, safeToUpperCase } from '@/lib/safe-text'
 
 export interface BasicExtractResult {

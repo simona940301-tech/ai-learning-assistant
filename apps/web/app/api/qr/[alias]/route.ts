@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getSupabaseClient } from '@/lib/api/auth';
 import type { QREntryResult, PackWithStatus } from '@plms/shared/types';
 import { getConfidenceBadge, isPackExpired } from '@plms/shared/types';
 
@@ -13,7 +13,7 @@ import { getConfidenceBadge, isPackExpired } from '@plms/shared/types';
 export async function GET(req: NextRequest, { params }: { params: { alias: string } }) {
   try {
     const { alias } = params;
-    const supabase = createClient();
+    const supabase = getSupabaseClient(req);
 
     // Get current user (optional)
     const {
@@ -60,6 +60,10 @@ export async function GET(req: NextRequest, { params }: { params: { alias: strin
         avgConfidence: p.avg_confidence,
         confidenceBadge: getConfidenceBadge(p.avg_confidence),
         status: p.status,
+        visibility: p.visibility || 'public',
+        source: p.source || 'internal',
+        sourceName: p.source_name || undefined,
+        sourceId: p.source_id || undefined,
         publishedAt: p.published_at,
         expiresAt: p.expires_at,
         installCount: p.install_count,

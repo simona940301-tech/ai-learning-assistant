@@ -1,0 +1,124 @@
+
+> web@1.0.0 build /Users/simonac/Desktop/moonshot-idea/apps/web
+> next build
+
+(node:1992) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/simonac/Desktop/moonshot-idea/apps/web/next.config.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/simonac/Desktop/moonshot-idea/apps/web/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+   ▲ Next.js 14.1.0
+   - Environments: .env.local
+
+   Creating an optimized production build ...
+(node:1999) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/simonac/Desktop/moonshot-idea/apps/web/next.config.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/simonac/Desktop/moonshot-idea/apps/web/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:7904) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/simonac/Desktop/moonshot-idea/apps/web/next.config.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/simonac/Desktop/moonshot-idea/apps/web/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:9257) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/simonac/Desktop/moonshot-idea/apps/web/next.config.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/simonac/Desktop/moonshot-idea/apps/web/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ Compiled successfully
+   Linting and checking validity of types ...
+
+./app/(app)/store-shop/page.tsx
+30:6  Warning: React Hook useEffect has a missing dependency: 'fetchSets'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./app/admin/universities/page.tsx
+548:17  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./app/onboarding/avatar/page.tsx
+178:17  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./components/ask/AnySubjectSolver.tsx
+185:5  Warning: React Hook useCallback has a missing dependency: 'currentAnalysis'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/ask/InputDock.tsx
+367:5  Warning: React Hook useCallback has a missing dependency: 'validateImageFile'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+572:21  Warning: Image elements must have an alt prop, either with meaningful text, or an empty string for decorative images.  jsx-a11y/alt-text
+
+./components/avatar/AvatarUploader.tsx
+72:5  Warning: React Hook useCallback has a missing dependency: 'uploadPreview'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+222:17  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./components/backpack/AnnotationLayer.tsx
+262:6  Warning: React Hook useCallback has unnecessary dependencies: 'onAnnotationDelete', 'onAnnotationUpdate', 'pageNumber', and 'tool'. Either exclude them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/backpack/BackpackReader.tsx
+640:22  Warning: The ref value 'renderBatchRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'renderBatchRef.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+650:22  Warning: The ref value 'renderTasksRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'renderTasksRef.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+652:6  Warning: React Hook useEffect has a missing dependency: 'triggerOCRForPage'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/backpack/NoteCanvas.tsx
+54:6  Warning: React Hook useEffect has a missing dependency: 'handleTextSelection'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/backpack/NoteCanvasV2.tsx
+83:11  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./components/backpack/PdfTextLayer.tsx
+160:22  Warning: The ref value 'textLayerRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'textLayerRef.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+
+./components/explain/ExplanationCard.tsx
+86:6  Warning: React Hook useEffect has missing dependencies: 'difficulty', 'isCorrect', 'packId', and 'skill'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/micro/MicroMissionCard.tsx
+45:6  Warning: React Hook useEffect has a missing dependency: 'fetchMissionData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+110:6  Warning: React Hook useEffect has a missing dependency: 'missionData.todayMission'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+141:6  Warning: React Hook useEffect has missing dependencies: 'fetchMissionData' and 'missionData.todayMission'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+149:6  Warning: React Hook useEffect has a missing dependency: 'fetchMissionData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/pdf/PdfViewerV2.tsx
+267:6  Warning: React Hook useMemo has an unnecessary dependency: 'selection'. Either exclude it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/play/AnimatedAvatar 2.tsx
+112:11  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./components/play/AnimatedAvatar.tsx
+118:11  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./components/play/BattleResultModal.tsx
+89:6  Warning: React Hook useEffect has missing dependencies: 'postMatchInsights?.finalScore?.player1' and 'postMatchInsights?.finalScore?.player2'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/play/GamifiedMatchResultModal.tsx
+305:6  Warning: React Hook useCallback has a missing dependency: 'wrongQuestions'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/play/InfinitePracticeRoom.tsx
+42:8  Warning: React Hook useEffect has missing dependencies: 'fetchQuestions' and 'setupRealtimeSubscription'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/solve/ExplainCard.tsx
+894:6  Warning: React Hook useEffect has a missing dependency: 'onLoadingChange'. Either include it or remove the dependency array. If 'onLoadingChange' changes too often, find the parent component that defines it and wrap that definition in useCallback.  react-hooks/exhaustive-deps
+961:6  Warning: React Hook useCallback has an unnecessary dependency: 'vm'. Either exclude it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/solve/explain/ClozeExplain.tsx
+84:6  Warning: React Hook useEffect has a missing dependency: 'highlight'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/solve/explain/ClozeExplain.v2.tsx
+339:5  Warning: React Hook useCallback has a missing dependency: 'unified'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/solve/explain/ReadingExplain.tsx
+35:6  Warning: React Hook useEffect has a missing dependency: 'view'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/solve/explain/ReadingExplain.v2.tsx
+330:5  Warning: React Hook useCallback has a missing dependency: 'unified'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./components/ui/typewriter-text.tsx
+61:6  Warning: React Hook useEffect has a missing dependency: 'startTyping'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/basic-features/eslint#disabling-rules
+Failed to compile.
+
+./components/backpack/BackpackReader.tsx:46:40
+Type error: Cannot find module 'pdfjs-dist' or its corresponding type declarations.
+
+[0m [90m 44 |[39m   pdfjsLoading [33m=[39m ([36masync[39m () [33m=>[39m {[0m
+[0m [90m 45 |[39m     [36mtry[39m {[0m
+[0m[31m[1m>[22m[39m[90m 46 |[39m       [36mconst[39m pdfjsModule [33m=[39m [36mawait[39m [36mimport[39m([32m'pdfjs-dist'[39m)[0m
+[0m [90m    |[39m                                        [31m[1m^[22m[39m[0m
+[0m [90m 47 |[39m       [36mconst[39m pdfjs [33m=[39m pdfjsModule[33m.[39m[36mdefault[39m [33m?[39m[33m?[39m pdfjsModule[0m
+[0m [90m 48 |[39m       pdfjs[33m.[39m[33mGlobalWorkerOptions[39m[33m.[39mworkerSrc [33m=[39m [32m'/pdf.worker.min.mjs'[39m[0m
+[0m [90m 49 |[39m       pdfjsLib [33m=[39m pdfjs[0m
+ ELIFECYCLE  Command failed with exit code 1.

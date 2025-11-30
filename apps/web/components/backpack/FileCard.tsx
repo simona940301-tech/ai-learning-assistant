@@ -86,11 +86,11 @@ export function FileCard({ file, onClick }: FileCardProps) {
             )}
             <div className="mt-2 flex flex-wrap gap-2">
               <div className="flex items-center gap-1">
-                <span className="text-[10px] uppercase opacity-60">OCR</span>
+                <span className="text-xs uppercase opacity-60">OCR</span>
                 {getStatusBadge(file.ocr_status)}
               </div>
               <div className="flex items-center gap-1">
-                <span className="text-[10px] uppercase opacity-60">索引</span>
+                <span className="text-xs uppercase opacity-60">索引</span>
                 {getStatusBadge(file.embed_status)}
               </div>
             </div>

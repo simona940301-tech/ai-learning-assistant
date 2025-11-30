@@ -59,6 +59,15 @@ export interface BackpackNoteInsert {
 }
 
 export async function saveBackpackNote(note: BackpackNoteInsert) {
+  // In mock mode, return mock data without database operations
+  if (process.env.PREVIEW_FORCE_MOCK === 'true') {
+    return {
+      id: 'mock-backpack-note-id',
+      ...note,
+      created_at: note.created_at ?? new Date().toISOString(),
+    }
+  }
+
   const client = ensureServiceClient()
   const payload = { ...note, created_at: note.created_at ?? new Date().toISOString() }
   const { data, error } = await client.from('backpack_notes').insert(payload).select().single()

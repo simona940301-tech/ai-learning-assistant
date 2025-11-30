@@ -21,7 +21,7 @@ interface RoomSettings {
   roomName: string
   subject?: string
   questionSource: 'SYSTEM' | 'UGC' | 'MIXED'
-  enableDeceiverOptions: boolean
+  enableUserCreatedQuestions: boolean // 啟用用戶自創題目
   maxPlayers: number
   contractAmount?: number // P11: 合約金額（10/50/100 金幣）
 }
@@ -34,9 +34,9 @@ export function CustomBattleModal({ onClose }: CustomBattleModalProps) {
   const [createdRoom, setCreatedRoom] = useState<{ roomCode: string; roomName: string } | null>(null)
   const [roomSettings, setRoomSettings] = useState<RoomSettings>({
     roomName: '',
-    subject: undefined,
+    subject: 'english',
     questionSource: 'SYSTEM',
-    enableDeceiverOptions: false,
+    enableUserCreatedQuestions: false,
     maxPlayers: 2,
     contractAmount: undefined, // P11: 默認無合約
   })
@@ -51,20 +51,21 @@ export function CustomBattleModal({ onClose }: CustomBattleModalProps) {
     // 只檢查 Energy，不消耗
     const result = await checkEnergy()
     if (!result.success) {
-      alert('精力值不足！')
+      alert('羽毛不足！')
       return
     }
 
     setIsCreating(true)
     try {
-      // 發送 WebSocket START_MATCH 消息（包含合約金額和 UGC 迷惑模式）
+      // 發送 WebSocket START_MATCH 消息（包含合約金額和用戶自創題目模式）
       // Energy 將在大廳確認完成時才消耗
       sendWebSocketMessage({
         type: 'START_MATCH',
         match_type: 'CUSTOM',
         subject: roomSettings.subject || null,
         contract_amount: roomSettings.contractAmount || null,
-        is_ugc_deceiver_mode: roomSettings.enableDeceiverOptions || false,
+        enable_user_created_questions: roomSettings.enableUserCreatedQuestions || false,
+        question_source: roomSettings.questionSource,
       })
       
       // 生成臨時房間代碼（實際應由服務端返回）
@@ -90,7 +91,7 @@ export function CustomBattleModal({ onClose }: CustomBattleModalProps) {
     // 只檢查 Energy，不消耗（將在大廳確認完成時才消耗）
     const result = await checkEnergy()
     if (!result.success) {
-      alert('精力值不足！')
+      alert('羽毛不足！')
       return
     }
 
@@ -213,10 +214,10 @@ export function CustomBattleModal({ onClose }: CustomBattleModalProps) {
               <Label htmlFor="questionSource">題目來源</Label>
               <Select
                 value={roomSettings.questionSource}
-                onValueChange={(value: 'SYSTEM' | 'UGC' | 'MIXED') =>
+                onValueChange={(value) =>
                   setRoomSettings({
                     ...roomSettings,
-                    questionSource: value,
+                    questionSource: value as 'SYSTEM' | 'UGC' | 'MIXED',
                   })
                 }
               >
@@ -225,8 +226,8 @@ export function CustomBattleModal({ onClose }: CustomBattleModalProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="SYSTEM">系統題庫</SelectItem>
-                  <SelectItem value="UGC">UGC 題目</SelectItem>
-                  <SelectItem value="MIXED">混合</SelectItem>
+                  <SelectItem value="UGC">用戶自創題目</SelectItem>
+                  <SelectItem value="MIXED">混合模式</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -261,20 +262,20 @@ export function CustomBattleModal({ onClose }: CustomBattleModalProps) {
               </p>
             </div>
 
-            {/* P11: UGC 迷惑模式開關 */}
+            {/* 用戶自創題目開關 */}
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label>UGC 迷惑模式</Label>
+                <Label>啟用用戶自創題目</Label>
                 <p className="text-xs text-muted-foreground">
-                  啟用用戶生成的迷惑選項
+                  使用社群創建的題目進行對戰
                 </p>
               </div>
               <Switch
-                checked={roomSettings.enableDeceiverOptions}
+                checked={roomSettings.enableUserCreatedQuestions}
                 onCheckedChange={(checked) =>
                   setRoomSettings({
                     ...roomSettings,
-                    enableDeceiverOptions: checked,
+                    enableUserCreatedQuestions: checked,
                   })
                 }
               />
@@ -375,4 +376,3 @@ export function CustomBattleModal({ onClose }: CustomBattleModalProps) {
     </Dialog>
   )
 }
-

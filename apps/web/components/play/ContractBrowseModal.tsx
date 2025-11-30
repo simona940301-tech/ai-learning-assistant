@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -39,11 +39,7 @@ export function ContractBrowseModal({ onClose }: ContractBrowseModalProps) {
   const [filterType, setFilterType] = useState<string>('')
   const [isAccepting, setIsAccepting] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadContracts()
-  }, [filterStatus, filterType])
-
-  const loadContracts = async () => {
+  const loadContracts = useCallback(async () => {
     setIsLoading(true)
     try {
       const params = new URLSearchParams()
@@ -65,7 +61,11 @@ export function ContractBrowseModal({ onClose }: ContractBrowseModalProps) {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [filterStatus, filterType])
+
+  useEffect(() => {
+    loadContracts()
+  }, [loadContracts])
 
   const handleAcceptContract = async (contractId: string) => {
     setIsAccepting(contractId)

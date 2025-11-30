@@ -43,7 +43,7 @@ export class OptionRepo {
   async getCorrectAnswerBySessionId(sessionId: string): Promise<OptionRecord | null> {
     const { data, error } = await this.db
       .from('solve_options')
-      .select('concept_id, label')
+      .select('id, session_id, label, is_answer, concept_id')
       .eq('session_id', sessionId)
       .eq('is_answer', true)
       .maybeSingle()
@@ -75,4 +75,3 @@ export class OptionRepo {
     }
   }
 }
-

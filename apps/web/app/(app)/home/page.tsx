@@ -2,7 +2,11 @@
 
 import { useEffect } from 'react';
 import { AppBar } from '@/components/layout/app-bar';
-import { MicroMissionCard } from '@/components/micro/MicroMissionCard';
+import { NextActionCard } from '@/components/home/NextActionCard';
+import { StorePromoCard } from '@/components/home/StorePromoCard';
+import { VirtualItemBanner } from '@/components/home/VirtualItemBanner';
+import { DailySnapshot } from '@/components/home/DailySnapshot';
+import { CommunitySnippet } from '@/components/home/CommunitySnippet';
 import { setupBeforeUnloadFlush } from '@plms/shared/analytics';
 
 export default function HomePage() {
@@ -15,12 +19,23 @@ export default function HomePage() {
     <>
       <AppBar title="首頁" user={{ name: 'User', avatar: '' }} />
 
-      <main className="mx-auto max-w-lg p-4 space-y-4">
-        {/* Micro-Mission Card - Main feature */}
-        <MicroMissionCard />
+      <main className="mx-auto max-w-lg p-4 space-y-6 pb-24">
+        {/* 1. Daily Snapshot (Welcome & Social Proof) */}
+        <DailySnapshot />
 
-        {/* Other cards can be added here */}
-        <div className="text-center text-gray-500 text-sm mt-8">
+        {/* 2. Next Action Card (Primary CTA - Loss Aversion) */}
+        <NextActionCard />
+
+        {/* 3. Store Promo Card (Monetization - Scarcity) */}
+        <StorePromoCard />
+
+        {/* 4. Virtual Item Banner (Retention - Endowment Effect) */}
+        <VirtualItemBanner />
+
+        {/* 5. Community Snippet (Social Proof) */}
+        <CommunitySnippet />
+
+        <div className="text-center text-xs text-muted-foreground mt-8 pb-4">
           每日堅持練習，進步看得見
         </div>
       </main>

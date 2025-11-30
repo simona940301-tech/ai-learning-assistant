@@ -17,9 +17,9 @@ export const E0QuestionSchema = z.object({
     // Validation happens in toCanonicalKind
     return typeof val === 'string'
   }),
-  stem: z.string().min(1),
-  choices: z.array(z.string()).min(2),
-  answer: z.string().min(1), // 文本答案（或選項文本）
+  stem: z.string().optional().default(''), // 放寬：可選，允許空字串
+  choices: z.array(z.string()).optional().default([]), // 放寬：不限制數量
+  answer: z.string().optional().default(''), // 放寬：可選
   answer_label: z.enum(['A', 'B', 'C', 'D']).optional(),
   one_line_reason: z.string().optional().default(''),
   distractor_rejects: z.array(z.object({
@@ -35,7 +35,7 @@ export const E0QuestionSchema = z.object({
 export const QuestionSetVMSchema = z.object({
   type: z.literal('E0_QUESTION_SET'),
   source_context: z.string().optional().default('N/A'),
-  questions: z.array(E0QuestionSchema).min(1),
+  questions: z.array(E0QuestionSchema).optional().default([]), // 放寬：允許空陣列
 })
 
 export type QuestionSetVM = z.infer<typeof QuestionSetVMSchema>

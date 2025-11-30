@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
+import { getApiUser } from '@/lib/api/auth'
 import { orchestrateEnglishExplanation } from '@/lib/english'
 import { ExplainCardSchema } from '@/lib/contracts/explain'
 import { getAskCacheKey, readAskCache, writeAskCache } from '@/lib/cache/ask-solver-cache'
@@ -239,8 +240,30 @@ function parseOptionsFromText(text: string): Array<{ key: string; text: string }
  */
 export async function POST(request: NextRequest) {
   const start = Date.now()
-  
+
   try {
+    // Authentication check
+    const { user, errorType } = await getApiUser(request)
+
+    if (!user) {
+      const message =
+        errorType === 'invalid-jwt'
+          ? '登入狀態失效，請重新登入或清除 Cookies 後再試。'
+          : errorType === 'unauthenticated'
+          ? 'Authentication required'
+          : 'Authentication error occurred'
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'UNAUTHORIZED',
+          message,
+          errorType,
+        },
+        { status: 401 }
+      )
+    }
+
     // Parse and validate input
     let body: unknown
     try {

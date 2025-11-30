@@ -18,7 +18,7 @@ const Select = ({ value, onValueChange, children }: { value: string; onValueChan
 
   return (
     <SelectContext.Provider value={{ value, onValueChange, open, setOpen }}>
-      <div className="relative">{children}</div>
+      <div className="relative w-full">{children}</div>
     </SelectContext.Provider>
   )
 }
@@ -26,7 +26,7 @@ const Select = ({ value, onValueChange, children }: { value: string; onValueChan
 const SelectTrigger = React.forwardRef<
   HTMLButtonElement,
   React.ButtonHTMLAttributes<HTMLButtonElement> & { children?: React.ReactNode }
->(({ className, children, ...props }, ref) => {
+>(({ className, children, disabled, ...props }, ref) => {
   const context = React.useContext(SelectContext)
   if (!context) throw new Error('SelectTrigger must be used within Select')
 
@@ -34,9 +34,10 @@ const SelectTrigger = React.forwardRef<
     <button
       ref={ref}
       type="button"
-      onClick={() => context.setOpen(!context.open)}
+      disabled={disabled}
+      onClick={() => !disabled && context.setOpen(!context.open)}
       className={cn(
-        "flex h-10 w-full items-center justify-between rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+        "flex h-11 w-full items-center justify-between rounded-lg border border-input bg-background px-4 py-3 text-base ring-offset-background placeholder:text-muted-foreground transition-all focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer",
         className
       )}
       {...props}
@@ -52,7 +53,17 @@ const SelectValue = ({ placeholder }: { placeholder?: string }) => {
   const context = React.useContext(SelectContext)
   if (!context) throw new Error('SelectValue must be used within Select')
 
-  return <span>{context.value || placeholder}</span>
+  // Map values to display labels
+  const displayLabels: Record<string, string> = {
+    'GSAT': '學測',
+    'AST': '指考',
+    'NATIONAL_MOCK': '全國模考',
+    'NORTHERN_MOCK': '北部模考',
+    'OTHER': '其他'
+  }
+
+  const displayText = displayLabels[context.value] || context.value || placeholder
+  return <span>{displayText}</span>
 }
 
 const SelectContent = React.forwardRef<
@@ -65,22 +76,16 @@ const SelectContent = React.forwardRef<
   if (!context.open) return null
 
   return (
-    <>
-      <div
-        className="fixed inset-0 z-40"
-        onClick={() => context.setOpen(false)}
-      />
-      <div
-        ref={ref}
-        className={cn(
-          "absolute z-50 mt-1 max-h-96 min-w-[8rem] overflow-auto rounded-lg border bg-popover text-popover-foreground shadow-md p-1",
-          className
-        )}
-        {...props}
-      >
-        {children}
-      </div>
-    </>
+    <div
+      ref={ref}
+      className={cn(
+        "absolute top-full left-0 z-[9999] mt-1 max-h-[min(24rem,50vh)] min-w-full w-full overflow-auto rounded-lg border bg-card text-card-foreground shadow-lg p-1.5",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </div>
   )
 })
 SelectContent.displayName = "SelectContent"
@@ -100,7 +105,7 @@ const SelectItem = React.forwardRef<
         context.setOpen(false)
       }}
       className={cn(
-        "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 px-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "relative flex w-full cursor-pointer select-none items-center rounded-md py-2.5 px-3 text-base outline-none transition-all hover:bg-accent hover:text-accent-foreground active:bg-accent/80 active:scale-[0.98] focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         context.value === value && "bg-accent text-accent-foreground",
         className
       )}

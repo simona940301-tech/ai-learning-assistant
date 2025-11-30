@@ -7,7 +7,7 @@
 /**
  * Explain 狀態類型
  */
-export type ExplainStatus = 'full' | 'basic' | 'raw'
+export type ExplainStatus = 'full' | 'basic' | 'raw' | 'minimal'
 
 /**
  * 選項詳情（用於英文單字題）
@@ -82,4 +82,3 @@ export function isIndependentList(
     )
   )
 }
-

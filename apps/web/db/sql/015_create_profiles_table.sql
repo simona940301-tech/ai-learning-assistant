@@ -84,11 +84,22 @@ CREATE POLICY "Users can insert own profile"
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, username, created_at)
+  INSERT INTO public.profiles (
+    id,
+    email,
+    username,
+    daily_energy,
+    daily_energy_reset_at,
+    energy_last_updated_at,
+    created_at
+  )
   VALUES (
     NEW.id,
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
+    8,
+    get_next_reset_time(),
+    NOW(),
     NOW()
   )
   ON CONFLICT (id) DO NOTHING;

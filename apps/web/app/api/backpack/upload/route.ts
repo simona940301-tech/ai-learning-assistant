@@ -1,29 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getApiUser } from '@/lib/api/auth'
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
 
 /**
  * POST /api/backpack/upload
- * 
+ *
  * Upload file to backpack
  * Requires authentication
  */
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createClient()
+    // Check authentication with proper JWT error handling
+    const { supabase, user, errorType } = await getApiUser(req)
 
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
+    if (!user) {
+      const message =
+        errorType === 'invalid-jwt'
+          ? '登入狀態失效，請重新登入或清除 Cookies 後再試。'
+          : errorType === 'unauthenticated'
+          ? 'Authentication required'
+          : 'Authentication error occurred'
 
-    if (authError || !user) {
       return NextResponse.json(
         {
           error: 'UNAUTHORIZED',
-          message: 'Authentication required',
+          message,
+          errorType,
         },
         { status: 401 }
       )
@@ -137,6 +140,11 @@ export async function POST(req: NextRequest) {
     )
   }
 }
+
+
+
+
+
 
 
 

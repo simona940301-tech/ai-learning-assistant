@@ -1,31 +1,114 @@
 'use client'
 
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabaseBrowser } from '@/lib/supabase'
-import type { User } from '@supabase/supabase-js'
+import type { Provider, User } from '@supabase/supabase-js'
 
 interface AuthContextType {
   user: User | null
   loading: boolean
+  signIn: (email: string, password: string) => Promise<void>
+  signUp: (email: string, password: string, name?: string) => Promise<void>
+  signInWithOAuth: (provider: Provider | 'google' | 'facebook' | 'apple') => Promise<void>
+  hasValidSession: boolean // 新增：真實 session 狀態
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Development/Preview mode: Always use mock user when enabled
-// - In local development: NODE_ENV === 'development'
-// - In Vercel preview: NEXT_PUBLIC_PREVIEW_FORCE_MOCK === 'true'
-const USE_MOCK_USER =
-  process.env.NODE_ENV === 'development' ||
-  process.env.NEXT_PUBLIC_PREVIEW_FORCE_MOCK === 'true'
+// 🎯 修復：徹底停用 Mock User 直到真正需要時才啟用
+const USE_MOCK_USER = false && (
+  process.env.NODE_ENV === 'development' && 
+  process.env.NEXT_PUBLIC_DISABLE_MOCK_USER !== 'true' &&
+  process.env.NEXT_PUBLIC_ENABLE_REAL_AUTH_TEST !== 'true'
+)
 
-const MOCK_USER_ID = 'e770f9cd-52a7-43de-b983-70f6f78d2f53' // Fixed UUID for deterministic testing
+const MOCK_USER_ID = 'e770f9cd-52a7-43de-b983-70f6f78d2f53'
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [hasValidSession, setHasValidSession] = useState(false)
+
+  // 🎯 新增：驗證真實 session 的函數
+  const validateSession = useCallback(async () => {
+    try {
+      const { data: sessionData, error } = await supabaseBrowser.auth.getSession()
+      const isValid = !error && !!sessionData?.session?.access_token
+      setHasValidSession(isValid)
+      return isValid
+    } catch {
+      setHasValidSession(false)
+      return false
+    }
+  }, [])
+
+  const mockAuthenticate = useCallback(async () => {
+    if (!USE_MOCK_USER) return
+    await new Promise(resolve => setTimeout(resolve, 200))
+  }, [])
+
+  const signIn = useCallback(
+    async (email: string, password: string) => {
+      if (USE_MOCK_USER) {
+        console.warn('[AuthProvider] Mock mode signIn called, ignoring credentials', { email })
+        await mockAuthenticate()
+        return
+      }
+      const { error } = await supabaseBrowser.auth.signInWithPassword({ email, password })
+      if (error) {
+        throw new Error(error.message)
+      }
+      // 登入成功後，導向 auth callback 頁面統一處理 onboarding 檢查
+      if (typeof window !== 'undefined') {
+        window.location.href = '/auth/callback'
+      }
+    },
+    [mockAuthenticate],
+  )
+
+  const signUp = useCallback(
+    async (email: string, password: string, name?: string) => {
+      if (USE_MOCK_USER) {
+        console.warn('[AuthProvider] Mock mode signUp called, ignoring credentials', { email, name })
+        await mockAuthenticate()
+        return
+      }
+      const { error } = await supabaseBrowser.auth.signUp({
+        email,
+        password,
+        options: name ? { data: { full_name: name } } : undefined,
+      })
+      if (error) {
+        throw new Error(error.message)
+      }
+    },
+    [mockAuthenticate],
+  )
+
+  const signInWithOAuth = useCallback(
+    async (provider: Provider | 'google' | 'facebook' | 'apple') => {
+      // 🎯 修復：OAuth 永遠使用真實認證，即使在開發模式
+      console.log('🚀 [AuthProvider] Starting real OAuth login with', provider)
+      const { error } = await supabaseBrowser.auth.signInWithOAuth({
+        provider,
+        options:
+          typeof window !== 'undefined'
+            ? {
+                redirectTo: `${window.location.origin}/auth/callback`,
+              }
+            : undefined,
+      })
+      if (error) {
+        console.error('❌ [AuthProvider] OAuth error:', error)
+        throw new Error(error.message)
+      }
+      console.log('✅ [AuthProvider] OAuth initiated successfully')
+    },
+    [],
+  )
 
   useEffect(() => {
-    // Mock user mode: Always use mock user (for local dev & preview)
+    // 🎯 修復：Mock user 模式改為可選，而非強制
     if (USE_MOCK_USER) {
       const mode = process.env.NODE_ENV === 'development' ? 'Development' : 'Preview'
       console.log(`[AuthProvider] 🔧 ${mode} mode: Auto-login as`, MOCK_USER_ID)
@@ -38,34 +121,73 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         aud: 'authenticated',
       } as User
       setUser(mockUser)
+      setHasValidSession(false) // Mock user 沒有真實 session
       setLoading(false)
       return
     }
 
-    // Production mode: Use real Supabase auth
-    supabaseBrowser.auth.getUser().then(({ data: { user }, error }) => {
-      if (error) {
-        console.error('[AuthProvider] Error getting user:', error)
+    // 🎯 修復：生產模式使用真實 Supabase 認證
+    async function initAuth() {
+      try {
+        // 先檢查 session
+        const sessionValid = await validateSession()
+        
+        // 再獲取用戶
+        const { data: { user: currentUser }, error } = await supabaseBrowser.auth.getUser()
+        
+        if (error) {
+          console.error('[AuthProvider] Error getting user:', error)
+          setUser(null)
+          setHasValidSession(false)
+        } else {
+          setUser(currentUser)
+          // 只有當用戶存在且 session 有效時才算完全認證
+          setHasValidSession(!!currentUser && sessionValid)
+        }
+      } catch (err) {
+        console.error('[AuthProvider] Auth initialization error:', err)
+        setUser(null)
+        setHasValidSession(false)
+      } finally {
+        setLoading(false)
       }
-      setUser(user)
-      setLoading(false)
-    })
+    }
 
-    // 監聽認證狀態變化
+    initAuth()
+
+    // 🎯 監聽認證狀態變化
     const {
       data: { subscription },
-    } = supabaseBrowser.auth.onAuthStateChange((_event, session) => {
+    } = supabaseBrowser.auth.onAuthStateChange(async (event, session) => {
+      console.log('[AuthProvider] Auth state changed:', event, { hasSession: !!session })
+      
       setUser(session?.user ?? null)
+      
+      // 每次狀態變化都重新驗證 session
+      if (session?.user) {
+        const sessionValid = await validateSession()
+        setHasValidSession(sessionValid)
+      } else {
+        setHasValidSession(false)
+      }
+      
       setLoading(false)
     })
 
     return () => {
       subscription.unsubscribe()
     }
-  }, [])
+  }, [validateSession])
 
   return (
-    <AuthContext.Provider value={{ user, loading }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      loading, 
+      signIn, 
+      signUp, 
+      signInWithOAuth,
+      hasValidSession 
+    }}>
       {children}
     </AuthContext.Provider>
   )
@@ -78,4 +200,3 @@ export function useAuth() {
   }
   return context
 }
-

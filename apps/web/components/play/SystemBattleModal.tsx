@@ -6,19 +6,21 @@ import { Card } from '@/components/ui/card'
 import { usePlay } from '@/lib/play-context'
 import { User, Bot, Trophy } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { MatchmakingModal } from './MatchmakingModal'
-import { PVETrainingModal } from './PVETrainingModal'
 
 interface SystemBattleModalProps {
   onClose: () => void
 }
 
 export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
-  const { systemMode, setSystemMode, checkEnergy, consumeEnergy } = usePlay()
+  const { systemMode, setSystemMode, checkEnergy, startMatch, setIsPveTransitioning, wsConnected } = usePlay()
   const [showMatchmaking, setShowMatchmaking] = useState(false)
-  const [selectedSubject, setSelectedSubject] = useState<string | undefined>()
-  const [timeLimit, setTimeLimit] = useState<20 | 30>(20) // 預設 20 秒
+  const [selectedSubject, setSelectedSubject] = useState<string | undefined>('english')
+  const [timeLimit, setTimeLimit] = useState<20 | 30 | 45 | 60>(20) // 預設 20 秒
+  const [quickSubject, setQuickSubject] = useState('english')
+  const [quickTimeLimit, setQuickTimeLimit] = useState<20 | 30 | 45 | 60>(20)
+  const hasStartedRef = useRef(false)
 
   const modes = [
     {
@@ -48,11 +50,7 @@ export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
   ]
 
   const subjects = [
-    { id: 'chinese', name: '國文' },
     { id: 'english', name: '英文' },
-    { id: 'math', name: '數學' },
-    { id: 'science', name: '自然' },
-    { id: 'social', name: '社會' },
   ]
 
   const handleModeSelect = async (modeId: typeof modes[number]['id']) => {
@@ -63,7 +61,7 @@ export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
       // 只檢查 Energy，不消耗（將在大廳確認完成時才消耗）
       const result = await checkEnergy()
       if (!result.success) {
-        alert('精力值不足！')
+        alert('羽毛不足！')
         return
       }
     }
@@ -75,7 +73,7 @@ export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
       // PVE 模式直接開始
       setSystemMode(modeId)
     } else {
-      // 弱點會戰直接開始匹配
+      setSystemMode(modeId)
       setShowMatchmaking(true)
     }
   }
@@ -89,14 +87,110 @@ export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
     setShowMatchmaking(true)
   }
 
+  const startQuickPVEBattle = async () => {
+    // Prevent duplicate START_MATCH
+    if (hasStartedRef.current) {
+      console.log('[SystemBattleModal] Already started, ignoring duplicate click')
+      return
+    }
+
+    hasStartedRef.current = true
+    try {
+      if (!wsConnected) {
+        alert('尚未連線，請稍後再試')
+        hasStartedRef.current = false
+        return
+      }
+
+      // 🎯 關鍵修改：啟動過渡動畫
+      console.log('[SystemBattleModal] 🚀 Starting PVE transition overlay')
+      setIsPveTransitioning(true)
+
+      const startResult = await startMatch({
+        type: 'PVE_TRAINING',
+        subject: quickSubject || null,
+        timeLimit: quickTimeLimit,
+        origin: 'QUICK_PVE',
+      })
+      if (!startResult.ok) {
+        alert(startResult.error || '啟動失敗，請稍後再試')
+        hasStartedRef.current = false
+        setIsPveTransitioning(false)
+        return
+      }
+      // 不要立即清空 systemMode，等到 ROUND_STARTED 時才清空
+      // 這樣才能正確檢測 PVE 模式
+      onClose()
+    } catch (error) {
+      console.error('[SystemBattleModal] Failed to start PVE match', error)
+      alert('啟動失敗，請稍後再試')
+      hasStartedRef.current = false
+      setIsPveTransitioning(false) // 失敗時關閉過渡動畫
+    }
+  }
+
   if (systemMode === 'PVE_TRAINING') {
     return (
-      <PVETrainingModal
-        onClose={() => {
-          setSystemMode(null)
-          onClose()
-        }}
-      />
+      <Dialog open={true} onOpenChange={onClose}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>快速系統對戰</DialogTitle>
+            <DialogDescription>選擇學科與時間後直接進入 AI 對戰</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-5 py-4">
+            <div>
+              <p className="mb-2 text-sm font-semibold text-slate-700">學科</p>
+              <div className="grid grid-cols-1 gap-2">
+                {subjects.map((subject) => (
+                  <Button
+                    key={subject.id}
+                    variant={quickSubject === subject.id ? 'default' : 'outline'}
+                    onClick={() => setQuickSubject(subject.id)}
+                    className="h-12"
+                  >
+                    {subject.name}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="mb-2 text-sm font-semibold text-slate-700">作答時間</p>
+              <div className="grid grid-cols-4 gap-2">
+                {[20, 30, 45, 60].map((value) => (
+                  <Button
+                    key={value}
+                    variant={quickTimeLimit === value ? 'default' : 'outline'}
+                    onClick={() => setQuickTimeLimit(value as 20 | 30 | 45 | 60)}
+                    className="h-12 flex-col"
+                  >
+                    <span className="text-xl font-bold">{value}</span>
+                    <span className="text-xs">秒</span>
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                className="flex-1"
+                onClick={() => {
+                  setSystemMode(null)
+                  onClose()
+                }}
+              >
+                返回
+              </Button>
+              <Button
+                className="flex-1 bg-[#5B7CFF] text-white hover:bg-[#4a63d7]"
+                onClick={startQuickPVEBattle}
+                disabled={!wsConnected}
+              >
+                立即開始
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     )
   }
 
@@ -150,6 +244,26 @@ export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
                   <span className="text-sm">秒</span>
                 </div>
               </Button>
+              <Button
+                variant={timeLimit === 45 ? 'default' : 'outline'}
+                onClick={() => setTimeLimit(45)}
+                className="h-20 text-lg"
+              >
+                <div className="flex flex-col items-center gap-2">
+                  <span className="text-2xl font-bold">45</span>
+                  <span className="text-sm">秒</span>
+                </div>
+              </Button>
+              <Button
+                variant={timeLimit === 60 ? 'default' : 'outline'}
+                onClick={() => setTimeLimit(60)}
+                className="h-20 text-lg"
+              >
+                <div className="flex flex-col items-center gap-2">
+                  <span className="text-2xl font-bold">60</span>
+                  <span className="text-sm">秒</span>
+                </div>
+              </Button>
             </div>
             <div className="flex gap-2">
               <Button
@@ -188,7 +302,7 @@ export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
             <DialogDescription>選擇要進行排位賽的學科</DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3">
               {subjects.map((subject) => (
                 <Button
                   key={subject.id}
@@ -258,4 +372,3 @@ export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
     </Dialog>
   )
 }
-

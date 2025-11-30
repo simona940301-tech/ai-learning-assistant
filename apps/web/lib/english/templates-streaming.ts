@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid'
-import { chatCompletionStream } from '@/lib/openai'
+import { chatCompletionStream } from '@/lib/gemini'
 import type { OptionKey } from '@/lib/explain-normalizer'
 
 /**

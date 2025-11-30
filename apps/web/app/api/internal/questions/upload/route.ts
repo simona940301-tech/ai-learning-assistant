@@ -118,13 +118,34 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        // Generate question ID
-        const questionId = `q-${Date.now()}-${i}`;
-        questionIds.push(questionId);
+        // Use QuestionService for complete upload pipeline
+        const { createClient } = await import('@/lib/supabase/server')
+        const { QuestionRepo } = await import('@/lib/dal/question-repo')
+        const { QuestionService } = await import('@/lib/services/question-service')
 
-        // TODO: Save to database (questions_raw)
-        // TODO: Detect duplicates
-        // TODO: Trigger AI labeling
+        const db = createClient()
+        const repo = new QuestionRepo(db)
+        const service = new QuestionService(repo)
+
+        try {
+          const result = await service.uploadQuestion({
+            stem: row.stem,
+            answer: row.answer,
+            options: row.options ? row.options.split('|') : undefined,
+            subject: row.subject || formData.get('subject') as string,
+          })
+
+          if (result.isDuplicate) {
+            duplicates++
+          } else {
+            questionIds.push(result.questionId)
+          }
+        } catch (uploadError) {
+          errorDetails.push({
+            row: i + 1,
+            error: uploadError instanceof Error ? uploadError.message : 'Upload failed',
+          })
+        }
 
       } catch (error) {
         errorDetails.push({

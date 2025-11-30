@@ -33,7 +33,7 @@ export function ContractCreateModal({ onClose, onCreateSuccess }: ContractCreate
 
     const result = await consumeEnergy()
     if (!result.success) {
-      alert('精力值不足！')
+      alert('羽毛不足！')
       return
     }
 
@@ -106,8 +106,8 @@ export function ContractCreateModal({ onClose, onCreateSuccess }: ContractCreate
             <Label htmlFor="contractType">合約類型</Label>
             <Select
               value={formData.contractType}
-              onValueChange={(value: 'PVP_BATTLE' | 'CHALLENGE' | 'TOURNAMENT') =>
-                setFormData({ ...formData, contractType: value })
+              onValueChange={(value) =>
+                setFormData({ ...formData, contractType: value as 'PVP_BATTLE' | 'CHALLENGE' | 'TOURNAMENT' })
               }
             >
               <SelectTrigger className="mt-1">
@@ -164,4 +164,3 @@ export function ContractCreateModal({ onClose, onCreateSuccess }: ContractCreate
     </Dialog>
   )
 }
-

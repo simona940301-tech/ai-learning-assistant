@@ -14,7 +14,7 @@ import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence, PanInfo } from 'framer-motion'
 import { X, Save, TrendingUp } from 'lucide-react'
 import { useTheme } from '@/lib/theme'
-import type { Difficulty } from './ExplanationCard'
+import type { Difficulty } from '@/lib/types'
 
 export interface PastPaperDetail {
   id: string
@@ -68,10 +68,11 @@ export default function PastPaperMiniCard({
   const getDifficultyBadge = () => {
     if (!paper.difficulty) return null
 
-    const badges = {
+    const badges: Record<Difficulty, { label: string; color: string }> = {
       easy: { label: '基礎', color: isDark ? 'text-green-400' : 'text-green-600' },
       medium: { label: '中等', color: isDark ? 'text-yellow-400' : 'text-yellow-600' },
       hard: { label: '進階', color: isDark ? 'text-red-400' : 'text-red-600' },
+      expert: { label: '專家', color: isDark ? 'text-purple-400' : 'text-purple-600' },
     }
 
     const badge = badges[paper.difficulty]
@@ -229,7 +230,7 @@ export default function PastPaperMiniCard({
                 className="mb-2 text-xs uppercase tracking-wider"
                 style={{ color: theme.textTertiary }}
               >
-                解題步驟
+                詳解
               </h4>
               <ol className="space-y-2 pl-5 text-sm" style={{ listStyleType: 'decimal' }}>
                 {paper.steps.slice(0, 3).map((step, idx) => (

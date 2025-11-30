@@ -136,9 +136,10 @@ interface InputDockProps {
   onChange: (value: string) => void
   onSubmit: (value: string) => Promise<void>
   onOcrComplete: (status: { type: 'success' | 'error'; message: string } | null) => void
+  placeholder?: string
 }
 
-const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrComplete }: InputDockProps) => {
+const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrComplete, placeholder }: InputDockProps) => {
   const { t } = useTranslation()
   const [menuOpen, setMenuOpen] = useState(false)
   const [uploadState, setUploadState] = useState<UploadState>(DEFAULT_UPLOAD_STATE)
@@ -164,9 +165,10 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
   const photoInputRef = useRef<HTMLInputElement>(null)
   const textAreaRef = useRef<HTMLTextAreaElement>(null)
 
-  const placeholder = useMemo(() => {
+  const dockPlaceholder = useMemo(() => {
+    if (placeholder) return placeholder
     return mode === 'single' ? t('ask.input.placeholderSingle') : t('ask.input.placeholderBatch')
-  }, [mode, t])
+  }, [mode, placeholder, t])
 
   useEffect(() => {
     // 只在客戶端執行，設置實際的網路狀態
@@ -220,42 +222,42 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
 
     // MIME type validation
     if (!mime || (!ACCEPTED_MIME.has(mime) && !ACCEPTED_EXT.has(ext))) {
-      return { 
-        code: 'file_type', 
-        message: t('ask.input.error.fileType', { 
-          default: '不支援的檔案格式。請上傳 JPG、PNG、WEBP、GIF 或 HEIC 格式的圖片。' 
-        }) 
+      return {
+        code: 'file_type',
+        message: t('ask.input.error.fileType', {
+          default: '不支援的檔案格式。請上傳 JPG、PNG、WEBP、GIF 或 HEIC 格式的圖片。'
+        })
       }
     }
 
     // Extension validation (double-check)
     if (!ACCEPTED_EXT.has(ext) && !ACCEPTED_MIME.has(mime)) {
-      return { 
-        code: 'file_type', 
-        message: t('ask.input.error.fileType', { 
-          default: '不支援的檔案格式。請上傳 JPG、PNG、WEBP、GIF 或 HEIC 格式的圖片。' 
-        }) 
+      return {
+        code: 'file_type',
+        message: t('ask.input.error.fileType', {
+          default: '不支援的檔案格式。請上傳 JPG、PNG、WEBP、GIF 或 HEIC 格式的圖片。'
+        })
       }
     }
 
     // File size validation
     if (file.size > MAX_IMAGE_SIZE) {
       const sizeMB = Math.round(MAX_IMAGE_SIZE / (1024 * 1024))
-      return { 
-        code: 'file_size', 
-        message: t('ask.input.error.fileSize', { 
-          default: `檔案大小超過上限（${sizeMB}MB）。請選擇較小的圖片。` 
-        }) 
+      return {
+        code: 'file_size',
+        message: t('ask.input.error.fileSize', {
+          default: `檔案大小超過上限（${sizeMB}MB）。請選擇較小的圖片。`
+        })
       }
     }
 
     // Check if already uploading (limit to 1 image)
     if (uploadState.status === 'uploading') {
-      return { 
-        code: 'upload_in_progress', 
-        message: t('ask.input.error.uploadInProgress', { 
-          default: '已有圖片正在上傳中，請等待完成後再試。' 
-        }) 
+      return {
+        code: 'upload_in_progress',
+        message: t('ask.input.error.uploadInProgress', {
+          default: '已有圖片正在上傳中，請等待完成後再試。'
+        })
       }
     }
 
@@ -292,12 +294,12 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
   const handleImageFile = useCallback(
     async (file: File, source: UploadSource) => {
       const validation = validateImageFile(file)
-    if (validation) {
-      setUploadState({ status: 'error', progress: 0, message: validation.message, errorCode: validation.code })
-      onOcrComplete({ type: 'error', message: validation.message })
-      emitUploadEvent('fail', { error_code: validation.code, file_name: file.name, file_size: file.size, source })
-      return
-    }
+      if (validation) {
+        setUploadState({ status: 'error', progress: 0, message: validation.message, errorCode: validation.code })
+        onOcrComplete({ type: 'error', message: validation.message })
+        emitUploadEvent('fail', { error_code: validation.code, file_name: file.name, file_size: file.size, source })
+        return
+      }
 
       emitUploadEvent('start', { file_name: file.name, file_size: file.size, source })
       onOcrComplete(null)
@@ -433,31 +435,31 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
       }
 
       if (imageFiles.length > 0) {
-            event.preventDefault()
-        
+        event.preventDefault()
+
         // Limit to 1 file
         if (imageFiles.length > 1) {
-          onOcrComplete({ 
-            type: 'error', 
-            message: t('ask.input.error.multipleFiles', { 
-              default: '一次只能貼上一張圖片。請選擇一張圖片後再試。' 
-            }) 
+          onOcrComplete({
+            type: 'error',
+            message: t('ask.input.error.multipleFiles', {
+              default: '一次只能貼上一張圖片。請選擇一張圖片後再試。'
+            })
           })
-          emitUploadEvent('fail', { 
-            error_code: 'multiple_files', 
+          emitUploadEvent('fail', {
+            error_code: 'multiple_files',
             file_count: imageFiles.length,
             source: 'paste'
           })
           return
         }
-        
+
         const file = imageFiles[0]
-            track('ask.input.paste.image', {
-              file_name: file.name,
-              file_size: file.size,
-              network_state: getNetworkState(),
-            })
-            handleImageFile(file, 'paste')
+        track('ask.input.paste.image', {
+          file_name: file.name,
+          file_size: file.size,
+          network_state: getNetworkState(),
+        })
+        handleImageFile(file, 'paste')
       }
     },
     [handleImageFile, onOcrComplete, t]
@@ -481,23 +483,23 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
       event.preventDefault()
       setIsDragActive(false)
       const files = Array.from(event.dataTransfer?.files ?? [])
-      
+
       // Limit to 1 file
       const file = files[0]
       if (files.length > 1) {
-        onOcrComplete({ 
-          type: 'error', 
-          message: t('ask.input.error.multipleFiles', { 
-            default: '一次只能上傳一張圖片。請選擇一張圖片後再試。' 
-          }) 
+        onOcrComplete({
+          type: 'error',
+          message: t('ask.input.error.multipleFiles', {
+            default: '一次只能上傳一張圖片。請選擇一張圖片後再試。'
+          })
         })
-        emitUploadEvent('fail', { 
-          error_code: 'multiple_files', 
-          file_count: files.length 
+        emitUploadEvent('fail', {
+          error_code: 'multiple_files',
+          file_count: files.length
         })
         return
       }
-      
+
       if (file) {
         handleImageFile(file, 'drag')
       }
@@ -537,13 +539,13 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
               type="button"
               onClick={() => setMenuOpen((prev) => !prev)}
               className={cn(
-                'flex h-6 w-6 items-center justify-center rounded-full bg-white/5 text-[#6EC1E4] transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-                menuOpen && 'shadow-[0_0_12px_rgba(110,193,228,0.3)]'
+                'flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-primary transition-all hover:bg-secondary/80 active:scale-95 active:bg-secondary/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                menuOpen && 'shadow-lg'
               )}
               aria-expanded={menuOpen}
               aria-label={t('ask.input.action.openMenu')}
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-4 w-4" />
             </button>
             <AnimatePresence>
               {menuOpen && (
@@ -552,22 +554,22 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
                   transition={{ duration: 0.18 }}
-                  className="absolute left-0 top-10 w-40 rounded-xl border border-white/10 bg-[#141A20] p-1.5 text-xs text-[#F1F5F9] shadow-[0_8px_20px_rgba(0,0,0,0.4)]"
+                  className="absolute left-0 top-11 w-44 rounded-xl border border-border bg-popover p-2 text-sm text-popover-foreground shadow-lg"
                 >
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="flex w-full items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-left text-xs text-[#E6EDF4] transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm text-popover-foreground transition-all hover:bg-accent active:bg-accent/80 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
-                    <Paperclip className="h-3.5 w-3.5 text-[#6EC1E4]" />
+                    <Paperclip className="h-4 w-4 text-primary" />
                     {t('ask.input.action.uploadFile')}
                   </button>
                   <button
                     type="button"
                     onClick={() => photoInputRef.current?.click()}
-                    className="mt-0.5 flex w-full items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-left text-xs text-[#E6EDF4] transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm text-popover-foreground transition-all hover:bg-accent active:bg-accent/80 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
-                    <Image className="h-3.5 w-3.5 text-[#6EC1E4]" />
+                    <Image className="h-4 w-4 text-primary" />
                     {t('ask.input.action.uploadPhoto')}
                   </button>
                 </motion.div>
@@ -609,11 +611,11 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
             aria-label={t('ask.input.action.uploadPhoto', { default: '拍照上傳' })}
           />
 
-          <div className="flex flex-1 items-center rounded-xl bg-white/5 px-2 py-1">
+          <div className="flex flex-1 items-center rounded-xl bg-secondary px-3 py-2">
             <textarea
               ref={textAreaRef}
               value={value}
-              placeholder={placeholder}
+              placeholder={dockPlaceholder}
               onCompositionStart={() => {
                 compositionRef.current = true
               }}
@@ -628,8 +630,8 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
               onBlur={() => setIsFocused(false)}
               onChange={(event) => onChange(event.target.value)}
               onPaste={handlePaste}
-              className="w-full min-h-[20px] max-h-[48px] resize-none border-0 bg-transparent px-1.5 py-0.5 text-[13px] leading-5 text-[#F1F5F9] placeholder:text-[#A9B7C8]/60 focus:outline-none"
-              aria-label={placeholder}
+              className="w-full min-h-[24px] max-h-[60px] resize-none border-0 bg-transparent px-0 py-0 text-base leading-6 text-foreground placeholder:text-muted-foreground focus:outline-none"
+              aria-label={dockPlaceholder}
               aria-multiline="true"
             />
           </div>
@@ -638,13 +640,13 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
             type="submit"
             disabled={isBusy || pendingSend || uploadState.status === 'uploading'}
             className={cn(
-              'flex h-6 w-6 items-center justify-center rounded-full bg-[#1E2A34] text-[#6EC1E4] shadow-[0_0_10px_rgba(110,193,228,0.3)] transition hover:bg-[#23313C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+              'flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-all hover:bg-primary/90 active:scale-95 active:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
               (isBusy || pendingSend || uploadState.status === 'uploading') && 'opacity-60'
             )}
             aria-label={t('ask.input.sendLabel')}
             aria-busy={pendingSend || isBusy}
           >
-            {isBusy || pendingSend ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+            {isBusy || pendingSend ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </button>
         </motion.form>
       </div>

@@ -15,13 +15,12 @@ const REQUEST_TIMEOUT = 30000; // 30s
 
 /**
  * CR1: Generate semantic hash from embeddings
- * TODO: Replace with actual OpenAI embeddings API
+ * Uses Gemini-based semantic hashing
  */
 export async function generateSemanticHash(text: string): Promise<string> {
-  // Placeholder: Use simple hash for now
-  // In production: Call OpenAI embeddings API and hash the vector
-  const normalized = text.toLowerCase().trim().replace(/\s+/g, ' ');
-  return crypto.createHash('sha256').update(normalized).digest('hex').substring(0, 16);
+  const { getGeminiService } = await import('@/lib/services/gemini-service')
+  const geminiService = getGeminiService()
+  return geminiService.generateSemanticHash(text)
 }
 
 /**
@@ -55,25 +54,13 @@ async function retryWithBackoff<T>(
 
 /**
  * Label question with AI (with fault tolerance)
+ * Uses Gemini API for intelligent labeling
  */
 export async function labelQuestion(questionContent: string): Promise<AILabel> {
   return retryWithBackoff(async () => {
-    // TODO: Call OpenAI API
-    // For now, use heuristic-based labeling
-
-    const difficulty = estimateDifficulty(questionContent);
-    const topic = extractTopic(questionContent);
-
-    return {
-      topic,
-      skill: 'problem_solving',
-      difficulty,
-      errorTypes: ['calculation', 'concept'],
-      grade: 'junior_high_1',
-      confidence: 0.75,
-      labeledAt: new Date().toISOString(),
-      version: LABELING_VERSION,
-    };
+    const { getGeminiService } = await import('@/lib/services/gemini-service')
+    const geminiService = getGeminiService()
+    return geminiService.labelQuestion(questionContent)
   });
 }
 

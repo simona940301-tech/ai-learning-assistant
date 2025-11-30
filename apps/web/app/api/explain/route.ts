@@ -16,13 +16,17 @@
 
 export const dynamic = 'force-dynamic'
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { z } from 'zod'
+import { getApiUser } from '@/lib/api/auth'
+import { Api } from '@/lib/api/response'
 import { universalExplainer } from '@/lib/ai/universal-explainer'
 import { basicExtractor } from '@/lib/ai/basic-extractor'
 import { minimalFallback } from '@/lib/ai/minimal-fallback'
 import { safeText, safeMatch, safeTrim, safeToUpperCase } from '@/lib/safe-text'
 import type { ExplainMode } from '@/lib/types'
+import type { MinimalFallbackResult } from '@/lib/ai/minimal-fallback'
+import { getCachedExplanation, setCachedExplanation } from '@/lib/cache/explain-cache'
 
 // Feature flag for quick rollback
 const UNIVERSAL_EXPLAINER_ENABLED = process.env.EXPLAIN_UNIVERSAL_ENABLED !== 'false'
@@ -34,15 +38,179 @@ const Schema = z.object({
   }),
   mode: z.enum(['fast', 'deep']).optional(),
   conservative: z.boolean().optional(),
+  questionId: z.string().optional(), // 可選的題目 ID，用於緩存 key 生成
 })
 
 export async function POST(req: NextRequest) {
+  // Authentication check - required for all AI endpoints
+  const { user, errorType } = await getApiUser(req)
+
+  if (!user) {
+    const message =
+      errorType === 'invalid-jwt'
+        ? '登入狀態失效，請重新登入或清除 Cookies 後再試。'
+        : errorType === 'unauthenticated'
+          ? 'Authentication required'
+          : 'Authentication error occurred'
+
+    return Api.unauthorized(message)
+  }
+
   const startTime = Date.now()
+  let requestMode: 'fast' | 'deep' | undefined
+  let cachedQuestionId: string | undefined = undefined
+  let inputText: string = '' // ✅ 存儲 input text 供後續使用
+
+  // 輔助函數：存入緩存並返回響應
+  const buildAndCacheResponse = async (
+    markdown: string,
+    status: string,
+    meta: any,
+    answer: string,
+    briefReason: string,
+    kind: string = 'vocab',
+    structured?: any
+  ) => {
+    const response = {
+      kind: kind as any,
+      mode: (requestMode || 'deep') as any,
+      answer: answer || '',
+      briefReason: briefReason || '',
+      fullExplanation: markdown,
+      markdown,
+      status,
+      ...(structured ? { structured } : {}),
+      meta: {
+        ...meta,
+        totalElapsedMs: Date.now() - startTime,
+        cached: false,
+      },
+    }
+
+    // 存入緩存（非阻塞，不影響響應速度）
+    if (inputText && inputText.trim().length > 0) {
+      setCachedExplanation(inputText, {
+        markdown,
+        structured,
+        status,
+        meta: response.meta,
+      }, cachedQuestionId).catch((err) => {
+        console.error('[api/explain] Failed to cache result:', err)
+      })
+    }
+
+    return Api.success(response)
+  }
+
+  const buildMinimalResponse = (
+    minimal: MinimalFallbackResult,
+    failureCause?: string
+  ) => {
+    const minimalMarkdown = `## 📝 題目
+
+${minimal.question}
+
+${minimal.options.length > 0 ? `## 🔡 選項
+
+${minimal.options.map(opt => `(${opt.key}) ${opt.text}`).join('\n\n')}
+
+` : ''}## ✅ 答案
+
+${minimal.answer !== '-' ? `**${minimal.answer}**` : '-'}
+
+## 🧠 詳解
+
+${minimal.reason !== '-' ? minimal.reason : '無法生成詳細解析，請檢查題目格式'}
+
+## 💡 解題技巧
+
+- **主題識別**：找出段落主題與最能概括的選項
+- **細節比對**：核對選項細節是否與原文一致
+- **上下文**：選能補足或延伸主旨的選項
+- **排除法**：先剔除不相干或與原文矛盾者`
+
+    const answerText = minimal.answer !== '-' ? minimal.answer : ''
+    const briefReasonText = minimal.reason !== '-' ? minimal.reason.substring(0, 25) : '無法生成詳細解析'
+
+    return Api.success({
+      // ExplainViewModel 格式
+      kind: 'vocab' as any, // 默認為 vocab
+      mode: (requestMode || 'deep') as any,
+      answer: answerText || '-',
+      briefReason: briefReasonText,
+      fullExplanation: minimalMarkdown,
+      // 保留原有格式
+      markdown: minimalMarkdown,
+      status: minimal.status,
+      meta: {
+        ...minimal.meta,
+        totalElapsedMs: Date.now() - startTime,
+        ...(failureCause ? { failureCause } : {}),
+      },
+    })
+  }
 
   try {
     const body = await req.json()
-    const { input, mode } = Schema.parse(body)
+    const { input, mode, questionId } = Schema.parse(body)
+    requestMode = mode
+    cachedQuestionId = questionId // 保存 questionId 供後續使用
     const text = safeText(input.text, '')
+    inputText = text // ✅ 存儲到外部變量供 buildAndCacheResponse 使用
+
+    // ✅ 緩存檢查：在處理前先檢查是否有緩存
+    if (text && text.trim().length > 0) {
+      const cached = await getCachedExplanation(text, questionId)
+      if (cached) {
+        // 從緩存返回，標記為 cached
+        const latency = Date.now() - startTime
+        console.log('[api/explain] ✅ Cache hit', {
+          questionId: questionId || 'none',
+          latency_ms: latency,
+        })
+
+        // 確保返回格式與正常流程一致
+        let answer = ''
+        let briefReason = '詳解已生成'
+        let kind: string = 'vocab'
+
+        // 嘗試從 markdown 中提取答案（與正常流程相同的邏輯）
+        const answerMatch =
+          cached.markdown.match(/##\s*✅\s*正確答案\s*\n+(?:\s*\n){0,2}\s*正確答案[：:]\s*(?:\(?\d+\)?\s*)?([A-E])/im) ||
+          cached.markdown.match(/正確答案[：:]\s*(?:\(?\d+\)?\s*)?([A-E])/i) ||
+          cached.markdown.match(/答案[：:]\s*(?:\(?\d+\)?\s*)?([A-E])/i)
+
+        if (answerMatch) {
+          answer = answerMatch[1].toUpperCase()
+        }
+
+        const reasoningMatch =
+          cached.markdown.match(/##\s*小結與記憶\s*\n+([^\n]{15,80})/i) ||
+          cached.markdown.match(/##\s*錯誤選項解析\s*\n+([^\n]{15,80})/i) ||
+          cached.markdown.match(/##\s*解題步驟\s*\n+([^\n]{15,80})/i) ||
+          cached.markdown.match(/##\s*題意說明\s*\n+([^\n]{15,80})/i) ||
+          cached.markdown.match(/##\s*詳解\s*\n+([^\n]{15,80})/i)
+
+        if (reasoningMatch) {
+          briefReason = reasoningMatch[1].trim().substring(0, 50)
+        }
+
+        return Api.success({
+          kind: kind as any,
+          mode: (mode || 'deep') as any,
+          answer: answer || '',
+          briefReason: briefReason || '',
+          fullExplanation: cached.markdown,
+          markdown: cached.markdown,
+          status: cached.status,
+          meta: {
+            ...cached.meta,
+            totalElapsedMs: latency,
+            cached: true, // 標記為緩存結果
+          },
+        })
+      }
+    }
 
     if (!text || text.trim().length === 0) {
       // Empty input → minimal fallback (Markdown format)
@@ -59,7 +227,7 @@ export async function POST(req: NextRequest) {
 
 請輸入題目內容以生成詳解`
 
-      return NextResponse.json({
+      return Api.success({
         // ExplainViewModel 格式
         kind: 'vocab' as any,
         mode: (mode || 'deep') as any,
@@ -76,6 +244,20 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    // 如果缺少 Gemini 設定，直接回傳最小解析，避免 500 或空白回應
+    const hasGeminiKey = !!process.env.GEMINI_API_KEY
+    console.log('[api/explain] Checking API keys:', {
+      hasGeminiKey,
+      geminiKeyLength: process.env.GEMINI_API_KEY?.length || 0,
+      hasOpenAIKey: !!process.env.OPENAI_API_KEY,
+    })
+
+    if (!hasGeminiKey) {
+      console.warn('[api/explain] Missing GEMINI_API_KEY, returning minimal fallback')
+      const minimal = minimalFallback(text)
+      return buildMinimalResponse(minimal, 'missing_gemini_api_key')
+    }
+
     // Layer 1: Universal Explainer
     if (UNIVERSAL_EXPLAINER_ENABLED) {
       try {
@@ -85,91 +267,81 @@ export async function POST(req: NextRequest) {
           console.log('[api/explain] ✅ Universal layer success', {
             elapsedMs: universal.meta?.elapsedMs,
             markdownLength: universal.markdown.length,
+            markdownPreview: universal.markdown.substring(0, 100),
             status: universal.status,
           })
 
-          // 提取 answer 和 briefReason 從 markdown 或 structured
+          // ✅ 簡化：直接從 markdown 中提取答案，不需要結構化數據
+          // 嘗試從 markdown 中提取答案（例如：答案：(1) B 或 答案：C）
           let answer = ''
-          let briefReason = '依據文意判定。'
+          let briefReason = '詳解已生成'
           let kind: string = 'vocab'
 
-          // 從 markdown 中提取答案
-          const answerMatch = universal.markdown.match(/##\s*✅\s*答案\s*\n\n\*\*([A-E])\*\*/i) || 
-                             universal.markdown.match(/答案[：:]\s*\*\*?([A-E])\*\*?/i)
+          // 從 markdown 中提取答案（優先尋找新格式：## ✅ 正確答案 標題後的「正確答案：(B) hatch」）
+          // 優先順序：1. 在「## ✅ 正確答案」標題後尋找「正確答案：(X)」格式
+          //           2. 直接尋找「正確答案：(X)」格式
+          //           3. 尋找「答案：(X)」格式
+          const answerMatch =
+            // 優先：在「## ✅ 正確答案」標題後 0-3 行內尋找「正確答案：(X)」格式
+            // 支援：**正確答案**：(B)、正確答案: (B)、(B) hatch 等格式
+            universal.markdown.match(/##\s*✅\s*正確答案\s*\n+(?:[^\n]*\n){0,3}.*?([A-E])\)/im) ||
+            universal.markdown.match(/##\s*✅\s*正確答案\s*\n+(?:[^\n]*\n){0,3}.*?([A-E])\s+[a-zA-Z]/im) ||
+            // 次優先：直接尋找「正確答案：(X)」格式
+            universal.markdown.match(/正確答案[:：]\s*(?:\(?\d+\)?\s*)?\(?([A-E])\)?/i) ||
+            // Fallback：尋找「答案：(X)」格式
+            universal.markdown.match(/答案[:：]\s*(?:\(?\d+\)?\s*)?\(?([A-E])\)?/i)
+
           if (answerMatch) {
-            answer = answerMatch[1]
-          }
-
-          // 從 structured 中提取答案
-          if (universal.structured?.answer) {
-            const structuredAnswerMatch = universal.structured.answer.match(/^([A-E])[^\w]/i)
-            if (structuredAnswerMatch) {
-              answer = structuredAnswerMatch[1]
-            } else {
-              answer = universal.structured.answer
+            answer = answerMatch[1].toUpperCase()
+          } else {
+            // 如果找不到單一答案，嘗試找多個答案（例如：(1) B, (2) C）
+            const multiAnswerMatch = universal.markdown.match(/(?:\(?\d+\)?\s*([A-E]))/gi)
+            if (multiAnswerMatch && multiAnswerMatch.length > 0) {
+              // 多題答案，用第一個作為代表
+              answer = multiAnswerMatch[0].match(/([A-E])/i)?.[1]?.toUpperCase() || ''
             }
-            briefReason = universal.structured.reasoning || briefReason
           }
 
-          // 從 questions 或 sharedPassage 中提取答案（如果是多題）
-          if (universal.questions && universal.questions.length > 0) {
-            const firstQuestion = universal.questions[0]
-            if (firstQuestion.explanation?.answer) {
-              // 從 explanation.answer 中提取答案（格式可能是 "B among others" 或 "(1) B — among others"）
-              const answerMatch = firstQuestion.explanation.answer.match(/\(?\d+\)?\s*([A-E])/i) || 
-                                 firstQuestion.explanation.answer.match(/^([A-E])/i)
-              if (answerMatch) {
-                answer = answerMatch[1]
-              } else {
-                answer = firstQuestion.explanation.answer
-              }
-            }
-            briefReason = firstQuestion.explanation?.reasoning || briefReason
-            kind = (firstQuestion as any).kind || kind
+          // 從 markdown 中提取簡短理由（優先順序：小結與記憶 > 錯誤選項解析 > 解題步驟/題意說明 > 其他）
+          // 新規格：小結與記憶和錯誤選項解析是必填的，優先從這些區塊提取
+          const reasoningMatch =
+            // 優先 1：從「Reminder」區塊提取（必填，1-3 句總結）
+            universal.markdown.match(/##\s*Reminder\s*\n+([^\n]{15,80})/i) ||
+            // 優先 2：從「小結與記憶」區塊提取（舊格式相容）
+            universal.markdown.match(/##\s*小結與記憶\s*\n+([^\n]{15,80})/i) ||
+            // 優先 3：從「錯誤選項解析」區塊提取（必填，條列說明）
+            universal.markdown.match(/##\s*錯誤選項解析\s*\n+([^\n]{15,80})/i) ||
+            // Fallback 1：從「解題步驟」區塊提取（可能不存在）
+            universal.markdown.match(/##\s*解題步驟\s*\n+([^\n]{15,80})/i) ||
+            // Fallback 2：從「題意說明」區塊提取（可能不存在）
+            universal.markdown.match(/##\s*題意說明\s*\n+([^\n]{15,80})/i) ||
+            // Fallback 3：其他可能的標題
+            universal.markdown.match(/##\s*詳解\s*\n+([^\n]{15,80})/i) ||
+            universal.markdown.match(/##\s*解析\s*\n+([^\n]{15,80})/i)
+
+          if (reasoningMatch) {
+            briefReason = reasoningMatch[1].trim().substring(0, 50)
           }
 
-          if (universal.sharedPassage && universal.sharedPassage.questions && universal.sharedPassage.questions.length > 0) {
-            const firstQuestion = universal.sharedPassage.questions[0]
-            if (firstQuestion.explanation?.answer) {
-              // 從 explanation.answer 中提取答案
-              const answerMatch = firstQuestion.explanation.answer.match(/\(?\d+\)?\s*([A-E])/i) || 
-                                 firstQuestion.explanation.answer.match(/^([A-E])/i)
-              if (answerMatch) {
-                answer = answerMatch[1]
-              } else {
-                answer = firstQuestion.explanation.answer
-              }
-            }
-            briefReason = firstQuestion.explanation?.reasoning || briefReason
-            kind = (firstQuestion as any).kind || kind
-          }
-
-          // 如果沒有找到答案，嘗試從 markdown 中提取
+          // 如果還是沒有答案，從 markdown 開頭提取（避免顯示 '-'）
           if (!answer) {
-            const markdownAnswerMatch = universal.markdown.match(/\*\*([A-E])\*\*/i)
-            if (markdownAnswerMatch) {
-              answer = markdownAnswerMatch[1]
+            // 嘗試從 markdown 內容中找答案提示
+            const fallbackMatch = universal.markdown.match(/([A-E])\s*[—–-]/i) ||
+              universal.markdown.match(/選項\s*([A-E])/i)
+            if (fallbackMatch) {
+              answer = fallbackMatch[1].toUpperCase()
             }
           }
 
-          return NextResponse.json({
-            // ExplainViewModel 格式
-            kind: kind as any,
-            mode: (mode || 'deep') as any,
-            answer: answer || '-',
-            briefReason: briefReason.substring(0, 25), // 限制長度
-            fullExplanation: universal.markdown,
-            // 保留原有格式
-            markdown: universal.markdown,
-            structured: universal.structured,
-            questions: universal.questions,
-            sharedPassage: universal.sharedPassage,
-            status: universal.status,
-            meta: {
-              ...universal.meta,
-              totalElapsedMs: Date.now() - startTime,
-            },
-          })
+          // ✅ 存入緩存並返回
+          return await buildAndCacheResponse(
+            universal.markdown,
+            universal.status,
+            universal.meta,
+            answer || '',
+            briefReason || '',
+            kind
+          )
         }
       } catch (error) {
         console.error('[api/explain] Universal layer failed:', error)
@@ -230,22 +402,16 @@ ${basic.reason !== '-' ? basic.reason : '無法生成詳細解析'}
       const answerText = basic.answer !== '-' ? basic.answer : ''
       const briefReasonText = basic.reason !== '-' ? basic.reason.substring(0, 25) : '依據文意判定。'
 
-      return NextResponse.json({
-        // ExplainViewModel 格式
-        kind: 'vocab' as any, // 默認為 vocab，因為 Basic Extractor 不區分題型
-        mode: (mode || 'deep') as any,
-        answer: answerText || '-',
-        briefReason: briefReasonText,
-        fullExplanation: markdown,
-        // 保留原有格式
-        structured,
+      // ✅ 存入緩存並返回
+      return await buildAndCacheResponse(
         markdown,
-        status: basic.status,
-        meta: {
-          ...basic.meta,
-          totalElapsedMs: Date.now() - startTime,
-        },
-      })
+        basic.status,
+        basic.meta,
+        answerText || '-',
+        briefReasonText,
+        'vocab',
+        structured
+      )
     } catch (error) {
       console.error('[api/explain] Basic layer failed:', error)
     }
@@ -257,49 +423,7 @@ ${basic.reason !== '-' ? basic.reason : '無法生成詳細解析'}
       hint: minimal.meta.hint,
     })
 
-    // 將 Minimal Fallback 結果轉換為 Markdown 格式
-    const minimalMarkdown = `## 📝 題目
-
-${minimal.question}
-
-${minimal.options.length > 0 ? `## 🔡 選項
-
-${minimal.options.map(opt => `(${opt.key}) ${opt.text}`).join('\n\n')}
-
-` : ''}## ✅ 答案
-
-${minimal.answer !== '-' ? `**${minimal.answer}**` : '-'}
-
-## 🧠 詳解
-
-${minimal.reason !== '-' ? minimal.reason : '無法生成詳細解析，請檢查題目格式'}
-
-## 💡 解題技巧
-
-- **主題識別**：找出段落主題與最能概括的選項
-- **細節比對**：核對選項細節是否與原文一致
-- **上下文**：選能補足或延伸主旨的選項
-- **排除法**：先剔除不相干或與原文矛盾者`
-
-    // 提取答案和理由
-    const answerText = minimal.answer !== '-' ? minimal.answer : ''
-    const briefReasonText = minimal.reason !== '-' ? minimal.reason.substring(0, 25) : '無法生成詳細解析'
-
-    return NextResponse.json({
-      // ExplainViewModel 格式
-      kind: 'vocab' as any, // 默認為 vocab
-      mode: (mode || 'deep') as any,
-      answer: answerText || '-',
-      briefReason: briefReasonText,
-      fullExplanation: minimalMarkdown,
-      // 保留原有格式
-      markdown: minimalMarkdown,
-      status: minimal.status,
-      meta: {
-        ...minimal.meta,
-        totalElapsedMs: Date.now() - startTime,
-      },
-    })
+    return buildMinimalResponse(minimal)
   } catch (error) {
     console.error('[api/explain] Critical error:', error)
     const minimal = minimalFallback('')
@@ -317,10 +441,10 @@ ${minimal.reason !== '-' ? minimal.reason : '無法生成詳細解析，請檢�
 
 錯誤訊息：${error instanceof Error ? error.message : 'Unknown error'}`
 
-    return NextResponse.json({
+    return Api.success({
       // ExplainViewModel 格式
       kind: 'vocab' as any,
-      mode: (mode || 'deep') as any,
+      mode: (requestMode || 'deep') as any,
       answer: '-',
       briefReason: '無法生成詳解，請重試一次',
       fullExplanation: errorMarkdown,

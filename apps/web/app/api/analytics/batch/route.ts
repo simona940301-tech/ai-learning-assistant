@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getSupabaseClient } from '@/lib/api/auth';
 
 /**
  * POST /api/analytics/batch
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
   const startTime = Date.now();
 
   try {
-    const supabase = createClient();
+    const supabase = getSupabaseClient(req);
 
     // Get current user (optional - some events may be anonymous)
     const {

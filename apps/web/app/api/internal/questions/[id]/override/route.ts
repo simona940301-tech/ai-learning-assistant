@@ -1,95 +1,84 @@
-import { NextRequest, NextResponse } from 'next/server';
-import type { QuestionNormalized } from '@plms/shared/types';
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { QuestionRepo } from '@/lib/dal/question-repo'
+import { QuestionService } from '@/lib/services/question-service'
+import { AuthorizationService } from '@/lib/services/authorization-service'
 
 /**
- * PATCH /api/internal/questions/:id/override
- *
- * Override difficulty manually
- * Updates: manualOverride with source and version
+ * PATCH /api/internal/questions/[id]/override
+ * 
+ * 管理員強制覆寫題目內容
+ * 
+ * Body:
+ * {
+ *   stem?: string
+ *   answer?: string
+ *   options?: string[]
+ * }
  */
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = params;
-    const body = await req.json();
+    const supabase = createClient()
 
-    const { difficulty, overriddenBy, source } = body;
-
-    if (!difficulty || !overriddenBy || !source) {
+    // 1. 權限檢查 (Admin Only)
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'Missing required fields: difficulty, overriddenBy, source',
-        },
-        { status: 400 }
-      );
+        { success: false, error: 'UNAUTHORIZED', message: 'Authentication required' },
+        { status: 401 }
+      )
     }
 
-    // TODO: Fetch question from database
-    // For now, mock data
-    const question: QuestionNormalized = {
-      id,
-      rawId: 'raw-123',
-      subject: 'math',
-      stem: 'Example question',
-      choices: ['A', 'B', 'C', 'D'],
-      answer: 'B',
-      aiLabel: {
-        topic: 'algebra',
-        skill: 'problem_solving',
-        difficulty: 'medium',
-        errorTypes: ['calculation'],
-        grade: 'junior_high_1',
-        confidence: 0.75,
-        labeledAt: new Date().toISOString(),
-        version: '1.0.0',
-      },
-      confidence: 0.75,
-      labelSource: 'teacher_override',
-      labelVersion: 1,
-      finalDifficulty: difficulty,
-      manualOverride: {
-        difficulty,
-        overriddenBy,
-        overriddenAt: new Date().toISOString(),
-        source,
-        version: '1.0.0',
-      },
-      isDuplicate: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    // 檢查管理員角色
+    const authService = new AuthorizationService(supabase)
+    const isAdmin = await authService.checkRole(user.id, 'admin')
 
-    // TODO: Save to database
+    if (!isAdmin) {
+      return NextResponse.json(
+        { success: false, error: 'FORBIDDEN', message: 'Admin access required' },
+        { status: 403 }
+      )
+    }
 
-    console.log('[Difficulty Override]', {
-      questionId: id,
-      aiDifficulty: question.aiLabel.difficulty,
-      manualDifficulty: difficulty,
-      overriddenBy,
-      source,
-    });
+    const id = params.id
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: 'VALIDATION_ERROR', message: 'Question ID is required' },
+        { status: 400 }
+      )
+    }
+
+    const body = await req.json()
+
+    // 2. 初始化 Services
+    const questionRepo = new QuestionRepo(supabase)
+    const questionService = new QuestionService(questionRepo)
+
+    // 3. 執行覆寫
+    await questionService.overrideQuestion(id, {
+      stem: body.stem,
+      answer: body.answer,
+      options: body.options
+    })
 
     return NextResponse.json({
       success: true,
-      data: question,
-      timestamp: new Date().toISOString(),
-    });
+      message: 'Question overridden successfully',
+      data: { id, ...body }
+    })
 
   } catch (error) {
-    console.error('[Difficulty Override] Error:', error);
+    console.error('[Override Question API] Error:', error)
     return NextResponse.json(
       {
         success: false,
-        error: {
-          code: 'OVERRIDE_FAILED',
-          message: error instanceof Error ? error.message : 'Override failed',
-        },
-        timestamp: new Date().toISOString(),
+        error: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
-    );
+    )
   }
 }

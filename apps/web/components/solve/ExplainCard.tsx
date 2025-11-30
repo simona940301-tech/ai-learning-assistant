@@ -358,8 +358,9 @@ function convertExplainViewModelToCard(vm: ExplainViewModel, inputText: string):
     translation: safeText(vm.cnTranslation, ''),
     cues: vm.grammarHighlights?.map((h) => safeText(h, '')) || [],
     options,
+    // 使用通用標題「詳解」，避免硬編碼「解題步驟」（新格式可能只有「題意說明」而沒有「解題步驟」）
     steps: vm.fullExplanation
-      ? [{ title: '解題步驟', detail: safeText(vm.fullExplanation, '') }]
+      ? [{ title: '詳解', detail: safeText(vm.fullExplanation, '') }]
       : [{ title: '解析', detail: safeText(vm.briefReason, '') }],
     correct: answerKey
       ? {

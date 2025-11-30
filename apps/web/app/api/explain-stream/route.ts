@@ -11,7 +11,7 @@ import { universalExplainer } from '@/lib/ai/universal-explainer'
 import { basicExtractor } from '@/lib/ai/basic-extractor'
 import { minimalFallback } from '@/lib/ai/minimal-fallback'
 import { getCachedExplanation, setCachedExplanation } from '@/lib/cache/explain-cache'
-import { chatCompletionJSON } from '@/lib/openai'
+import { chatCompletionJSON } from '@/lib/gemini'
 import { safeText } from '@/lib/safe-text'
 
 const Schema = z.object({

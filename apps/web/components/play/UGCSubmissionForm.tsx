@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { SubjectSelect, SUBJECT_OPTIONS } from '@/components/ui/subject-select'
+import { SubjectSelect } from '@/components/ui/subject-select'
 import { Textarea } from '@/components/ui/textarea'
 import { motion } from 'framer-motion'
 import { CheckCircle, Loader2 } from 'lucide-react'
@@ -23,7 +23,7 @@ export interface UGCFormData {
   optionC: string
   optionD: string
   correctAnswer: 'A' | 'B' | 'C' | 'D'
-  deceiverOption?: string
+  userCreatedHint?: string // 用戶自創提示（可選）
   subject: 'chinese' | 'english' | 'social' | 'science' | 'math'
   skillTags: string[]
   difficulty: number
@@ -37,7 +37,7 @@ export function UGCSubmissionForm({ onClose, onSubmit }: UGCSubmissionFormProps)
     optionC: '',
     optionD: '',
     correctAnswer: 'A',
-    deceiverOption: '',
+    userCreatedHint: '',
     subject: 'math',
     skillTags: [],
     difficulty: 3,
@@ -72,9 +72,9 @@ export function UGCSubmissionForm({ onClose, onSubmit }: UGCSubmissionFormProps)
             className="flex flex-col items-center justify-center py-8"
           >
             <CheckCircle className="mb-4 h-16 w-16 text-green-500" />
-            <h3 className="mb-2 text-xl font-bold">提交成功！</h3>
+            <h3 className="mb-2 text-xl font-bold">題目創建成功！</h3>
             <p className="text-sm text-muted-foreground">
-              題目已提交審核，審核通過後將獲得獎勵
+              題目已提交審核，審核通過後即可在對戰中使用並獲得貢獻獎勵
             </p>
           </motion.div>
         </DialogContent>
@@ -86,21 +86,20 @@ export function UGCSubmissionForm({ onClose, onSubmit }: UGCSubmissionFormProps)
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>提交 UGC 題目</DialogTitle>
+          <DialogTitle>創建自訂題目</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           {/* 學科 */}
           <SubjectSelect
             value={formData.subject}
-            onValueChange={(value: any) => {
+            onValueChange={(value) => {
               if (value) {
                 setFormData({ ...formData, subject: value as UGCFormData['subject'] })
               }
             }}
             label="學科"
             placeholder="選擇學科"
-            allowEmpty={false}
           />
 
           {/* 難度 */}
@@ -197,8 +196,8 @@ export function UGCSubmissionForm({ onClose, onSubmit }: UGCSubmissionFormProps)
             <Label htmlFor="correctAnswer">正確答案</Label>
             <Select
               value={formData.correctAnswer}
-              onValueChange={(value: 'A' | 'B' | 'C' | 'D') =>
-                setFormData({ ...formData, correctAnswer: value })
+              onValueChange={(value) =>
+                setFormData({ ...formData, correctAnswer: value as 'A' | 'B' | 'C' | 'D' })
               }
             >
               <SelectTrigger className="mt-1">
@@ -213,18 +212,21 @@ export function UGCSubmissionForm({ onClose, onSubmit }: UGCSubmissionFormProps)
             </Select>
           </div>
 
-          {/* 迷惑選項（可選） */}
+          {/* 用戶自創提示（可選） */}
           <div>
-            <Label htmlFor="deceiverOption">迷惑選項文本（可選）</Label>
+            <Label htmlFor="userCreatedHint">解題提示文本（可選）</Label>
             <Input
-              id="deceiverOption"
-              value={formData.deceiverOption}
+              id="userCreatedHint"
+              value={formData.userCreatedHint}
               onChange={(e) =>
-                setFormData({ ...formData, deceiverOption: e.target.value })
+                setFormData({ ...formData, userCreatedHint: e.target.value })
               }
-              placeholder="AI 生成的迷惑選項文本..."
+              placeholder="提供解題提示，幫助其他玩家學習..."
               className="mt-1"
             />
+            <p className="text-xs text-muted-foreground mt-1">
+              例如：注意時態、考慮文法結構、使用公式等
+            </p>
           </div>
 
           {/* 提交按鈕 */}
@@ -253,4 +255,3 @@ export function UGCSubmissionForm({ onClose, onSubmit }: UGCSubmissionFormProps)
     </Dialog>
   )
 }
-

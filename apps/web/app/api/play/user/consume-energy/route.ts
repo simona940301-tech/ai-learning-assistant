@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { NextRequest } from 'next/server'
+import { getSupabaseClient } from '@/lib/api/auth'
+import { Api } from '@/lib/api/response'
+import { ApiErrorCode } from '@/lib/types/api'
 
 /**
  * POST /api/play/user/consume-energy
@@ -9,7 +11,7 @@ import { createClient } from '@/lib/supabase/server'
  */
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = getSupabaseClient(req)
 
     // Check authentication
     const {
@@ -18,106 +20,165 @@ export async function POST(req: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
-          timestamp: new Date().toISOString(),
-        },
-        { status: 401 }
-      )
+      return Api.unauthorized('Authentication required')
     }
 
     // Get current energy (with lazy-reset)
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('daily_energy, daily_energy_reset_at')
+      .select('*')
       .eq('id', user.id)
       .single()
 
     if (profileError || !profile) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: { code: 'PROFILE_NOT_FOUND', message: 'User profile not found' },
-          timestamp: new Date().toISOString(),
-        },
-        { status: 404 }
-      )
+      return Api.notFound('User profile')
     }
 
     // Check if reset needed
     const nowUtc = new Date()
-    const resetTimeUtc = new Date(profile.daily_energy_reset_at)
-    
-    let currentEnergy = profile.daily_energy || 8
+
+    const hasDailyEnergy = Object.prototype.hasOwnProperty.call(profile, 'daily_energy')
+    const hasDailyEnergyCount = Object.prototype.hasOwnProperty.call(profile, 'daily_energy_count')
+
+    if (!hasDailyEnergy && !hasDailyEnergyCount) {
+      console.error('[Consume Energy] profiles table missing daily energy columns')
+      return Api.customError(
+        ApiErrorCode.DATABASE_ERROR,
+        'profiles table missing daily energy columns'
+      )
+    }
+
+    // Determine current stored energy and timestamp
+    let dailyEnergy: number
+    let energyLastUpdatedAt: string | null = null
+
+    if (hasDailyEnergy) {
+      dailyEnergy = profile.daily_energy
+      energyLastUpdatedAt = profile.energy_last_updated_at
+    } else if (hasDailyEnergyCount) {
+      dailyEnergy = profile.daily_energy_count
+      energyLastUpdatedAt = profile.energy_last_updated_at
+    } else {
+      console.error('[Consume Energy] profiles table missing daily energy columns')
+      return Api.customError(
+        ApiErrorCode.DATABASE_ERROR,
+        'profiles table missing daily energy columns'
+      )
+    }
+
+    // Compute current energy using regeneration logic
+    const { data: calcData, error: calcError } = await supabase.rpc('calculate_current_energy', {
+      p_daily_energy: dailyEnergy,
+      p_last_updated_at: energyLastUpdatedAt,
+      p_max_energy: 8,
+      p_interval_minutes: 30,
+    })
+
+    if (calcError) {
+      console.error('[Consume Energy] Regeneration RPC error:', calcError)
+      return Api.serverError('Failed to compute energy')
+    }
+
+    let currentEnergy = calcData as number
     let resetAt = profile.daily_energy_reset_at
+
+    // Fallback: 如果 daily_energy_reset_at 為 NULL，自動修正
+    if (!resetAt) {
+      console.warn(`[Consume Energy] User ${user.id} has NULL daily_energy_reset_at, fixing...`)
+      const nextResetTime = getNextResetTime()
+      resetAt = nextResetTime.toISOString()
+
+      // 同時修正羽毛為滿值
+      if (currentEnergy < 8) {
+        currentEnergy = 8
+      }
+
+      // 更新資料庫
+      const updatePayload: Record<string, any> = {
+        daily_energy_reset_at: resetAt,
+        energy_last_updated_at: new Date().toISOString(),
+      }
+      if (hasDailyEnergy) {
+        updatePayload.daily_energy = currentEnergy
+      }
+      if (hasDailyEnergyCount) {
+        updatePayload.daily_energy_count = currentEnergy
+      }
+
+      await supabase.from('profiles').update(updatePayload).eq('id', user.id)
+    }
+
+    const resetTimeUtc = new Date(resetAt)
 
     if (nowUtc >= resetTimeUtc) {
       // Reset first
       const nextResetTime = getNextResetTime()
       currentEnergy = 8
       resetAt = nextResetTime.toISOString()
-      
-      await supabase
-        .from('profiles')
-        .update({
-          daily_energy: 8,
-          daily_energy_reset_at: resetAt,
-        })
-        .eq('id', user.id)
+
+      const resetPayload: Record<string, any> = {
+        daily_energy_reset_at: resetAt,
+        energy_last_updated_at: new Date().toISOString(),
+      }
+      if (hasDailyEnergy) {
+        resetPayload.daily_energy = 8
+      }
+      if (hasDailyEnergyCount) {
+        resetPayload.daily_energy_count = 8
+      }
+
+      await supabase.from('profiles').update(resetPayload).eq('id', user.id)
+    } else if (currentEnergy !== dailyEnergy) {
+      // If regeneration happened but no daily reset, persist the regenerated value
+      // This is important so we consume from the regenerated amount
+      const updatePayload: Record<string, any> = {
+        energy_last_updated_at: new Date().toISOString(),
+      }
+      if (hasDailyEnergy) {
+        updatePayload.daily_energy = currentEnergy
+      }
+      if (hasDailyEnergyCount) {
+        updatePayload.daily_energy_count = currentEnergy
+      }
+      await supabase.from('profiles').update(updatePayload).eq('id', user.id)
     }
 
     // Check if energy available
     if (currentEnergy <= 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: { code: 'INSUFFICIENT_ENERGY', message: 'Daily energy exhausted' },
-          dailyEnergyCount: 0,
-          timestamp: new Date().toISOString(),
-        },
-        { status: 400 }
+      return Api.customError(
+        ApiErrorCode.INSUFFICIENT_BALANCE,
+        'Daily energy exhausted',
+        { dailyEnergyCount: 0 }
       )
     }
 
     // Consume energy
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({
-        daily_energy: currentEnergy - 1,
-      })
-      .eq('id', user.id)
+    const updatePayload: Record<string, any> = {}
+    if (hasDailyEnergy) {
+      updatePayload.daily_energy = currentEnergy - 1
+    }
+    if (hasDailyEnergyCount) {
+      updatePayload.daily_energy_count = currentEnergy - 1
+    }
+
+    const { error: updateError } = await supabase.from('profiles').update(updatePayload).eq('id', user.id)
 
     if (updateError) {
       console.error('[Consume Energy] Update error:', updateError)
-      return NextResponse.json(
-        {
-          success: false,
-          error: { code: 'UPDATE_FAILED', message: 'Failed to consume energy' },
-          timestamp: new Date().toISOString(),
-        },
-        { status: 500 }
+      return Api.customError(
+        ApiErrorCode.DATABASE_ERROR,
+        'Failed to consume energy'
       )
     }
 
-    return NextResponse.json({
-      success: true,
-      dailyEnergyCount: currentEnergy - 1,
-      timestamp: new Date().toISOString(),
-    })
+    return Api.success(
+      { dailyEnergyCount: currentEnergy - 1 },
+      Api.withTimestamp()
+    )
   } catch (error) {
     console.error('[Consume Energy] Error:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error',
-        },
-        timestamp: new Date().toISOString(),
-      },
-      { status: 500 }
+    return Api.serverError(
+      error instanceof Error ? error.message : undefined
     )
   }
 }
@@ -133,4 +194,3 @@ function getNextResetTime(): Date {
   const taipeiOffset = taipeiTime.getTime() - new Date(taipeiTime.toLocaleString('en-US', { timeZone: 'Asia/Taipei' })).getTime()
   return new Date(taipeiTime.getTime() - taipeiOffset)
 }
-

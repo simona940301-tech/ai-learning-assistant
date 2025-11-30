@@ -2,7 +2,7 @@
  * Conservative Mode Explainer
  * Generates structured, slot-by-slot, verifiable explanations
  */
-import { chatCompletionJSON } from '@/lib/openai'
+import { chatCompletionJSON } from '@/lib/gemini'
 import type {
   ConservativeQuestionType,
   ConservativeAnswer,

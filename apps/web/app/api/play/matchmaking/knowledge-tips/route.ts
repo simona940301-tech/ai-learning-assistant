@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 
 /**
  * GET /api/play/matchmaking/knowledge-tips
@@ -69,4 +68,3 @@ export async function GET(req: NextRequest) {
     )
   }
 }
-
