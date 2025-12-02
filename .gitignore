@@ -26,6 +26,7 @@ yarn-error.log*
 # Local env files
 .env*.local
 .env
+.env.local.*
 .env.preview
 
 # Vercel
@@ -103,6 +104,7 @@ dist
 # Temporary folders
 tmp/
 temp/
+apps/web/public/fallback-*.js
 
 # Editor directories and files
 .vscode/*
