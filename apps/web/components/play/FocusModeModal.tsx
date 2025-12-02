@@ -1,26 +1,30 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { motion } from 'framer-motion'
 import { X, Play, Pause, RotateCcw, CheckCircle2, AlertTriangle } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import Image from 'next/image'
-import { useChickStore } from '@/src/store/chickStore'
 
 interface FocusModeModalProps {
     onClose: () => void
 }
 
+const QUICK_TIME_OPTIONS = [15, 25, 30, 45, 60] as const
+const MIN_DURATION = 5 // 最小 5 分鐘
+const MAX_DURATION = 120 // 最大 120 分鐘
+const DEFAULT_DURATION = 25 // 預設 25 分鐘
+
 export function FocusModeModal({ onClose }: FocusModeModalProps) {
-    const [timeLeft, setTimeLeft] = useState(25 * 60) // 25 minutes
+    const [selectedMinutes, setSelectedMinutes] = useState(DEFAULT_DURATION)
+    const [customMinutes, setCustomMinutes] = useState('')
+    const [timeLeft, setTimeLeft] = useState(DEFAULT_DURATION * 60)
+    const [initialDuration, setInitialDuration] = useState(DEFAULT_DURATION * 60)
     const [isActive, setIsActive] = useState(false)
     const [isPaused, setIsPaused] = useState(false)
     const [focusState, setFocusState] = useState<'idle' | 'running' | 'paused' | 'completed' | 'failed'>('idle')
     const [earnedXP, setEarnedXP] = useState(0)
+    const [timeError, setTimeError] = useState('')
 
-    // Use a ref to track if we should fail on visibility change
-    // We only want to fail if the timer is actively running (not paused, not idle)
     const isRunningRef = useRef(false)
 
     useEffect(() => {
@@ -46,15 +50,78 @@ export function FocusModeModal({ onClose }: FocusModeModalProps) {
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (document.hidden && isRunningRef.current) {
+                console.log('[FocusMode] Window hidden detected, failing focus session')
+                handleFail()
+            }
+        }
+
+        // Also listen for blur event as fallback
+        const handleBlur = () => {
+            if (isRunningRef.current) {
+                console.log('[FocusMode] Window blur detected, failing focus session')
                 handleFail()
             }
         }
 
         document.addEventListener('visibilitychange', handleVisibilityChange)
-        return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+        window.addEventListener('blur', handleBlur)
+        
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange)
+            window.removeEventListener('blur', handleBlur)
+        }
     }, [])
 
+    const validateAndSetTime = useCallback((minutes: number) => {
+        if (minutes < MIN_DURATION) {
+            setTimeError(`時間至少需要 ${MIN_DURATION} 分鐘`)
+            return false
+        }
+        if (minutes > MAX_DURATION) {
+            setTimeError(`時間最多 ${MAX_DURATION} 分鐘`)
+            return false
+        }
+        setTimeError('')
+        setSelectedMinutes(minutes)
+        setCustomMinutes('')
+        setTimeLeft(minutes * 60)
+        return true
+    }, [])
+
+    const handleQuickTimeSelect = (minutes: number) => {
+        validateAndSetTime(minutes)
+    }
+
+    const handleCustomTimeChange = (value: string) => {
+        setCustomMinutes(value)
+        setTimeError('')
+        
+        if (value === '') {
+            return
+        }
+
+        const numValue = parseInt(value, 10)
+        if (isNaN(numValue)) {
+            setTimeError('請輸入數字')
+            return
+        }
+
+        validateAndSetTime(numValue)
+    }
+
     const handleStart = () => {
+        if (timeError) {
+            return
+        }
+        const finalMinutes = customMinutes ? parseInt(customMinutes, 10) : selectedMinutes
+        if (finalMinutes < MIN_DURATION || finalMinutes > MAX_DURATION) {
+            setTimeError(`時間必須在 ${MIN_DURATION}-${MAX_DURATION} 分鐘之間`)
+            return
+        }
+        
+        const finalSeconds = finalMinutes * 60
+        setInitialDuration(finalSeconds)
+        setTimeLeft(finalSeconds)
         setIsActive(true)
         setIsPaused(false)
         setFocusState('running')
@@ -73,26 +140,27 @@ export function FocusModeModal({ onClose }: FocusModeModalProps) {
     const handleReset = () => {
         setIsActive(false)
         setIsPaused(false)
-        setTimeLeft(25 * 60)
+        setSelectedMinutes(DEFAULT_DURATION)
+        setCustomMinutes('')
+        setTimeLeft(DEFAULT_DURATION * 60)
+        setInitialDuration(DEFAULT_DURATION * 60)
         setFocusState('idle')
+        setTimeError('')
     }
 
     const handleComplete = async () => {
         setIsActive(false)
         setFocusState('completed')
 
-        // Calculate elapsed time
-        const initialDuration = 25 * 60 // 25 minutes in seconds
         const elapsedTime = initialDuration - timeLeft
 
-        // Award XP via API
         try {
             const response = await fetch('/api/play/focus/complete', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     duration: elapsedTime,
-                    questionsCompleted: 0, // Not applicable for timer-based focus mode
+                    questionsCompleted: 0,
                     correctAnswers: 0,
                 }),
             })
@@ -104,17 +172,21 @@ export function FocusModeModal({ onClose }: FocusModeModalProps) {
                 console.log('[FocusMode] XP awarded:', xpAwarded)
             } else {
                 console.error('[FocusMode] Failed to award XP:', await response.text())
-                setEarnedXP(50) // Fallback
+                setEarnedXP(50)
             }
         } catch (error) {
             console.error('[FocusMode] Error awarding XP:', error)
-            setEarnedXP(50) // Fallback
+            setEarnedXP(50)
         }
     }
 
     const handleFail = () => {
+        console.log('[FocusMode] Focus session failed - user switched windows')
         setIsActive(false)
+        setIsPaused(false)
         setFocusState('failed')
+        // 停止計時器
+        setTimeLeft((prev) => prev)
     }
 
     const formatTime = (seconds: number) => {
@@ -123,132 +195,221 @@ export function FocusModeModal({ onClose }: FocusModeModalProps) {
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
     }
 
+    const currentMinutes = customMinutes ? parseInt(customMinutes, 10) : selectedMinutes
+    const isValidTime = !timeError && currentMinutes >= MIN_DURATION && currentMinutes <= MAX_DURATION
+
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#F9F5EF]/96 backdrop-blur-sm">
             <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
+                initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className="relative w-full max-w-md p-6"
+                exit={{ opacity: 0, scale: 0.98 }}
+                transition={{ duration: 0.2 }}
+                className="relative w-full max-w-md px-8"
             >
-                <Card className="overflow-hidden border-white/10 bg-black/40 p-8 text-center backdrop-blur-xl shadow-2xl">
+                <div className="bg-[#F9F5EF] text-center">
+                    {/* 關閉按鈕 */}
                     <button
                         onClick={onClose}
-                        className="absolute right-4 top-4 text-white/50 hover:text-white"
+                        className="absolute right-0 top-0 text-[#8C847C] hover:text-[#5A5248] transition-colors"
+                        aria-label="關閉"
                     >
-                        <X className="h-6 w-6" />
+                        <X className="h-4 w-4" />
                     </button>
 
+                    {/* 小雞插圖 - 根據狀態調整顯示 */}
                     <div className="mb-8 flex justify-center">
-                        <div className="relative h-48 w-48">
-                            {/* Glow Effect */}
-                            <div className="absolute inset-0 rounded-full bg-blue-500/20 blur-3xl animate-pulse" />
-
+                        <div className={`relative h-24 w-24 ${
+                            focusState === 'failed' 
+                                ? 'opacity-100' 
+                                : focusState === 'running' || focusState === 'paused'
+                                ? 'opacity-70'
+                                : 'opacity-60'
+                        }`}>
                             <Image
                                 src={focusState === 'failed' ? '/chicks/statussick.png' : '/chicks/meditation.png'}
-                                alt="Focus Chick"
+                                alt={focusState === 'failed' ? '生病小雞' : '專注小雞'}
                                 fill
-                                className="object-contain drop-shadow-[0_0_15px_rgba(100,200,255,0.5)]"
+                                className={`object-contain ${
+                                    focusState === 'failed' 
+                                        ? '' 
+                                        : 'grayscale-[20%]'
+                                }`}
                             />
                         </div>
                     </div>
 
-                    <h2 className="mb-2 text-2xl font-bold text-white">
-                        {focusState === 'idle' && '準備修煉'}
-                        {focusState === 'running' && '修煉中...'}
-                        {focusState === 'paused' && '修煉暫停'}
-                        {focusState === 'completed' && '修煉完成！'}
-                        {focusState === 'failed' && '修煉失敗'}
-                    </h2>
+                    {/* 標題 - 根據狀態顯示 */}
+                    {focusState === 'idle' && (
+                        <h2 className="mb-12 text-base font-normal text-[#8C847C]">
+                            準備修煉
+                        </h2>
+                    )}
+                    {focusState === 'running' && (
+                        <h2 className="mb-12 text-base font-normal text-[#8C847C]">
+                            修煉中...
+                        </h2>
+                    )}
+                    {focusState === 'paused' && (
+                        <h2 className="mb-12 text-base font-normal text-[#8C847C]">
+                            修煉暫停
+                        </h2>
+                    )}
+                    {focusState === 'failed' && (
+                        <h2 className="mb-12 text-base font-normal text-[#DC2626]">
+                            修煉失敗
+                        </h2>
+                    )}
+                    {focusState === 'completed' && (
+                        <h2 className="mb-12 text-base font-normal text-[#4A3728]">
+                            修煉完成！
+                        </h2>
+                    )}
 
-                    <div className="mb-8 text-6xl font-mono font-bold tracking-wider text-white">
+                    {/* 計時器 - 畫面最大元素，周圍大量留白 */}
+                    <div className="mb-20 text-7xl font-mono font-bold tracking-tight text-[#4A3728]">
                         {formatTime(timeLeft)}
                     </div>
 
+                    {/* Idle 狀態：時間選擇 */}
                     {focusState === 'idle' && (
-                        <div className="space-y-4">
-                            <p className="text-sm text-white/60">
-                                保持專注，切換視窗將導致修煉失敗。
-                            </p>
-                            <Button
-                                size="lg"
-                                className="w-full bg-blue-600 hover:bg-blue-500 text-lg h-14 rounded-xl shadow-[0_0_20px_rgba(37,99,235,0.3)]"
-                                onClick={handleStart}
-                            >
-                                <Play className="mr-2 h-5 w-5" /> 開始專注
-                            </Button>
-                        </div>
-                    )}
-
-                    {focusState === 'running' && (
-                        <div className="flex gap-4">
-                            <Button
-                                variant="outline"
-                                size="lg"
-                                className="flex-1 border-white/20 bg-white/5 hover:bg-white/10 text-white h-14 rounded-xl"
-                                onClick={handlePause}
-                            >
-                                <Pause className="mr-2 h-5 w-5" /> 暫停
-                            </Button>
-                        </div>
-                    )}
-
-                    {focusState === 'paused' && (
-                        <div className="flex gap-4">
-                            <Button
-                                variant="outline"
-                                size="lg"
-                                className="flex-1 border-white/20 bg-white/5 hover:bg-white/10 text-white h-14 rounded-xl"
-                                onClick={handleReset}
-                            >
-                                <RotateCcw className="mr-2 h-5 w-5" /> 放棄
-                            </Button>
-                            <Button
-                                size="lg"
-                                className="flex-1 bg-blue-600 hover:bg-blue-500 text-white h-14 rounded-xl"
-                                onClick={handleResume}
-                            >
-                                <Play className="mr-2 h-5 w-5" /> 繼續
-                            </Button>
-                        </div>
-                    )}
-
-                    {focusState === 'completed' && (
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-center gap-2 text-green-400">
-                                <CheckCircle2 className="h-6 w-6" />
-                                <span className="font-bold">獲得 +{earnedXP} XP</span>
+                        <div className="space-y-8">
+                            {/* 快速選項 - 單列水平，統一按鈕樣式 */}
+                            <div className="flex gap-3 justify-center">
+                                {QUICK_TIME_OPTIONS.map((minutes) => {
+                                    const isSelected = selectedMinutes === minutes && !customMinutes
+                                    return (
+                                        <button
+                                            key={minutes}
+                                            onClick={() => handleQuickTimeSelect(minutes)}
+                                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                                isSelected
+                                                    ? 'bg-[#4A3728] text-white'
+                                                    : 'border border-[#C8C2BB] bg-transparent text-[#5A5248] hover:border-[#8C847C]'
+                                            }`}
+                                        >
+                                            {minutes}
+                                        </button>
+                                    )
+                                })}
                             </div>
-                            <Button
-                                size="lg"
-                                className="w-full bg-green-600 hover:bg-green-500 text-white h-14 rounded-xl"
+
+                            {/* 自訂輸入 - 下劃線式 */}
+                            <div className="flex items-center justify-center gap-2">
+                                <input
+                                    type="number"
+                                    min={MIN_DURATION}
+                                    max={MAX_DURATION}
+                                    placeholder="輸入分鐘數"
+                                    value={customMinutes}
+                                    onChange={(e) => handleCustomTimeChange(e.target.value)}
+                                    className="w-32 border-0 border-b border-[#C8C2BB] bg-transparent text-center text-sm text-[#5A5248] placeholder:text-[#C8C2BB]/40 focus:border-[#8C847C] focus:outline-none"
+                                />
+                                <span className="text-sm text-[#C8C2BB]">分鐘</span>
+                            </div>
+                            
+                            {/* 錯誤提示 */}
+                            {timeError && (
+                                <p className="text-xs text-[#DC2626]">{timeError}</p>
+                            )}
+
+                            {/* 開始按鈕 - 縮小15-20%，圓角8-12px，統一主色 */}
+                            <div className="pt-4">
+                                <button
+                                    onClick={handleStart}
+                                    disabled={!isValidTime}
+                                    className={`w-full rounded-lg py-2.5 text-sm font-medium transition-colors ${
+                                        isValidTime
+                                            ? 'bg-[#4A3728] text-white hover:bg-[#5A5248]'
+                                            : 'bg-[#C8C2BB] text-[#8C847C] cursor-not-allowed'
+                                    }`}
+                                >
+                                    <span className="flex items-center justify-center gap-2">
+                                        <Play className="h-3.5 w-3.5" /> 開始專注
+                                    </span>
+                                </button>
+                            </div>
+
+                            {/* 提示文字 - 最底部，小字淡灰 */}
+                            <p className="pt-8 text-xs text-[#C8C2BB]">
+                                保持專注，切換視窗將導致修煉失敗
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Running 狀態 */}
+                    {focusState === 'running' && (
+                        <div className="pt-8">
+                            <button
+                                onClick={handlePause}
+                                className="w-full rounded-lg border border-[#C8C2BB] bg-transparent py-2.5 text-sm font-medium text-[#5A5248] transition-colors hover:border-[#8C847C]"
+                            >
+                                <span className="flex items-center justify-center gap-2">
+                                    <Pause className="h-3.5 w-3.5" /> 暫停
+                                </span>
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Paused 狀態 */}
+                    {focusState === 'paused' && (
+                        <div className="flex gap-3 pt-8">
+                            <button
+                                onClick={handleReset}
+                                className="flex-1 rounded-lg border border-[#C8C2BB] bg-transparent py-2.5 text-sm font-medium text-[#5A5248] transition-colors hover:border-[#8C847C]"
+                            >
+                                <span className="flex items-center justify-center gap-2">
+                                    <RotateCcw className="h-3.5 w-3.5" /> 放棄
+                                </span>
+                            </button>
+                            <button
+                                onClick={handleResume}
+                                className="flex-1 rounded-lg bg-[#4A3728] py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#5A5248]"
+                            >
+                                <span className="flex items-center justify-center gap-2">
+                                    <Play className="h-3.5 w-3.5" /> 繼續
+                                </span>
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Completed 狀態 */}
+                    {focusState === 'completed' && (
+                        <div className="space-y-6 pt-8">
+                            <div className="flex items-center justify-center gap-2 text-sm text-[#4A3728]">
+                                <CheckCircle2 className="h-4 w-4" />
+                                <span className="font-medium">獲得 +{earnedXP} XP</span>
+                            </div>
+                            <button
                                 onClick={onClose}
+                                className="w-full rounded-lg bg-[#4A3728] py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#5A5248]"
                             >
                                 領取獎勵
-                            </Button>
+                            </button>
                         </div>
                     )}
 
+                    {/* Failed 狀態 */}
                     {focusState === 'failed' && (
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-center gap-2 text-red-400">
-                                <AlertTriangle className="h-6 w-6" />
-                                <span className="font-bold">專注被打斷了！</span>
+                        <div className="space-y-6 pt-8">
+                            <div className="flex items-center justify-center gap-2 text-sm text-[#DC2626]">
+                                <AlertTriangle className="h-4 w-4" />
+                                <span className="font-medium">專注被打斷了</span>
                             </div>
-                            <p className="text-sm text-white/60">
-                                Chick 感到很失望... 下次請堅持到底。
+                            <p className="text-xs text-[#8C847C]">
+                                小雞感到很失望... 下次請堅持到底
                             </p>
-                            <Button
-                                variant="outline"
-                                size="lg"
-                                className="w-full border-white/20 bg-white/5 hover:bg-white/10 text-white h-14 rounded-xl"
+                            <button
                                 onClick={handleReset}
+                                className="w-full rounded-lg border border-[#C8C2BB] bg-transparent py-2.5 text-sm font-medium text-[#5A5248] transition-colors hover:border-[#8C847C]"
                             >
-                                <RotateCcw className="mr-2 h-5 w-5" /> 再試一次
-                            </Button>
+                                <span className="flex items-center justify-center gap-2">
+                                    <RotateCcw className="h-3.5 w-3.5" /> 再試一次
+                                </span>
+                            </button>
                         </div>
                     )}
-                </Card>
+                </div>
             </motion.div>
         </div>
     )

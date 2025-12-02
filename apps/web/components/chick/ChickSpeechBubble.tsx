@@ -44,13 +44,13 @@ export function ChickSpeechBubble({
       ? 'bg-red-50 ring-red-200 text-red-900'
       : priority === 'medium'
         ? 'bg-amber-50 ring-amber-200 text-amber-900'
-        : 'bg-card ring-border text-foreground'
+        : 'bg-[#fffdfa] ring-[#E7E1D8] text-[#42372b]'
   const tailStyle =
     priority === 'high'
       ? 'bg-red-50 ring-red-200'
       : priority === 'medium'
         ? 'bg-amber-50 ring-amber-200'
-        : 'bg-card ring-border'
+        : 'bg-[#fffdfa] ring-[#E7E1D8]'
 
   const priorityMotion =
     priority === 'high'
@@ -76,26 +76,26 @@ export function ChickSpeechBubble({
         >
           {/* Speech Bubble */}
           <div
-            className={`relative min-w-[160px] max-w-[85vw] sm:max-w-[420px] px-5 py-3.5 rounded-3xl shadow-lg ring-1 ${priorityStyle} ${onClick ? 'cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all' : ''
+            className={`relative min-w-[160px] max-w-[85vw] sm:max-w-[420px] px-6 py-4 rounded-3xl shadow-[0_3px_10px_rgba(0,0,0,0.05)] ring-[0.75px] ${priorityStyle} ${onClick ? 'cursor-pointer hover:shadow-[0_5px_14px_rgba(0,0,0,0.06)] transition-all' : ''
               }`}
           >
             {/* Dismiss */}
             {(persistent || onDismiss) && (
               <button
                 aria-label="關閉提示"
-                className="absolute right-3 top-3 text-xs text-muted-foreground hover:text-foreground"
+                className="absolute right-4 top-4 text-sm font-medium leading-none text-[#B8AFA4] hover:text-[#9c8f82] transition-colors"
                 onClick={(e) => {
                   e.stopPropagation()
                   onDismiss?.()
                   onHide()
                 }}
               >
-                X
+                ×
               </button>
             )}
 
             {/* Message Text */}
-            <p className="text-[15px] sm:text-base leading-relaxed whitespace-pre-wrap break-words pr-6">
+            <p className="text-[15px] sm:text-base leading-[1.7] font-normal whitespace-pre-wrap break-words pr-8">
               {message}
             </p>
 
@@ -137,7 +137,7 @@ export function ChickSpeechBubble({
 
             {/* Bubble Tail */}
             <div className="absolute -bottom-2 left-1/2 -translate-x-1/2">
-              <div className={`w-4 h-4 rotate-45 ring-1 ${tailStyle}`} />
+              <div className={`w-3 h-3 rotate-45 ring-[0.75px] ${tailStyle}`} />
             </div>
 
             {/* Tail Cover */}
