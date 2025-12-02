@@ -37,7 +37,7 @@ pub fn calculate_new_elo(
     
     // Round to integer
     let new_elo_int = new_elo.round() as i32;
-    let elo_diff_int = elo_diff.round() as i32;
+    let _elo_diff_int = elo_diff.round() as i32;
     
     // Ensure Elo doesn't go below 0
     let final_elo = new_elo_int.max(0) as f64;

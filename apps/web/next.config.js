@@ -41,16 +41,44 @@ const nextConfig = {
       bodySizeLimit: '2mb',
     },
   },
-  // 將 Node.js 專用包標記為外部包，避免被打包到客戶端
-  serverComponentsExternalPackages: ['redis'],
   webpack: (config, { isServer }) => {
     if (!isServer) {
-      // 客戶端構建時，將 redis 標記為外部包
+      // Client-side: exclude server-only packages
       config.resolve.fallback = {
         ...config.resolve.fallback,
+        canvas: false,
         redis: false,
       }
+    } else {
+      // Server-side: externalize canvas to avoid bundling native module
+      // This allows pdfjs-dist to optionally require canvas at runtime without breaking build
+      if (!config.externals) {
+        config.externals = []
+      }
+
+      // Add canvas as an external module for server builds
+      if (Array.isArray(config.externals)) {
+        config.externals.push('canvas')
+      } else if (typeof config.externals === 'function') {
+        const originalExternals = config.externals
+        config.externals = async (context, request, callback) => {
+          if (request === 'canvas') {
+            return callback(null, `commonjs canvas`)
+          }
+          return originalExternals(context, request, callback)
+        }
+      }
+
+      // ✅ 修復：確保 pdf-parse 內部的 pdfjs-dist 不會被 Webpack 錯誤解析
+      // pdf-parse@1.1.1 內部包含舊版 pdfjs-dist，需要確保它使用自己的版本
+      // 設置 resolve.alias 確保 pdf-parse 內部的 pdfjs-dist 不會被解析到外部存根
+      if (!config.resolve.alias) {
+        config.resolve.alias = {}
+      }
+      // 不設置 pdfjs-dist 的 alias，讓 pdf-parse 使用自己內部的版本
+      // 這確保 pdf-parse/lib/pdf.js/v1.9.426/build/pdf.js 不會被解析到外部存根
     }
+
     return config
   },
   images: {
@@ -169,4 +197,3 @@ const pwaConfig = withPWA({
 })
 
 export default pwaConfig(nextConfig)
-

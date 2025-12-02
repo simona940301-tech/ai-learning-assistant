@@ -9,6 +9,7 @@ interface TextHighlightOverlayProps {
   viewport: { width: number; height: number }
   scale: number
   onDelete?: (annotationId: string) => void
+  onClick?: (annotationId: string, rect: { x: number; y: number; width: number; height: number }) => void
 }
 
 /**
@@ -25,6 +26,7 @@ export function TextHighlightOverlay({
   viewport,
   scale,
   onDelete,
+  onClick,
 }: TextHighlightOverlayProps) {
   const [hoveredHighlightId, setHoveredHighlightId] = useState<string | null>(null)
 
@@ -75,6 +77,44 @@ export function TextHighlightOverlay({
             className="pointer-events-auto"
             onMouseEnter={() => setHoveredHighlightId(ann.id)}
             onMouseLeave={() => setHoveredHighlightId(null)}
+            onClick={(e) => {
+              if (onClick && rects.length > 0) {
+                e.stopPropagation()
+                // Calculate bounding box of all rects for the anchor
+                // For simplicity, use the first rect or calculate union
+                // Here we pass the event target's bounding rect if possible, or calculate from data
+                // Let's calculate the union of all rects for this annotation
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+
+                rects.forEach((r: any) => {
+                  const x = r.x ?? 0
+                  const y = r.y ?? 0
+                  const w = r.width ?? r.w ?? 0
+                  const h = r.height ?? r.h ?? 0
+
+                  const pxX = (x / viewport.width) * viewport.width * scale
+                  const pxY = (y / viewport.height) * viewport.height * scale
+                  const pxW = (w / viewport.width) * viewport.width * scale
+                  const pxH = (h / viewport.height) * viewport.height * scale
+
+                  minX = Math.min(minX, pxX)
+                  minY = Math.min(minY, pxY)
+                  maxX = Math.max(maxX, pxX + pxW)
+                  maxY = Math.max(maxY, pxY + pxH)
+                })
+
+                // Add scroll offset
+                const scrollX = typeof window !== 'undefined' ? window.scrollX : 0
+                const scrollY = typeof window !== 'undefined' ? window.scrollY : 0
+
+                onClick(ann.id, {
+                  x: minX + scrollX,
+                  y: minY + scrollY,
+                  width: maxX - minX,
+                  height: maxY - minY
+                })
+              }
+            }}
           >
             {rects.map((rect: any, idx: number) => {
               // 支援兩種格式：{x, y, w, h} 或 {x, y, width, height}

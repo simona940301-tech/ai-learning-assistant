@@ -87,6 +87,7 @@ export default function OnboardingChallengePage() {
   const [loading, setLoading] = useState(true)
   const [showReview, setShowReview] = useState(false)
   const [isAnonymous, setIsAnonymous] = useState(false)
+  const [isNavigating, setIsNavigating] = useState(false)
   const resultsRef = useRef<Result[]>([])
   const aiAnswerPromiseRef = useRef<Promise<void> | null>(null)
   const aiTimeoutsRef = useRef<number[]>([])
@@ -464,8 +465,15 @@ export default function OnboardingChallengePage() {
   }
 
   const handleContinueToReward = async () => {
+    // 防止重複點擊
+    if (isNavigating) {
+      console.log('[Challenge] Already navigating, ignoring duplicate call')
+      return
+    }
+
     try {
       console.log('[Challenge] handleContinueToReward called')
+      setIsNavigating(true)
       const correctCount = resultsRef.current.filter((r) => r.isCorrect).length
 
       // 儲存完整資料到 localStorage（匿名模式）
@@ -496,15 +504,16 @@ export default function OnboardingChallengePage() {
       if (!user || !sessionId) {
         // 匿名模式，直接導向 reward
         console.log('[Challenge] Anonymous mode, redirecting to reward')
-        router.push('/onboarding/reward')
+        await router.push('/onboarding/reward')
+        console.log('[Challenge] Navigation completed for anonymous user')
         return
       }
 
-      // 已登入模式，更新資料庫
+      // 已登入模式，更新資料庫（帶超時保護）
       console.log('[Challenge] Updating database for user session:', sessionId)
-      const { error: updateError } = await supabaseBrowserClient
-        .from('onboarding_sessions')
-        .update({
+      
+      try {
+        const updateData = {
           current_step: 3,
           challenge_completed_at: new Date().toISOString(),
           challenge_score: correctCount,
@@ -515,22 +524,51 @@ export default function OnboardingChallengePage() {
             time_ms: r.timeMs,
             answer_selected: r.answerSelected,
           })),
-        })
-        .eq('id', sessionId)
+        }
+        
+        console.log('[Challenge] Update data prepared:', updateData)
+        
+        // 添加 5 秒超時保護
+        const updatePromise = supabaseBrowserClient
+          .from('onboarding_sessions')
+          .update(updateData)
+          .eq('id', sessionId)
+        
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Database update timeout')), 5000)
+        )
+        
+        const result = await Promise.race([updatePromise, timeoutPromise])
+        const updateError = result?.error
 
-      if (updateError) {
-        console.error('[Challenge] Failed to update session:', updateError)
-        // 即使更新失敗，也繼續導航
-      } else {
-        console.log('[Challenge] Database updated successfully')
+        if (updateError) {
+          console.error('[Challenge] Failed to update session:', updateError)
+          // 即使更新失敗，也繼續導航
+        } else {
+          console.log('[Challenge] Database updated successfully')
+        }
+      } catch (dbError) {
+        console.error('[Challenge] Database operation threw error:', dbError)
+        // 繼續導航，不讓資料庫問題阻擋用戶體驗
       }
 
       console.log('[Challenge] Redirecting to /onboarding/reward')
-      router.push('/onboarding/reward')
+      await router.push('/onboarding/reward')
+      console.log('[Challenge] Navigation completed for logged in user')
     } catch (error) {
       console.error('[Challenge] Unexpected error in handleContinueToReward:', error)
       // 確保即使發生錯誤也能導航
-      router.push('/onboarding/reward')
+      try {
+        await router.push('/onboarding/reward')
+        console.log('[Challenge] Emergency navigation completed')
+      } catch (navError) {
+        console.error('[Challenge] Failed to navigate even in emergency:', navError)
+        // 最後手段：使用 window.location
+        window.location.href = '/onboarding/reward'
+      }
+    } finally {
+      // 在出現錯誤的情況下，重置導航狀態
+      setTimeout(() => setIsNavigating(false), 3000)
     }
   }
 
@@ -584,11 +622,11 @@ export default function OnboardingChallengePage() {
                       </div>
                       <div className="flex-1">
                         <h3 className="text-[16px] font-medium text-[#5D4037] mb-3 leading-relaxed">
-                          {question.questionText}
+                          {question?.questionText || '題目載入中...'}
                         </h3>
                         <div className="space-y-2 mb-4">
                           {optionLabels.map((label, optIndex) => {
-                            const isCorrect = label === question.correctAnswer
+                            const isCorrect = label === question?.correctAnswer
                             const isUserAnswer = label === result.answerSelected
                             return (
                               <div
@@ -606,7 +644,7 @@ export default function OnboardingChallengePage() {
                                     <span className={`font-semibold mr-2 ${isCorrect ? 'text-[#528555]' : 'text-[#FED168]'}`}>
                                       {label}.
                                     </span>
-                                    {question.options[optIndex]}
+                                    {question?.options?.[optIndex] || '選項載入中...'}
                                   </span>
                                   {isCorrect && <Check className="h-4 w-4 text-[#528555]" />}
                                   {isUserAnswer && !isCorrect && <X className="h-4 w-4 text-[#DC2626]" />}
@@ -618,9 +656,9 @@ export default function OnboardingChallengePage() {
                         <div className="text-[13px] text-[#8B6F47] mb-3 flex items-center gap-2">
                           <span>你選了 <span className="text-[#DC2626]">{result.answerSelected}</span></span>
                           <span>→</span>
-                          <span>正確答案 <span className="text-[#528555]">{question.correctAnswer}</span></span>
+                          <span>正確答案 <span className="text-[#528555]">{question?.correctAnswer}</span></span>
                         </div>
-                        {question.explanation && (
+                        {question?.explanation && (
                           <div className="bg-[#F8F5E8] rounded-xl p-4 border border-[#E0D0B8]">
                             <p className="text-[13px] font-medium text-[#5D4037] mb-1">📖 詳細解析</p>
                             <p className="text-[13px] text-[#8B6F47] leading-relaxed">
@@ -638,10 +676,17 @@ export default function OnboardingChallengePage() {
 
           <Button
             onClick={handleContinueToReward}
-            className="w-full h-14 bg-[#FED168] hover:bg-[#E6C058] text-[#5D4037] rounded-2xl text-[16px] font-bold shadow-lg"
+            disabled={isNavigating}
+            className="w-full h-14 bg-[#FED168] hover:bg-[#E6C058] disabled:bg-[#E0D0B8] disabled:cursor-not-allowed text-[#5D4037] disabled:text-[#8B6F47] rounded-2xl text-[16px] font-bold shadow-lg transition-colors"
           >
-            {wrongQuestions.length === 0 ? '查看獎勵 →' : '我理解了,繼續 →'}
+            {isNavigating 
+              ? '正在跳轉...' 
+              : wrongQuestions.length === 0 
+                ? '查看獎勵 →' 
+                : '我理解了,繼續 →'
+            }
           </Button>
+
         </div>
       </div>
     )

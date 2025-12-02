@@ -86,7 +86,7 @@ const previewPages: PreviewCard[] = [
   {
     title: 'Store & Rewards',
     description: '點數商店、獎勵卡片與換裝動線，檢查激勵系統連動。',
-    href: '/store',
+    href: '/store-shop',
     highlights: ['兌換流程', '點數狀態', '激勵提示'],
     gradient: 'from-orange-500/80 via-amber-500/80 to-yellow-400/80',
     emoji: '🏆',

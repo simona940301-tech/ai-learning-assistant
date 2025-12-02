@@ -48,6 +48,11 @@ const config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        companion: {
+          DEFAULT: "hsl(var(--companion))",
+          foreground: "hsl(var(--companion-foreground))",
+          glow: "hsl(var(--companion-glow))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

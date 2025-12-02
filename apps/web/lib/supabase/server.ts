@@ -3,21 +3,9 @@ import { createClient as createSupabaseClient, type SupabaseClient } from '@supa
 import { cookies } from 'next/headers'
 import type { User } from '@supabase/supabase-js'
 
-// Development/Preview mode: Mock user configuration
-// - In local development: NODE_ENV === 'development'
-// - In Vercel preview: PREVIEW_FORCE_MOCK === 'true'
-// 🎯 修復：只在明確啟用且不在測試模式時才使用 Mock User
-const USE_MOCK_USER = (
-  process.env.NODE_ENV === 'development' &&
-  process.env.NEXT_PUBLIC_DISABLE_MOCK_USER !== 'true' &&
-  process.env.NEXT_PUBLIC_ENABLE_REAL_AUTH_TEST !== 'true'
-) || (
-  process.env.PREVIEW_FORCE_MOCK === 'true' &&
-  process.env.NEXT_PUBLIC_DISABLE_MOCK_USER !== 'true'
-) || (
-  process.env.APP_USE_MOCK_USER === 'true' &&
-  process.env.NEXT_PUBLIC_DISABLE_MOCK_USER !== 'true'
-)
+// 🎯 企業級修復：徹底停用 Mock User - 零技術債務
+// 完全停用所有 Mock User 邏輯，強制使用真實認證
+const USE_MOCK_USER = false
 
 const MOCK_USER_ID =
   process.env.BACKPACK_DEV_USER_ID || 'e770f9cd-52a7-43de-b983-70f6f78d2f53'

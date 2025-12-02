@@ -1,6 +1,7 @@
 use crate::battle_models::Question;
 use serde::{Deserialize, Serialize};
 use std::env;
+use reqwest::header;
 use tracing::{error, info, warn};
 
 // ============================================
@@ -12,6 +13,10 @@ use tracing::{error, info, warn};
 struct PVEQuestionsResponse {
     success: bool,
     questions: Vec<QuestionData>,
+    #[serde(default)]
+    dda_pool: Option<std::collections::HashMap<String, Vec<QuestionData>>>,
+    #[serde(default)]
+    baselineDifficulty: Option<i32>,
 }
 
 /// 題目數據格式
@@ -26,6 +31,32 @@ struct QuestionData {
     skill_tags: Vec<String>,
 }
 
+pub struct PveQuestionBundle {
+    pub questions: Vec<Question>,
+    pub dda_pool: std::collections::HashMap<i32, Vec<Question>>,
+    pub baseline_difficulty: i32,
+}
+
+fn apply_vercel_bypass(mut request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+    if let Ok(token) = env::var("VERCEL_PROTECTION_BYPASS") {
+        request = request
+            .header("x-vercel-protection-bypass", token.clone())
+            .header(header::COOKIE, format!("x-vercel-protection-bypass={}", token));
+    }
+    request
+}
+
+fn with_vercel_bypass_url(url: String) -> String {
+    if let Ok(token) = env::var("VERCEL_PROTECTION_BYPASS") {
+        format!(
+            "{}?x-vercel-protection-bypass={}&x-vercel-set-bypass-cookie=true",
+            url, token
+        )
+    } else {
+        url
+    }
+}
+
 /// 從 Next.js API 獲取 PVE 題目
 ///
 /// 調用 /api/play/pve/questions 端點
@@ -34,13 +65,14 @@ pub async fn fetch_pve_questions(
     subject: Option<&str>,
     focus_on_weakness: bool,
     num_questions: i32,
-) -> Result<Vec<Question>, String> {
+) -> Result<PveQuestionBundle, String> {
     let api_url = env::var("NEXTJS_API_URL")
         .unwrap_or_else(|_| "http://localhost:3000".to_string());
-    let endpoint = format!("{}/api/play/pve/questions", api_url);
+    let endpoint = with_vercel_bypass_url(format!("{}/api/play/pve/questions", api_url));
 
     // 構建請求體
     let request_body = serde_json::json!({
+        "userId": user_id,
         "userId": user_id,
         "subject": subject,
         "focusOnWeakness": focus_on_weakness,
@@ -76,6 +108,7 @@ pub async fn fetch_pve_questions(
     if let Some(key) = &api_key {
         request = request.header("x-internal-api-key", key);
     }
+    request = apply_vercel_bypass(request);
 
     match request.send().await {
         Ok(response) => {
@@ -92,21 +125,72 @@ pub async fn fetch_pve_questions(
             match response.json::<PVEQuestionsResponse>().await {
                 Ok(data) => {
                     if data.success && !data.questions.is_empty() {
-                        info!("Successfully fetched {} PVE questions", data.questions.len());
-                        // 轉換為 Question 格式
+                        let original_count = data.questions.len();
+                        info!("Successfully fetched {} PVE questions", original_count);
+                        // 轉換為 Question 格式並驗證（但不要過於嚴格）
                         let questions: Vec<Question> = data
                             .questions
                             .into_iter()
-                            .map(|q| Question {
-                                id: q.id,
-                                question_text: q.question_text,
-                                options: q.options,
-                                correct_answer: q.correct_answer,
-                                difficulty: q.difficulty,
-                                time_limit: q.time_limit,
+                            .filter_map(|q| {
+                                // 驗證選項（至少需要 2 個選項）
+                                if q.options.len() < 2 {
+                                    warn!("Question {} has invalid options (count: {}): {:?}", q.id, q.options.len(), q.options);
+                                    return None;
+                                }
+                                // 驗證題目文本（允許空白字符，但不允許完全為空）
+                                let trimmed_text = q.question_text.trim();
+                                if trimmed_text.is_empty() {
+                                    warn!("Question {} has empty question_text", q.id);
+                                    return None;
+                                }
+                                Some(Question {
+                                    id: q.id,
+                                    question_text: q.question_text,
+                                    options: q.options,
+                                    correct_answer: q.correct_answer,
+                                    difficulty: q.difficulty,
+                                    time_limit: q.time_limit,
+                                })
                             })
                             .collect();
-                        Ok(questions)
+                        
+                        if questions.is_empty() {
+                            warn!("All questions were filtered out! Original count: {}", original_count);
+                        } else {
+                            info!("Successfully converted {} questions (filtered {} invalid)", questions.len(), original_count - questions.len());
+                        }
+                        let mut pool = std::collections::HashMap::new();
+                        if let Some(dda) = data.dda_pool {
+                            for (diff, entries) in dda.into_iter() {
+                                let diff_key = diff.parse::<i32>().unwrap_or(3);
+                                let converted: Vec<Question> = entries
+                                    .into_iter()
+                                    .filter_map(|q| {
+                                        // 驗證選項
+                                        if q.options.len() < 2 {
+                                            return None;
+                                        }
+                                        if q.question_text.trim().is_empty() {
+                                            return None;
+                                        }
+                                        Some(Question {
+                                            id: q.id,
+                                            question_text: q.question_text,
+                                            options: q.options,
+                                            correct_answer: q.correct_answer,
+                                            difficulty: q.difficulty,
+                                            time_limit: q.time_limit,
+                                        })
+                                    })
+                                    .collect();
+                                pool.insert(diff_key, converted);
+                            }
+                        }
+                        Ok(PveQuestionBundle {
+                            questions,
+                            dda_pool: pool,
+                            baseline_difficulty: data.baselineDifficulty.unwrap_or(3),
+                        })
                     } else {
                         warn!("PVE questions API returned empty questions");
                         Err("No questions available".to_string())
@@ -135,7 +219,7 @@ pub async fn fetch_seed_questions(
 ) -> Result<Vec<Question>, String> {
     let api_url = env::var("NEXTJS_API_URL")
         .unwrap_or_else(|_| "http://localhost:3000".to_string());
-    let endpoint = format!("{}/api/play/questions/seed", api_url);
+    let endpoint = with_vercel_bypass_url(format!("{}/api/play/questions/seed", api_url));
 
     // 構建請求體
     let request_body = serde_json::json!({
@@ -169,11 +253,12 @@ pub async fn fetch_seed_questions(
         .ok();
 
     let mut request = client.post(&endpoint).json(&request_body);
-
+    
     // 如果配置了 API key，添加到請求頭
     if let Some(key) = &api_key {
         request = request.header("x-internal-api-key", key);
     }
+    request = apply_vercel_bypass(request);
 
     match request.send().await {
         Ok(response) => {
@@ -191,17 +276,28 @@ pub async fn fetch_seed_questions(
                 Ok(data) => {
                     if data.success && !data.questions.is_empty() {
                         info!("Successfully fetched {} seed questions", data.questions.len());
-                        // 轉換為 Question 格式
+                        // 轉換為 Question 格式並驗證
                         let questions: Vec<Question> = data
                             .questions
                             .into_iter()
-                            .map(|q| Question {
-                                id: q.id,
-                                question_text: q.question_text,
-                                options: q.options,
-                                correct_answer: q.correct_answer,
-                                difficulty: q.difficulty,
-                                time_limit: q.time_limit,
+                            .filter_map(|q| {
+                                // 驗證選項
+                                if q.options.len() < 2 {
+                                    warn!("Seed question {} has invalid options: {:?}", q.id, q.options);
+                                    return None;
+                                }
+                                if q.question_text.trim().is_empty() {
+                                    warn!("Seed question {} has empty question_text", q.id);
+                                    return None;
+                                }
+                                Some(Question {
+                                    id: q.id,
+                                    question_text: q.question_text,
+                                    options: q.options,
+                                    correct_answer: q.correct_answer,
+                                    difficulty: q.difficulty,
+                                    time_limit: q.time_limit,
+                                })
                             })
                             .collect();
                         Ok(questions)
@@ -234,7 +330,7 @@ pub async fn create_pve_match_in_db(
 ) -> Result<(), String> {
     let api_url = env::var("NEXTJS_API_URL")
         .unwrap_or_else(|_| "http://localhost:3000".to_string());
-    let endpoint = format!("{}/api/play/pve/create-match", api_url);
+    let endpoint = with_vercel_bypass_url(format!("{}/api/play/pve/create-match", api_url));
 
     // 構建請求體
     let request_body = serde_json::json!({
@@ -273,6 +369,7 @@ pub async fn create_pve_match_in_db(
     if let Some(key) = &api_key {
         request = request.header("x-internal-api-key", key);
     }
+    request = apply_vercel_bypass(request);
 
     match request.send().await {
         Ok(response) => {

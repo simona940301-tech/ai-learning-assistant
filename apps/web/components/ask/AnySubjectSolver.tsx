@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea'
 import UserMessage from '@/components/ask/messages/UserMessage'
 import AIMessage from '@/components/ask/messages/AIMessage'
 import { useAsk } from '@/lib/ask-context'
-import { FileText, Loader2, Upload, X, Image as ImageIcon } from 'lucide-react'
+import { FileText, File, Loader2, Upload, X, Image as ImageIcon } from 'lucide-react'
 
 type FollowUpEntry = {
   id: string
@@ -67,7 +67,7 @@ export default function AnySubjectSolver() {
   const router = useRouter()
   const lastPrefillSignature = useRef<string | null>(null)
   const conversationRef = useRef<QuestionTurn[]>([])
-  const { currentAnalysis } = useAsk()
+  const { currentAnalysis, attachedFiles, removeFile } = useAsk()
 
   useEffect(() => {
     conversationRef.current = conversation
@@ -82,9 +82,39 @@ export default function AnySubjectSolver() {
       const trimmed = text.trim()
       if (!trimmed) return
 
+      // 🎯 合併檔案內容到 text（方案一：前端合併）
+      let enhancedText = trimmed
+
+      if (attachedFiles && attachedFiles.length > 0) {
+        const fileContexts: string[] = []
+        
+        attachedFiles.forEach((file) => {
+          if (file.content) {
+            // 有內容的檔案：直接添加內容
+            fileContexts.push(`\n\n[檔案：${file.name}]\n${file.content}`)
+          } else if (file.url) {
+            // 只有 URL 的檔案（PDF/圖片）：添加檔案引用說明
+            // AI 可以根據檔案 URL 和類型進行分析
+            const fileTypeLabel = file.type === 'pdf' ? 'PDF' : file.type === 'image' ? '圖片' : '檔案'
+            fileContexts.push(`\n\n[參考${fileTypeLabel}檔案：${file.name}]\n檔案類型：${fileTypeLabel}\n檔案 URL：${file.url}\n請根據此${fileTypeLabel}檔案內容協助回答問題。`)
+          }
+        })
+
+        if (fileContexts.length > 0) {
+          enhancedText = `${trimmed}${fileContexts.join('\n')}`
+          console.log('[AnySubjectSolver] ✅ Enhanced text with files:', {
+            originalLength: trimmed.length,
+            enhancedLength: enhancedText.length,
+            fileCount: attachedFiles.length,
+            filesWithContent: attachedFiles.filter(f => f.content).length,
+            filesWithUrl: attachedFiles.filter(f => f.url && !f.content).length
+          })
+        }
+      }
+
       const turn: QuestionTurn = {
         id: nanoid(),
-        questionText: trimmed,
+        questionText: enhancedText, // 使用合併後的文字
         questionId: options?.questionId ?? null,
         createdAt: Date.now(),
         followups: [],
@@ -94,9 +124,9 @@ export default function AnySubjectSolver() {
       setCardLoading((prev) => ({ ...prev, [turn.id]: true }))
       setActiveFollowUp(null)
 
-      console.log('[AnySubjectSolver] request.start', { turnId: turn.id, question: formatSnippet(trimmed, 64) })
+      console.log('[AnySubjectSolver] request.start', { turnId: turn.id, question: formatSnippet(trimmed, 64), hasFiles: attachedFiles?.length > 0 })
     },
-    []
+    [attachedFiles]
   )
 
   const handleSnapshot = useCallback((turnId: string, snapshot: ExplainCardSnapshot) => {
@@ -263,6 +293,43 @@ export default function AnySubjectSolver() {
           >
             <FileText className="h-3 w-3 text-[hsl(var(--companion))]" />
             <span>已載入文件重點：{currentAnalysis.detectedSubject || '未知科目'}</span>
+          </motion.div>
+        )}
+
+        {/* 🎯 顯示匯入的檔案（從背包匯入） */}
+        {attachedFiles.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mx-auto mb-4 max-w-2xl"
+          >
+            <div className="rounded-xl border border-border/40 bg-card/50 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                  <FileText className="h-3.5 w-3.5" />
+                  <span>已匯入檔案 ({attachedFiles.length})</span>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {attachedFiles.map((file) => (
+                  <div
+                    key={file.id}
+                    className="group flex items-center gap-2 rounded-lg border border-border/60 bg-background/50 px-2.5 py-1.5 text-xs"
+                  >
+                    {file.type === 'pdf' && <File className="h-3.5 w-3.5 text-red-500" />}
+                    {file.type === 'image' && <ImageIcon className="h-3.5 w-3.5 text-purple-500" />}
+                    {file.type === 'text' && <FileText className="h-3.5 w-3.5 text-blue-500" />}
+                    <span className="max-w-[120px] truncate text-foreground/80">{file.name}</span>
+                    <button
+                      onClick={() => removeFile(file.id)}
+                      className="opacity-0 transition-opacity group-hover:opacity-100"
+                    >
+                      <X className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
           </motion.div>
         )}
 

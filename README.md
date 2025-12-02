@@ -89,7 +89,14 @@ plms/
 │       ├── analytics/         # ✅ Analytics 介面 (20+ events)
 │       └── utils/             # ✅ 工具函式
 │
+├── supabase/
+│   └── schema.sql             # ✅ 資料庫 Schema 藍圖 (62 表)
+│
 └── 📄 Documentation
+    ├── docs/db/
+    │   └── schema_overview.md # ✅ 資料庫總覽與 Domain 說明
+    ├── apps/web/supabase/
+    │   └── erd.md             # ✅ Entity Relationship Diagram
     ├── README_SDK.md          # ✅ SDK 使用文檔（完整）
     ├── CONTRIBUTING.md        # ✅ 開發流程規範
     ├── MIGRATION_MAP.md       # ✅ Web/Mobile 組件對照
@@ -106,8 +113,9 @@ plms/
 
 ### 後端
 - **Runtime**: Next.js API Routes (Serverless)
-- **Database**: Supabase (PostgreSQL + RLS)
-- **AI**: OpenAI GPT-5 Flow
+- **Database**: Supabase (PostgreSQL + RLS + pgvector)
+- **Schema**: 62 張表，10 個 Domain（見 [Schema Overview](docs/db/schema_overview.md)）
+- **AI**: OpenAI GPT-4o, Gemini-1.5-flash
 
 ### 共用
 - **SDK**: TypeScript + Zod + tsup

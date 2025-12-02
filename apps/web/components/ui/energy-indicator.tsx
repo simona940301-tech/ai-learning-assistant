@@ -1,17 +1,19 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { usePlay } from '@/lib/play-context'
+import { useEnergyStatus } from '@/lib/hooks/useEnergyStatus'
+import { EnergyBadge } from '@/components/status/EnergyBar'
 import Image from 'next/image'
 
 /**
- * EnergyIndicator - 統一的能量顯示組件
+ * EnergyIndicator - 統一的能量顯示組件（已重構，使用新的 useEnergyStatus hook）
  * 
  * 功能：
  * - 顯示當前羽毛數量 (x/8)
  * - 顯示恢復倒數時間 (30分鐘/1點)
  * - 點擊跳轉到任務列表
+ * 
+ * @deprecated 建議直接使用 EnergyBar 或 EnergyBadge 組件
  */
 
 interface EnergyIndicatorProps {
@@ -29,90 +31,7 @@ export function EnergyIndicator({
     className = ''
 }: EnergyIndicatorProps) {
     const router = useRouter()
-    const { userStatus, refreshStatus } = usePlay()
-    const [timeUntilNextFeather, setTimeUntilNextFeather] = useState<number | null>(null)
-    const [isFull, setIsFull] = useState(false)
-
-    // 計算羽毛恢復時間
-    useEffect(() => {
-        if (!userStatus) return
-
-        const calculateTimeUntilNext = () => {
-            const currentFeathers = userStatus.dailyEnergyCount ?? 0
-            const maxFeathers = 8
-
-            if (currentFeathers >= maxFeathers) {
-                setIsFull(true)
-                setTimeUntilNextFeather(null)
-                return
-            }
-
-            setIsFull(false)
-
-            // 計算距離下次恢復的時間
-            // 每 30 分鐘恢復一點
-            const intervalMs = 30 * 60 * 1000 // 30分鐘
-            const now = new Date().getTime()
-
-            if (userStatus.energyLastUpdatedAt) {
-                const lastUpdated = new Date(userStatus.energyLastUpdatedAt).getTime()
-                const timeSinceUpdate = now - lastUpdated
-                const intervalsPassed = Math.floor(timeSinceUpdate / intervalMs)
-                const nextRecoveryTime = lastUpdated + (intervalsPassed + 1) * intervalMs
-                const timeUntilNext = nextRecoveryTime - now
-
-                if (timeUntilNext <= 0) {
-                    // 應該已經恢復了，刷新狀態
-                    refreshStatus()
-                    setTimeUntilNextFeather(intervalMs)
-                } else {
-                    setTimeUntilNextFeather(timeUntilNext)
-                }
-            } else {
-                // 沒有更新時間，使用固定 30 分鐘倒數
-                setTimeUntilNextFeather(intervalMs)
-            }
-        }
-
-        const updateTimer = () => {
-            const currentFeathers = userStatus.dailyEnergyCount ?? 0
-            const maxFeathers = 8
-
-            if (currentFeathers >= maxFeathers) {
-                setIsFull(true)
-                setTimeUntilNextFeather(null)
-                return
-            }
-
-            setIsFull(false)
-
-            // 更新倒數時間
-            setTimeUntilNextFeather(prev => {
-                if (prev === null || prev <= 0) {
-                    // 倒數結束，應該已經恢復了，刷新狀態
-                    refreshStatus()
-                    return 30 * 60 * 1000 // 重新開始 30 分鐘倒數
-                }
-                return Math.max(0, prev - 1000) // 每秒減 1 秒
-            })
-        }
-
-        calculateTimeUntilNext()
-        const interval = setInterval(updateTimer, 1000) // 每秒更新
-
-        return () => clearInterval(interval)
-    }, [userStatus?.dailyEnergyCount, userStatus?.energyLastUpdatedAt, refreshStatus])
-
-    // 格式化倒數時間
-    const formatCountdown = (ms: number | null): string => {
-        if (ms === null || ms <= 0) return 'Full'
-
-        const totalSeconds = Math.floor(ms / 1000)
-        const minutes = Math.floor(totalSeconds / 60)
-        const seconds = totalSeconds % 60
-
-        return `${minutes}:${seconds.toString().padStart(2, '0')}`
-    }
+    const { energy, maxEnergy, isFull, formattedTime, isLoading } = useEnergyStatus()
 
     const handleClick = () => {
         if (clickable) {
@@ -120,16 +39,13 @@ export function EnergyIndicator({
         }
     }
 
-    if (!userStatus) {
+    if (isLoading) {
         return (
             <div className={`flex items-center gap-2 ${className}`}>
                 <div className="h-6 w-20 animate-pulse rounded bg-muted" />
             </div>
         )
     }
-
-    const featherCount = userStatus.dailyEnergyCount ?? 0
-    const countdownText = isFull ? 'Full' : formatCountdown(timeUntilNextFeather)
 
     if (compact) {
         // 緊湊模式：只顯示圖標和數字
@@ -148,8 +64,8 @@ export function EnergyIndicator({
                     className="object-contain"
                     style={{ imageRendering: 'pixelated' }}
                 />
-                <span className="text-sm font-bold text-foreground" style={{ fontFamily: 'monospace' }}>
-                    {featherCount}/8
+                <span className="text-sm font-bold text-foreground tabular-nums">
+                    {energy}/{maxEnergy}
                 </span>
             </button>
         )
@@ -176,23 +92,17 @@ export function EnergyIndicator({
             </div>
             <div className="flex flex-col items-start">
                 <div className="flex items-center gap-1">
-                    <span className="text-[16px] font-bold text-foreground" style={{
-                        fontFamily: 'monospace',
-                        imageRendering: 'pixelated',
-                        textShadow: '1px 1px 0px rgba(0,0,0,0.1)'
-                    }}>
-                        {featherCount}
+                    <span className="text-[16px] font-bold text-foreground tabular-nums">
+                        {energy}
                     </span>
-                    <span className="text-[11px] text-muted-foreground" style={{ fontFamily: 'monospace' }}>
-                        /8
+                    <span className="text-[11px] text-muted-foreground tabular-nums">
+                        /{maxEnergy}
                     </span>
                 </div>
                 <div className="text-[10px] font-medium" style={{
-                    fontFamily: 'monospace',
-                    imageRendering: 'pixelated',
                     color: isFull ? '#528555' : '#D97706'
                 }}>
-                    {isFull ? 'Full' : `${countdownText} 後 +1`}
+                    {isFull ? 'Full' : `${formattedTime} 後 +1`}
                 </div>
             </div>
         </button>
@@ -219,7 +129,7 @@ export function EnergyCost({ cost, className = '' }: EnergyCostProps) {
                 className="object-contain"
                 style={{ imageRendering: 'pixelated' }}
             />
-            <span className="font-medium">{cost}</span>
+            <span className="font-medium tabular-nums">{cost}</span>
         </span>
     )
 }

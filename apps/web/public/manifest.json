@@ -32,14 +32,14 @@
   "screenshots": [
     {
       "src": "/screenshots/mobile-home.png",
-      "sizes": "1170x2532",
+      "sizes": "1200x630",
       "type": "image/png",
       "form_factor": "narrow",
       "label": "Home Screen"
     },
     {
       "src": "/screenshots/desktop-home.png",
-      "sizes": "1920x1080",
+      "sizes": "1200x630",
       "type": "image/png",
       "form_factor": "wide",
       "label": "Desktop Dashboard"
@@ -89,6 +89,12 @@
     "preferred_width": 400
   }
 }
+
+
+
+
+
+
 
 
 

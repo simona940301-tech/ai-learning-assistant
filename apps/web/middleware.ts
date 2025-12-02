@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import { createClientWithAccessToken } from '@/lib/supabase/server'
 
 /**
  * API Security Middleware
@@ -83,6 +84,13 @@ const ADMIN_API_ROUTES = [
   '/api/admin/',
 ]
 
+function extractBearerToken(header: string | null): string | null {
+  if (!header) return null
+  const match = header.match(/^\s*Bearer\s+(.+)$/i)
+  const token = match?.[1]?.trim()
+  return token || null
+}
+
 // ============================================================================
 // Environment Configuration
 // ============================================================================
@@ -161,6 +169,46 @@ export async function middleware(request: NextRequest) {
  */
 async function handleUserAuth(request: NextRequest, pathname: string): Promise<NextResponse> {
   try {
+    const bearerToken = extractBearerToken(request.headers.get('authorization'))
+
+    // Prefer Authorization header (used by frontend fetch guard) before falling back to cookies
+    if (bearerToken) {
+      try {
+        const supabase = createClientWithAccessToken(bearerToken)
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser()
+
+        if (error) {
+          const message = error.message || ''
+          if (message.includes('Expected 3 parts in JWT')) {
+            return NextResponse.json(
+              {
+                success: false,
+                error: 'INVALID_JWT',
+                message: '登入狀態失效，請重新登入或清除 Cookies 後再試。',
+                code: 'middleware_invalid_jwt',
+              },
+              { status: 401 }
+            )
+          }
+          console.warn(`[Middleware] Bearer auth error for ${pathname}:`, error.message)
+        } else if (user) {
+          console.log(`[Middleware] Authenticated user ${user.id} via bearer token accessing ${pathname}`)
+
+          const isAdminRoute = ADMIN_API_ROUTES.some(route => pathname.startsWith(route))
+          if (isAdminRoute) {
+            return handleAdminAuth(supabase, user.id, pathname)
+          }
+
+          return NextResponse.next()
+        }
+      } catch (error) {
+        console.error(`[Middleware] Unexpected bearer auth error for ${pathname}:`, error)
+      }
+    }
+
     // Create Supabase client with request cookies
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,

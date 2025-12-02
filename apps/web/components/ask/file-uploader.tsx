@@ -101,12 +101,16 @@ export function FileUploader({ className }: { className?: string }) {
       {/* 拖放區域 - Hero Mode */}
       <div
         className={cn(
-          "relative group cursor-pointer rounded-[32px] border-2 border-dashed transition-all duration-300 ease-out",
-          "min-h-[240px] flex flex-col items-center justify-center text-center p-8",
+          "relative group cursor-pointer rounded-[32px] transition-all duration-300 ease-out",
+          "min-h-[140px] flex flex-col items-center justify-center text-center p-8",
+          "border-[1.5px] border-dashed",
           isDragOver
-            ? "border-primary bg-primary/5 scale-[1.02]"
-            : "border-border bg-card hover:border-primary/50 hover:bg-secondary/10"
+            ? "border-[rgba(140,107,74,0.4)] bg-primary/5 scale-[1.02]"
+            : "border-[rgba(140,107,74,0.28)] bg-[#FFFDF8] hover:border-[rgba(140,107,74,0.4)] hover:bg-[#FFFDF8]"
         )}
+        style={{
+          borderColor: isDragOver ? 'rgba(140, 107, 74, 0.4)' : 'rgba(140, 107, 74, 0.28)'
+        }}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -117,10 +121,13 @@ export function FileUploader({ className }: { className?: string }) {
             "mx-auto h-16 w-16 rounded-full flex items-center justify-center transition-colors",
             isDragOver ? "bg-primary/20" : "bg-secondary/20 group-hover:bg-primary/10"
           )}>
-            <Upload className={cn(
-              "h-8 w-8 transition-colors",
-              isDragOver ? "text-primary" : "text-muted-foreground group-hover:text-primary"
-            )} />
+            <Upload 
+              className={cn(
+                "h-8 w-8 transition-colors",
+                isDragOver ? "text-primary" : "text-[#8C6B4A] group-hover:text-primary"
+              )}
+              strokeWidth={1.5}
+            />
           </div>
 
           <div className="space-y-1">

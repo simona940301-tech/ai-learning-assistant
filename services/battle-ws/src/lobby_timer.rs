@@ -26,6 +26,21 @@ pub async fn start_lobby_confirm_timer(
     matches: Matches,
     connections: Connections,
 ) {
+    // 檢查是否為 PVE 模式，如果是則不啟動計時器
+    let is_pve = {
+        let matches_guard = matches.read().await;
+        matches_guard.get(&match_id).map(|m| {
+            m.player2_id == "AI" 
+                || m.match_type == "PVE_TRAINING" 
+                || m.match_type == "PVE_CHALLENGE"
+        }).unwrap_or(false)
+    };
+    
+    if is_pve {
+        info!("[LobbyTimer] PVE match {} detected, skipping lobby timer", match_id);
+        return;
+    }
+    
     let start_time = get_server_timestamp_ms();
     
     // 更新 match 的計時器開始時間
@@ -227,6 +242,7 @@ async fn send_lobby_confirmed(
             let match_found_message = ServerMessage::MatchFound {
                 match_id: match_id.to_string(),
                 question_list: question_list.clone(),
+                match_type: None, // PVP matches don't need to specify type
             };
             let question_count = question_list.len();
             info!("[LobbyTimer] 📤 Attempting to send MATCH_FOUND to player {} with {} questions (receivers: {})", 
@@ -267,14 +283,12 @@ async fn send_lobby_confirmed(
         let matches_clone = matches.clone();
         let connections_clone = connections.clone();
         let match_id_clone = match_id.to_string();
-        tokio::spawn(async move {
-            crate::ai_answer_handler::start_round(
-                match_id_clone,
-                0, // 第一題
-                matches_clone,
-                connections_clone,
-            ).await;
-        });
+        tokio::spawn(crate::ai_answer_handler::start_round(
+            match_id_clone,
+            0, // 第一題
+            matches_clone,
+            connections_clone,
+        ));
     }
 }
 
@@ -313,4 +327,3 @@ async fn dissolve_lobby(
     matches.write().await.remove(match_id);
     info!("Lobby {} dissolved: {}", match_id, reason);
 }
-

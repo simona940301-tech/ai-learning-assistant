@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
 
     // Call Gemini API for image analysis
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${GEMINI_API_KEY}`, // ⚡ Use 2.5 Pro for complex vision analysis
       {
         method: 'POST',
         headers: {

@@ -1,0 +1,39 @@
+import { z } from 'zod'
+
+const QuestionSchema = z.object({
+    id: z.string().optional(),
+    questionType: z.enum(['單選', '多選', '填充', '簡答', '作圖', '混合題']).describe('學測題型分類'),
+    question: z.string(),
+    options: z.array(z.string()).optional(),
+    answer: z.string(),
+    analysis: z.string().describe('詳解，包含觀念連結'),
+    difficulty: z.enum(['Easy', 'Medium', 'Hard']).describe('難度分級'),
+    curriculumCode: z.string().optional().describe('對應課綱單元代碼，如：數A-11-1、歷史(一)-Ch2'),
+    sourceDocId: z.string().optional().describe('題目來源文件的ID（當有多個文件時使用）'),
+})
+
+const QuestionSetSchema = z.object({
+    type: z.literal('question_set'),
+    context: z.string().describe('題組情境引文（新聞報導、實驗紀錄、古文翻譯等）'),
+    questions: z.array(QuestionSchema),
+})
+
+export const KeyConceptSchema = z.object({
+    concept: z.string().describe('核心知識點'),
+    explanation: z.string().describe('簡潔的解釋或定義'),
+    importance: z.enum(['高', '中', '低']).describe('該概念在學測中的考頻和重要性'),
+    curriculumCode: z.string().optional().describe('對應的課綱單元代碼，例如：數A-11-1 或 高中歷史(一)-Ch2'),
+})
+
+export const GSATAnalysisSchema = z.object({
+    analysisID: z.string().optional().describe('該分析的唯一ID'),
+    subject: z.string().describe('科目，如國文、英文、數學A、數學B、物理、化學、生物、地科、歷史、地理、公民'),
+    topics: z.array(z.string()).describe('涵蓋單元'),
+    summary: z.string().describe('符合108課綱的重點整理，使用 Markdown 格式，包含核心摘要、主題重點、專有名詞解釋'),
+    keyConcepts: z.array(KeyConceptSchema).describe('核心概念解析'),
+    examPrediction: z.array(
+        z.union([QuestionSchema, QuestionSetSchema])
+    ).describe('符合學測命題原則的考題預測（必須包含至少一個題組）'),
+})
+
+export type GSATAnalysis = z.infer<typeof GSATAnalysisSchema>

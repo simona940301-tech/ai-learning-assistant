@@ -1,10 +1,10 @@
 import type { NextRequest } from 'next/server'
 import type { SupabaseClient, User } from '@supabase/supabase-js'
 import { createClient, createClientWithAccessToken } from '@/lib/supabase/server'
+import { createClientForEdge } from '@/lib/supabase/server-edge'
 import { getCurrentUser, type AuthErrorType } from '@/lib/auth/getCurrentUser'
 
 const MOCK_MODE =
-  process.env.NODE_ENV === 'development' ||
   process.env.PREVIEW_FORCE_MOCK === 'true'
 
 let bearerWarningLogged = false
@@ -35,6 +35,17 @@ export function getSupabaseClient(req?: NextRequest): SupabaseClient {
           error
         )
       }
+    }
+  }
+
+  // Edge runtime: use request-based client if req is provided
+  // This handles edge runtime where cookies() may not work
+  if (req) {
+    try {
+      return createClientForEdge(req)
+    } catch (error) {
+      // Fallback to regular client if edge client fails
+      console.warn('[API Auth] Edge client failed, using regular client:', error)
     }
   }
 
@@ -88,14 +99,33 @@ export async function getApiUser(req?: NextRequest): Promise<{
     }
   }
 
-  // For cookie-based auth, use getCurrentUser which properly handles JWT errors
-  const { user, errorType } = await getCurrentUser()
-
-  // IMPORTANT: Create supabase client AFTER checking auth
-  // This ensures the client uses mock mode if enabled, or filtered cookies
+  // For cookie-based auth, create client first then get user directly
+  // This ensures proper cookie reading in API routes
   const supabase = getSupabaseClient(req)
-
-  return { supabase, user, errorType }
+  
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser()
+    
+    if (error) {
+      const message = error.message || String(error)
+      if (message.includes('Expected 3 parts in JWT')) {
+        return { supabase, user: null, errorType: 'invalid-jwt' }
+      }
+      return { supabase, user: null, errorType: 'other' }
+    }
+    
+    if (!user) {
+      return { supabase, user: null, errorType: 'unauthenticated' }
+    }
+    
+    return { supabase, user, errorType: 'none' }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    if (message.includes('Expected 3 parts in JWT')) {
+      return { supabase, user: null, errorType: 'invalid-jwt' }
+    }
+    return { supabase, user: null, errorType: 'other' }
+  }
 }
 
 /**

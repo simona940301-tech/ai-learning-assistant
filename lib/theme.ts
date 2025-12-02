@@ -1,17 +1,15 @@
-/**
- * PLMS Theme System: Dark & Light Mode
- *
- * Auto-detects OS color-scheme preference and provides unified theme constants.
- * Supports smooth transitions and real-time theme switching.
- */
+import { useState, useEffect } from 'react'
 
-import { useEffect, useState } from 'react'
+/**
+ * PLMS Theme System: Warm Light Theme
+ *
+ * Unified warm light color palette matching globals.css
+ * All components should use Tailwind CSS variables for consistency
+ */
 
 // ========================================
 // Theme Type Definitions
 // ========================================
-
-export type ThemeMode = 'dark' | 'light'
 
 export interface ThemeColors {
   bg: string
@@ -41,65 +39,41 @@ export interface ThemeColors {
 }
 
 // ========================================
-// Dark Mode Theme (Current)
+// Warm Light Theme (Unified)
 // ========================================
+// Colors match globals.css HSL values:
+// Background: hsl(44 56% 95%) = #FAF6E9
+// Foreground: hsl(14 26% 29%) = #5D4037
+// Card: hsl(50 100% 98%) = #FFFDF5
+// Primary: hsl(42 98% 70%) = #FED168
+// Secondary: hsl(36 41% 67%) = #CCB188
+// Accent: hsl(123 23% 42%) = #528555
 
-export const darkTheme: ThemeColors = {
-  bg: '#0E1116',
-  card: '#141A20',
-  cardHover: '#1A2028',
-  accent: '#6EC1E4',
-  accentHover: '#8ED1EC',
-  text: '#F1F5F9',
-  textSecondary: '#A9B7C8',
-  textTertiary: '#64748B',
-  border: '#1F2937',
-  borderHover: '#374151',
-  shadow: '0 4px 16px rgba(110, 193, 228, 0.08)',
-  shadowHover: '0 6px 24px rgba(110, 193, 228, 0.12)',
-  success: '#10B981',
-  warning: '#F59E0B',
-  error: '#EF4444',
-  // Badges
-  badgeBg: 'rgba(110, 193, 228, 0.1)',
-  badgeBorder: 'rgba(110, 193, 228, 0.3)',
-  // Toast
-  toastBg: 'rgba(20, 26, 32, 0.95)',
-  toastBorder: 'rgba(110, 193, 228, 0.2)',
-  // Mini card (slightly darker than card)
-  miniCardBg: '#0E1116',
-  miniCardBorder: '#1F2937',
-}
-
-// ========================================
-// Light Mode Theme (New)
-// ========================================
-
-export const lightTheme: ThemeColors = {
-  bg: '#FFFFFF',
-  card: '#F8FAFC',
-  cardHover: '#F1F5F9',
-  accent: '#007AFF',
-  accentHover: '#0051D5',
-  text: '#0E1116',
-  textSecondary: '#475569',
-  textTertiary: '#94A3B8',
-  border: '#E2E8F0',
-  borderHover: '#CBD5E1',
-  shadow: '0 4px 16px rgba(0, 122, 255, 0.08)',
-  shadowHover: '0 6px 24px rgba(0, 122, 255, 0.12)',
-  success: '#059669',
+export const warmLightTheme: ThemeColors = {
+  bg: '#FAF6E9',
+  card: '#FFFDF5',
+  cardHover: '#F8F5E8',
+  accent: '#528555',
+  accentHover: '#4A7A4D',
+  text: '#5D4037',
+  textSecondary: '#8B6F47',
+  textTertiary: '#A68B6B',
+  border: '#E0D0B8',
+  borderHover: '#D4C0A8',
+  shadow: '0 4px 16px rgba(94, 64, 55, 0.08)',
+  shadowHover: '0 6px 24px rgba(94, 64, 55, 0.12)',
+  success: '#528555',
   warning: '#D97706',
   error: '#DC2626',
   // Badges
-  badgeBg: 'rgba(0, 122, 255, 0.08)',
-  badgeBorder: 'rgba(0, 122, 255, 0.25)',
+  badgeBg: 'rgba(254, 209, 104, 0.15)',
+  badgeBorder: 'rgba(254, 209, 104, 0.3)',
   // Toast
-  toastBg: 'rgba(255, 255, 255, 0.95)',
-  toastBorder: 'rgba(0, 122, 255, 0.2)',
+  toastBg: 'rgba(255, 253, 245, 0.95)',
+  toastBorder: 'rgba(254, 209, 104, 0.2)',
   // Mini card (slightly darker than card)
-  miniCardBg: '#F1F5F9',
-  miniCardBorder: '#CBD5E1',
+  miniCardBg: '#F8F5E8',
+  miniCardBorder: '#E0D0B8',
 }
 
 // ========================================
@@ -107,46 +81,19 @@ export const lightTheme: ThemeColors = {
 // ========================================
 
 /**
- * Detects OS color-scheme preference
- */
-export function getSystemTheme(): ThemeMode {
-  if (typeof window === 'undefined') return 'dark'
-
-  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-  return mediaQuery.matches ? 'dark' : 'light'
-}
-
-/**
  * React hook for theme management
+ * Always returns warm light theme (no dark mode)
  */
 export function useTheme() {
-  const [mode, setMode] = useState<ThemeMode>('dark')
   const [isClient, setIsClient] = useState(false)
 
   useEffect(() => {
     setIsClient(true)
-    const systemTheme = getSystemTheme()
-    setMode(systemTheme)
-
-    // Listen for OS theme changes
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-    const handleChange = (e: MediaQueryListEvent) => {
-      setMode(e.matches ? 'dark' : 'light')
-    }
-
-    mediaQuery.addEventListener('change', handleChange)
-    return () => mediaQuery.removeEventListener('change', handleChange)
   }, [])
 
-  const theme = mode === 'dark' ? darkTheme : lightTheme
-
   return {
-    mode,
-    theme,
-    isDark: mode === 'dark',
-    isLight: mode === 'light',
+    theme: warmLightTheme,
     isClient, // For SSR safety
-    toggleTheme: () => setMode(prev => prev === 'dark' ? 'light' : 'dark'),
   }
 }
 
@@ -273,9 +220,6 @@ export function isDesktop(): boolean {
 // Export Convenience
 // ========================================
 
-export const themes = {
-  dark: darkTheme,
-  light: lightTheme,
-}
+export const theme = warmLightTheme
 
 export default useTheme

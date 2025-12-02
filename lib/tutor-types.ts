@@ -112,18 +112,9 @@ export interface AskState {
   error: string | null;
 }
 
-// 主題色彩常數
-export const THEME = {
-  bg: '#0E1116',
-  card: '#141A20',
-  accent: '#6EC1E4',
-  text: '#F1F5F9',
-  textSecondary: '#A9B7C8',
-  border: '#1F2937',
-  borderRadius: '14px',
-  borderRadiusLg: '16px',
-  shadow: '0 4px 16px rgba(110, 193, 228, 0.08)',
-} as const;
+// 主題色彩常數已移除
+// 請使用 Tailwind CSS 變數（如 bg-background, text-foreground 等）
+// 或從 lib/theme.ts 導入 warmLightTheme
 
 // Deprecated tutor structures (scheduled for removal after 14-day observation window)
 export type {

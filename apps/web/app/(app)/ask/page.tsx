@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import ModeTabs from '@/components/ask/ModeTabs'
 import AnySubjectSolver from '@/components/ask/AnySubjectSolver'
@@ -11,7 +12,17 @@ import { installGlobalFetchGuard } from '@/lib/api-client'
 import { useGuidance } from '@/lib/guidance/useGuidance'
 
 export default function AskPage() {
-  const [activeTab, setActiveTab] = useState<'solve' | 'summary'>('solve')
+  const searchParams = useSearchParams()
+  // 🎯 Phase 3: 從 URL 參數讀取 tab（支援從 Backpack 跳轉）
+  const tabFromUrl = searchParams?.get('tab') as 'solve' | 'summary' | null
+  const [activeTab, setActiveTab] = useState<'solve' | 'summary'>(tabFromUrl || 'solve')
+  
+  // 🎯 當 URL 參數改變時，同步更新 activeTab
+  useEffect(() => {
+    if (tabFromUrl && (tabFromUrl === 'solve' || tabFromUrl === 'summary')) {
+      setActiveTab(tabFromUrl)
+    }
+  }, [tabFromUrl])
 
   // 🎯 引導系統：自動檢測 T04 (Onboarding 完成後) 和 T01 (停留過久)
   const { recordOperation } = useGuidance({

@@ -111,6 +111,20 @@ if (USE_MOCK_USER) {
    - Environment: **Preview** only
    - 用途: 繞過 RLS，直接讀寫 profiles
 
+4. **`APP_USE_MOCK_USER`**
+   - Value: `true`
+   - Environment: **Local / Preview**（可選）
+   - 用途: 強制所有 Server Component / API 使用統一的 mock user 取代 JWT
+
+5. **`BACKPACK_DEV_USER_ID`**
+   - Value: Mock user UUID（例如 `e770f9cd-52a7-43de-b983-70f6f78d2f53`）
+   - Environment: **Local / Preview**
+   - 用途: 指定 mock user 的 primary key，讓 `getCurrentUser()` 可直接回傳該使用者
+
+6. **`AUTH_CLEAR_INVALID_JWT`**
+   - Value: `true`（僅建議在開發/Preview 啟用）
+   - 用途: 偵測到「Expected 3 parts in JWT」時，自動清除 Supabase auth cookies，避免頁面殘留錯誤狀態
+
 ### 步驟 2: 確保其他必要環境變數存在
 
 確保以下變數在 Preview 環境已設置：
@@ -131,6 +145,16 @@ git push
 ---
 
 ## 📊 資料準備
+
+### CLI 一鍵初始化
+
+在本地或 Preview 環境已配置 `NEXT_PUBLIC_SUPABASE_URL` 與 `SUPABASE_SERVICE_ROLE_KEY` 後，可直接執行：
+
+```bash
+pnpm --filter web seed:mock-user
+```
+
+這會自動建立 mock user profile 並插入範例背包資料，避免每次手動執行 SQL。
 
 ### 為 Mock User 預先 Seed 資料
 

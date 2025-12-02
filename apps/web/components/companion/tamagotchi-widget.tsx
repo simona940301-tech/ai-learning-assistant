@@ -1,7 +1,7 @@
 'use client'
 
 import { motion, useAnimation, AnimatePresence } from 'framer-motion'
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import Image from 'next/image'
 import { useChickStore } from '@/src/store/chickStore'
 import { getChickImagePath } from '@/components/chick/chickImage'
@@ -164,12 +164,21 @@ export function TamagotchiWidget({ forceState }: { forceState?: ChickEmotion }) 
     const [idleAnimation, setIdleAnimation] = useState<'jump' | 'spin' | null>(null)
     const [particleTrigger, setParticleTrigger] = useState(0)
     const [flash, setFlash] = useState(false)
+    const isMountedRef = useRef(false)
     const shakeControls = useAnimation()
     const idleControls = useAnimation()
 
     // Hide chick when exploring
     const isExploring = !!explorationStartAt
     const isReturned = isExploring && isExplorationFinished
+
+    // Mark component as mounted
+    useEffect(() => {
+        isMountedRef.current = true
+        return () => {
+            isMountedRef.current = false
+        }
+    }, [])
 
     // Fetch status on mount
     useEffect(() => {
@@ -235,9 +244,11 @@ export function TamagotchiWidget({ forceState }: { forceState?: ChickEmotion }) 
 
     // Random Idle Animations (Jump/Spin)
     useEffect(() => {
-        if (isExploring) return
+        if (isExploring || !isMountedRef.current) return
 
         const triggerIdleAnimation = async () => {
+            if (!isMountedRef.current) return // Safety check
+            
             const type = Math.random() > 0.5 ? 'jump' : 'spin'
             setIdleAnimation(type)
 
@@ -254,13 +265,15 @@ export function TamagotchiWidget({ forceState }: { forceState?: ChickEmotion }) 
             }
 
             setIdleAnimation(null)
-            // Reset to base state
-            idleControls.set({ y: 0, rotate: 0 })
+            // Reset to base state - only if component is still mounted
+            if (isMountedRef.current) {
+                idleControls.set({ y: 0, rotate: 0 })
+            }
         }
 
         const interval = setInterval(() => {
             // 10% chance every 5 seconds to trigger animation
-            if (Math.random() < 0.2) {
+            if (Math.random() < 0.2 && isMountedRef.current) {
                 void triggerIdleAnimation()
             }
         }, 5000)
@@ -384,7 +397,7 @@ export function TamagotchiWidget({ forceState }: { forceState?: ChickEmotion }) 
             {/* Minimalist Floating Chick - No Background, No Buttons */}
             <div className="fixed bottom-[calc(var(--tab-bar-height,64px)+1.5rem)] right-6 z-40 pointer-events-none">
                 {/* Speech Bubble - positioned outside button to prevent clipping */}
-                <div className="absolute bottom-full right-0 mb-2 pointer-events-none">
+                <div className="absolute bottom-full right-0 mb-6 pointer-events-none">
                     {/* Status Indicators (Hunger / Exploring / Returned) */}
                     <ChickStatusIndicators
                         status={
@@ -422,7 +435,7 @@ export function TamagotchiWidget({ forceState }: { forceState?: ChickEmotion }) 
                 {/* Streak Badge - shown in top-right corner */}
                 {streakDays > 0 && (
                     <div className="absolute -top-1 -right-1 z-10 pointer-events-none">
-                        <div className="flex items-center justify-center w-7 h-7 bg-gradient-to-br from-orange-400 to-red-500 rounded-full border-2 border-white shadow-lg">
+                        <div className="flex items-center justify-center w-7 h-7 bg-gradient-to-br from-orange-400 to-red-500 rounded-full border-2 border-white shadow-[0_4px_10px_rgba(0,0,0,0.08)]">
                             <span className="text-[10px] font-bold text-white">
                                 {streakDays}d
                             </span>
@@ -431,7 +444,10 @@ export function TamagotchiWidget({ forceState }: { forceState?: ChickEmotion }) 
                 )}
 
                 {/* Subtle glow background */}
-                <div className="absolute inset-0 rounded-full bg-gradient-radial from-yellow-200/20 via-transparent to-transparent blur-xl" style={{ transform: 'scale(1.5)' }} />
+                <div
+                    className="absolute inset-0 rounded-full bg-gradient-radial from-yellow-200/12 via-transparent to-transparent blur-[32px]"
+                    style={{ transform: 'scale(1.25)' }}
+                />
 
                 <motion.button
                     initial="idle"
@@ -451,6 +467,11 @@ export function TamagotchiWidget({ forceState }: { forceState?: ChickEmotion }) 
                     aria-label="Open Chick Companion"
                     style={{ willChange: 'transform' }}
                 >
+                    {/* Ground shadow */}
+                    <div className="absolute inset-0 pointer-events-none">
+                        <div className="absolute left-1/2 bottom-1 h-4 w-16 -translate-x-1/2 rounded-full bg-[rgba(60,40,20,0.06)] blur-lg" />
+                    </div>
+
                     {/* Idle Animation Wrapper */}
                     <motion.div animate={idleControls} className="w-full h-full">
 
@@ -464,9 +485,9 @@ export function TamagotchiWidget({ forceState }: { forceState?: ChickEmotion }) 
                             {/* Buff Halo (Well Fed) */}
                             {isWellFed && !isExploring && (
                                 <motion.div
-                                    animate={{ opacity: [0.4, 0.8, 0.4], scale: [1, 1.1, 1] }}
-                                    transition={{ duration: 2, repeat: Infinity }}
-                                    className="absolute inset-0 bg-yellow-400/30 rounded-full blur-xl -z-10"
+                                    animate={{ opacity: [0.12, 0.2, 0.12], scale: [1, 1.06, 1] }}
+                                    transition={{ duration: 2.4, repeat: Infinity }}
+                                    className="absolute inset-0 bg-yellow-300/25 rounded-full blur-xl -z-10"
                                 />
                             )}
 
@@ -489,7 +510,7 @@ export function TamagotchiWidget({ forceState }: { forceState?: ChickEmotion }) 
                                             quality={100}
                                             sizes="112px"
                                             style={{
-                                                filter: 'brightness(1.05) contrast(1.1) drop-shadow(0 8px 16px rgba(0, 0, 0, 0.3)) drop-shadow(0 0 8px rgba(255, 220, 100, 0.4))',
+                                                filter: 'brightness(1.02) contrast(1.05) drop-shadow(0 10px 18px rgba(58, 44, 24, 0.14)) drop-shadow(0 4px 10px rgba(214, 181, 120, 0.18))',
                                                 mixBlendMode: 'normal',
                                             }}
                                         />

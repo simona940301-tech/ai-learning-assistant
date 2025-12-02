@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use crate::dda::DdaSmoother;
+use std::collections::HashMap;
 
 // ============================================
 // 客戶端消息類型
@@ -45,7 +46,12 @@ pub enum ClientMessage {
 #[serde(tag = "type")]
 pub enum ServerMessage {
     #[serde(rename = "MATCH_FOUND")]
-    MatchFound { match_id: String, question_list: Vec<Question> },
+    MatchFound {
+        match_id: String,
+        question_list: Vec<Question>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        match_type: Option<String>,
+    },
     #[serde(rename = "LOBBY_CONFIRMING")]
     LobbyConfirming { match_id: String, countdown: i32, players: Vec<String> },
     #[serde(rename = "LOBBY_CONFIRMED")]
@@ -92,6 +98,12 @@ pub enum ServerMessage {
         question_index: usize,
         player1_score: i32,
         player2_score: i32,
+    },
+    #[serde(rename = "QUESTION_DECK_UPDATE")]
+    QuestionDeckUpdate {
+        match_id: String,
+        start_index: usize,
+        questions: Vec<Question>,
     },
     #[serde(rename = "ERROR")]
     Error { message: String },
@@ -149,6 +161,15 @@ impl Default for RecallOverlayPayload {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct TutorialPlan {
+    pub min_accuracy: f32,
+    pub max_accuracy: f32,
+    pub reaction_range_ms: (u64, u64),
+    pub force_last_question_wrong: bool,
+    pub target_correct: usize,
+}
+
 // ============================================
 // 數據結構
 // ============================================
@@ -161,6 +182,8 @@ pub struct Question {
     pub correct_answer: String,
     pub difficulty: i32,
     pub time_limit: i32,
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 impl Question {
@@ -193,6 +216,7 @@ impl Question {
             correct_answer,
             difficulty,
             time_limit,
+            tags: Vec::new(),
         }
     }
 
@@ -327,6 +351,10 @@ pub struct Match {
     pub player1_reaction_times: Vec<Option<f32>>,
     pub player2_reaction_times: Vec<Option<f32>>,
     pub dda_smoother: DdaSmoother,
+    pub tutorial_plan: Option<TutorialPlan>,
+    pub tutorial_ai_correct: usize,
+    pub dda_pool: HashMap<i32, Vec<Question>>,
+    pub dda_adjusted_at: Option<usize>,
 }
 
 impl Match {
@@ -390,7 +418,7 @@ impl Match {
             player2_answer_timestamps: vec![None; question_count],
             contract_amount,
             is_ugc_deceiver_mode,
-            match_type,
+            match_type: match_type.clone(),
             mode,
             init_theme_choice: None,
             arousal_level: 0.5,
@@ -405,6 +433,22 @@ impl Match {
             player1_reaction_times: vec![None; question_count],
             player2_reaction_times: vec![None; question_count],
             dda_smoother: DdaSmoother::default(),
+            tutorial_plan: if match_type.eq_ignore_ascii_case("PVE_TUTORIAL") {
+                let target = ((question_count as f32) * 0.5).round().max(3.0) as usize;
+                Some(TutorialPlan {
+                    min_accuracy: 0.4,
+                    max_accuracy: 0.6,
+                    // 🎮 更新：使用更真實的反應時間（3-10 秒）
+                    reaction_range_ms: (3_000, 10_000),
+                    force_last_question_wrong: true,
+                    target_correct: target,
+                })
+            } else {
+                None
+            },
+            tutorial_ai_correct: 0,
+            dda_pool: HashMap::new(),
+            dda_adjusted_at: None,
         }
     }
 }
@@ -445,6 +489,10 @@ impl Clone for Match {
             player1_reaction_times: self.player1_reaction_times.clone(),
             player2_reaction_times: self.player2_reaction_times.clone(),
             dda_smoother: self.dda_smoother.clone(),
+            tutorial_plan: self.tutorial_plan.clone(),
+            tutorial_ai_correct: self.tutorial_ai_correct,
+            dda_pool: self.dda_pool.clone(),
+            dda_adjusted_at: self.dda_adjusted_at,
         }
     }
 }

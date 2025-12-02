@@ -28,7 +28,7 @@ import { TamagotchiWidget } from '@/components/companion/tamagotchi-widget'
 import { FocusModeModal } from '@/components/play/FocusModeModal'
 import { Brain } from 'lucide-react'
 import { useGuidance, useErrorCorrection } from '@/lib/guidance/useGuidance'
-import { GameStatusBar } from '@/components/play/GameStatusBar'
+import { AppBar } from '@/components/layout/app-bar'
 
 
 // ============================================
@@ -40,7 +40,7 @@ const glassCardClass =
 
 // getTierLabel 已移除，等級 icon 將顯示在 profile 頁面頭像旁
 
-// StatusCard 已移除，改用 GameStatusBar
+// StatusCard 已移除
 
 function ModeCard({
   label,
@@ -73,31 +73,36 @@ function ModeCard({
       type="button"
       onClick={handleClick}
       data-mode-card={modeId}
-      className="flex w-full items-center gap-4 rounded-[24px] border border-border bg-card px-5 py-4 text-left text-card-foreground transition hover:-translate-y-0.5 hover:bg-accent"
+      className="flex w-full items-center gap-3 rounded-[24px] border border-border bg-card px-4 py-2.5 text-left text-card-foreground transition hover:-translate-y-0.5 hover:bg-accent"
     >
-      <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${accent}`}>
-        <Icon className="h-6 w-6" />
+      {/* 左側：Icon - 縮小 */}
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${accent}`}>
+        <Icon className="h-5 w-5" />
       </div>
-      <div className="flex-1">
-        <p className="text-lg font-semibold tracking-tight">{label}</p>
-        <p className="text-sm text-muted-foreground">{description}</p>
-        {(energyCost !== undefined || estimatedTime) && (
-          <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
-            {energyCost !== undefined && (
-              <span className="flex items-center gap-1">
-                <img src="/feather.png" alt="羽毛" className="w-4 h-4 object-contain" />
-                <span className="font-medium">{energyCost}</span>
-              </span>
-            )}
-            {estimatedTime && (
-              <span className="flex items-center gap-1">
-                <span className="text-base">⏱️</span>
-                <span>{estimatedTime}</span>
-              </span>
-            )}
-          </div>
-        )}
+
+      {/* 中間：標題與描述 - 縮小 */}
+      <div className="flex-1 min-w-0">
+        <p className="text-base font-semibold tracking-tight">{label}</p>
+        <p className="text-xs text-muted-foreground">{description}</p>
       </div>
+
+      {/* 右側：羽毛與時間（與描述同高） - 羽毛放大 3 倍 */}
+      {(energyCost !== undefined || estimatedTime) && (
+        <div className="flex shrink-0 flex-col items-end gap-1.5 text-xs text-muted-foreground">
+          {energyCost !== undefined && (
+            <span className="flex items-center gap-1">
+              <img src="/featherpoint.png" alt="羽毛" className="object-contain" style={{ width: '48px', height: '48px' }} />
+              <span className="font-medium">{energyCost}</span>
+            </span>
+          )}
+          {estimatedTime && (
+            <span className="flex items-center gap-1">
+              <span className="text-base">⏱️</span>
+              <span>{estimatedTime}</span>
+            </span>
+          )}
+        </div>
+      )}
     </button>
   )
 }
@@ -586,16 +591,17 @@ function PlayPageContent() {
 
   return (
     <>
+      <AppBar title="知識對戰" showEnergy={true} maxWidthClass="max-w-3xl" />
+
       {/* Mobile-first: 減少 padding，確保在 360×800、390×844 等尺寸下完整顯示 */}
       <main className="mx-auto max-w-3xl px-4 py-4 pb-20 md:py-10 md:pb-24">
         <div className="space-y-4 md:space-y-6">
-          <GameStatusBar />
-
-          <div className="space-y-2 pt-2 text-center">
+          {/* 主標題區 - 極簡主義，保留大量留白 */}
+          <div className="space-y-2 pt-4 text-center">
             <motion.h1
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-[36px] font-bold tracking-tight text-foreground"
+              className="text-[22px] md:text-[24px] font-semibold tracking-tight text-[#6A4A3C]"
             >
               知識對戰
             </motion.h1>
@@ -603,7 +609,7 @@ function PlayPageContent() {
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.05 }}
-              className="text-[18px] text-muted-foreground"
+              className="text-[16px] text-[#8F6E58]"
             >
               選擇你的對戰模式，開始挑戰
             </motion.p>

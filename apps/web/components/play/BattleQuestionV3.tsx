@@ -26,6 +26,77 @@ import type { OpponentStatus } from './AnimatedAvatar'
 export type { OpponentStatus }
 
 // ============================================
+// Battle Scoring Functions
+// ============================================
+
+/**
+ * Calculate base score based on question difficulty
+ */
+export function calculateBaseScore(difficulty: number): number {
+  // Base score calculation: higher difficulty = higher base score
+  // Difficulty typically ranges from 1-10
+  const basePoints = Math.max(50, Math.min(200, 50 + difficulty * 15))
+  return Math.round(basePoints)
+}
+
+/**
+ * Calculate speed coefficient based on remaining time
+ */
+export function calculateSpeedCoefficient(timeRemaining: number, timeLimit: number): number {
+  if (timeLimit <= 0) return 1.0
+  
+  const timeUsed = timeLimit - timeRemaining
+  const timeRatio = timeUsed / timeLimit
+  
+  // Speed bonus: answering quickly gives higher multiplier
+  // Linear interpolation from 1.5x (instant) to 0.8x (timeout)
+  const speedBonus = Math.max(0.8, Math.min(1.5, 1.5 - (timeRatio * 0.7)))
+  return Number(speedBonus.toFixed(2))
+}
+
+/**
+ * Calculate combo coefficient based on streak
+ */
+export function calculateComboCoefficient(streak: number): number {
+  if (streak <= 1) return 1.0
+  
+  // Combo multiplier: increases with streak but with diminishing returns
+  // 2x = 1.1x, 3x = 1.2x, 5x = 1.3x, 8x = 1.4x, 10+ = 1.5x
+  let multiplier = 1.0
+  if (streak >= 2) multiplier += 0.1
+  if (streak >= 3) multiplier += 0.1
+  if (streak >= 5) multiplier += 0.1
+  if (streak >= 8) multiplier += 0.1
+  if (streak >= 10) multiplier += 0.1
+  
+  return Number(multiplier.toFixed(2))
+}
+
+/**
+ * Calculate combo milestone bonus points
+ */
+export function calculateComboMilestoneBonus(streak: number): number {
+  // Milestone bonuses for reaching certain streaks
+  const milestones = {
+    3: 50,
+    5: 100,
+    8: 200,
+    10: 300,
+    15: 500,
+  }
+  
+  return milestones[streak as keyof typeof milestones] || 0
+}
+
+/**
+ * Generate RNG bonus (placeholder for random bonus mechanics)
+ */
+export function generateRNGBonus(): number {
+  // Simple random bonus: 0-20 points, 10% chance
+  return Math.random() < 0.1 ? Math.floor(Math.random() * 21) : 0
+}
+
+// ============================================
 // Types
 // ============================================
 

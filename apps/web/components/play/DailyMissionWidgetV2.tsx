@@ -238,83 +238,79 @@ export function DailyMissionWidgetV2() {
                 )}
             </div>
 
-            {/* Missions List */}
-            <div className="relative z-10 space-y-3">
+            {/* Missions List - Horizontal Layout */}
+            <div className="relative z-10 grid grid-cols-3 gap-2.5">
                 {data.missions.map((mission, index) => (
                     <motion.div
                         key={mission.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.1 }}
                         className={`
-                            flex items-center justify-between rounded-xl p-3 shadow-sm
-                            transition-all duration-300
+                            flex flex-col items-center justify-between rounded-xl p-2.5 shadow-sm
+                            transition-all duration-300 min-h-[120px]
                             ${mission.is_completed
                                 ? 'bg-accent/10 border border-accent/20'
                                 : 'bg-card border border-border/30'
                             }
                         `}
                     >
-                        <div className="flex items-center gap-3 flex-1">
-                            {/* Icon with Enhanced Styling */}
-                            <motion.div
-                                className={`
-                                    flex h-11 w-11 items-center justify-center rounded-xl
-                                    transition-all duration-300
-                                    ${mission.is_completed
-                                        ? 'bg-primary text-primary-foreground shadow-md'
-                                        : 'bg-muted/50 text-muted-foreground'
-                                    }
-                                `}
-                                animate={mission.is_completed ? { scale: [1, 1.1, 1] } : {}}
-                                transition={{ duration: 0.5 }}
-                            >
-                                {getMissionIcon(mission.type, mission.metadata?.status_icon)}
-                            </motion.div>
+                        {/* Icon with Enhanced Styling */}
+                        <motion.div
+                            className={`
+                                flex h-10 w-10 items-center justify-center rounded-xl mb-2
+                                transition-all duration-300
+                                ${mission.is_completed
+                                    ? 'bg-primary text-primary-foreground shadow-md'
+                                    : 'bg-muted/50 text-muted-foreground'
+                                }
+                            `}
+                            animate={mission.is_completed ? { scale: [1, 1.1, 1] } : {}}
+                            transition={{ duration: 0.5 }}
+                        >
+                            {getMissionIcon(mission.type, mission.metadata?.status_icon)}
+                        </motion.div>
 
-                            {/* Mission Details */}
-                            <div className="flex-1">
-                                <p className={`text-sm font-semibold ${
-                                    mission.is_completed ? 'text-foreground' : 'text-muted-foreground'
-                                }`}>
-                                    {mission.title}
-                                </p>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                    <p className="text-xs text-muted-foreground">
-                                        {mission.current_count}/{mission.target_count}
-                                    </p>
-                                    {/* Rewards Preview */}
-                                    <span className="text-xs text-muted-foreground">•</span>
-                                    <div className="flex items-center gap-1.5 text-xs">
-                                        <span className="text-primary font-medium">
-                                            {mission.reward.xp} XP
-                                        </span>
+                        {/* Mission Details - Centered */}
+                        <div className="flex flex-col items-center text-center flex-1 w-full">
+                            <p className={`text-xs font-semibold mb-1 leading-tight ${
+                                mission.is_completed ? 'text-foreground' : 'text-muted-foreground'
+                            }`}>
+                                {mission.title}
+                            </p>
+                            <p className="text-xs text-muted-foreground mb-1.5">
+                                {mission.current_count}/{mission.target_count}
+                            </p>
+                            {/* Rewards Preview - Compact */}
+                            <div className="flex items-center justify-center gap-1 text-xs flex-wrap">
+                                <span className="text-primary font-medium">
+                                    {mission.reward.xp} XP
+                                </span>
+                                <span className="text-muted-foreground">+</span>
+                                <span className="text-accent font-medium">
+                                    {mission.reward.gold} 金幣
+                                </span>
+                                {mission.reward.bonus_item && (
+                                    <>
                                         <span className="text-muted-foreground">+</span>
-                                        <span className="text-accent font-medium">
-                                            {mission.reward.gold} 金幣
+                                        <span className="text-destructive font-medium flex items-center gap-0.5">
+                                            <Star className="h-2.5 w-2.5" />
+                                            稀有
                                         </span>
-                                        {mission.reward.bonus_item && (
-                                            <>
-                                                <span className="text-muted-foreground">+</span>
-                                                <span className="text-destructive font-medium flex items-center gap-0.5">
-                                                    <Star className="h-3 w-3" />
-                                                    稀有
-                                                </span>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
+                                    </>
+                                )}
                             </div>
                         </div>
 
-                        {/* Completion Check */}
+                        {/* Completion Check - Top Right */}
                         {mission.is_completed && (
                             <motion.div
                                 initial={{ scale: 0, rotate: -180 }}
                                 animate={{ scale: 1, rotate: 0 }}
                                 transition={{ type: 'spring', stiffness: 200 }}
+                                className="absolute top-1.5 right-1.5"
                             >
-                                <CheckCircle2 className="h-6 w-6 text-accent" />
+                                <CheckCircle2 className="h-4 w-4 text-accent" />
                             </motion.div>
                         )}
                     </motion.div>

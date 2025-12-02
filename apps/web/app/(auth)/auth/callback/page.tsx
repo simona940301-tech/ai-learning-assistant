@@ -21,7 +21,7 @@ export default function AuthCallbackPage() {
         const score = sessionStorage.getItem('onboarding_challenge_score')
         const results = sessionStorage.getItem('onboarding_challenge_results')
         const questions = sessionStorage.getItem('onboarding_challenge_questions')
-        
+
         if (!score && !results) {
           return false // 沒有匿名資料
         }
@@ -146,25 +146,77 @@ export default function AuthCallbackPage() {
   }
 
   useEffect(() => {
-    // 等待認證狀態更新
+    // Wait for auth state to load
     const checkAuthAndRedirect = async () => {
-      // 如果還在載入中，等待
+      // If still loading, wait
       if (loading) {
         return
       }
 
-      // 檢查 session 是否有效
+      // Handle OAuth callback (code exchange)
+      const urlParams = new URLSearchParams(window.location.search)
+      const code = urlParams.get('code')
+      const error_param = urlParams.get('error')
+      const error_description = urlParams.get('error_description')
+
+      // Check for OAuth errors from provider
+      if (error_param) {
+        console.error('[AuthCallback] OAuth error from provider:', {
+          error: error_param,
+          description: error_description
+        })
+        router.push('/onboarding')
+        return
+      }
+
+      if (code) {
+        console.log('[AuthCallback] OAuth code detected:', code.substring(0, 20) + '...')
+        try {
+          const { data, error } = await supabaseBrowserClient.auth.exchangeCodeForSession(code)
+
+          if (error) {
+            console.error('[AuthCallback] Code exchange failed:', {
+              message: error.message,
+              status: error.status,
+              name: error.name,
+              code: error.code
+            })
+            router.push('/onboarding')
+            return
+          }
+
+          if (!data?.session) {
+            console.error('[AuthCallback] Code exchange succeeded but no session returned')
+            router.push('/onboarding')
+            return
+          }
+
+          console.log('[AuthCallback] Code exchange successful, session:', {
+            user: data.session.user.id,
+            expires_at: data.session.expires_at
+          })
+
+          // Wait a bit for auth context to update
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          // Continue with normal flow below
+        } catch (err) {
+          console.error('[AuthCallback] Code exchange error:', err)
+          router.push('/onboarding')
+          return
+        }
+      }
+
+      // Check session validity
       const { data: sessionData, error: sessionError } = await supabaseBrowserClient.auth.getSession()
-      
+
       if (sessionError || !sessionData?.session) {
         console.warn('[AuthCallback] No valid session found, redirecting to onboarding')
         router.push('/onboarding')
         return
       }
 
-      // 如果有 session 但 user 還沒更新，等待一下
+      // If have session but user not updated, wait
       if (!user && sessionData.session) {
-        // 等待 auth context 更新 user 狀態
         setTimeout(() => {
           checkAuthAndRedirect()
         }, 500)
@@ -191,7 +243,7 @@ export default function AuthCallbackPage() {
           }
 
           // Check if has anonymous data (completed challenge before login)
-          const hasAnonymousData = 
+          const hasAnonymousData =
             sessionStorage.getItem('onboarding_challenge_score') ||
             sessionStorage.getItem('onboarding_challenge_results') ||
             localStorage.getItem('onboarding_anonymous_data')

@@ -18,7 +18,7 @@ export async function extractiveSummary(
     text: string,
     numSentences: number = 5
 ): Promise<string> {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' }) // ⚡ Use 2.5 Flash
 
     const prompt = `你是一個專業的文本摘要專家。請從以下文本中提取 ${numSentences} 個最能代表核心思想的關鍵句子。
 
@@ -50,7 +50,7 @@ export async function extractKeywords(
     text: string,
     topK: number = 10
 ): Promise<string[]> {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' }) // ⚡ Use 2.5 Flash
 
     const prompt = `你是一個專業的關鍵詞提取專家。請從以下文本中提取 ${topK} 個最重要的關鍵詞。
 
@@ -86,7 +86,7 @@ ${text}
  * 使用 Gemini 分析文本並生成主題
  */
 export async function generateDocumentTheme(text: string): Promise<string> {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' }) // ⚡ Use 2.5 Flash
 
     const prompt = `你是一個專業的文件分析專家。請閱讀以下文本，並用一句話概括這份文件的核心主題（Document Theme）。
 

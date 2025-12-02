@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Moon, Sun } from 'lucide-react'
 import { useTheme } from 'next-themes'
@@ -16,6 +17,8 @@ interface AppBarProps {
 
 export function AppBar({ title, user }: AppBarProps) {
   const { theme, setTheme } = useTheme()
+  const pathname = usePathname()
+  const isProfilePage = pathname === '/store'
 
   return (
     <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-xl">
@@ -33,8 +36,8 @@ export function AppBar({ title, user }: AppBarProps) {
             <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
           </Button>
 
-          {user && (
-            <Link href="/profile">
+          {user && !isProfilePage && (
+            <Link href="/store">
               <Avatar className="h-9 w-9">
                 <AvatarImage src={user.avatar} alt={user.name} />
                 <AvatarFallback>{user.name[0]}</AvatarFallback>

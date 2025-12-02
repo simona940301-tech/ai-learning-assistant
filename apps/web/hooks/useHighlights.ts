@@ -28,6 +28,12 @@ export function useHighlights(fileId: string) {
       setLoading(true)
       const response = await fetch(`/api/backpack/annotations?file_id=${fileId}`)
       
+      // 🎯 優雅處理 404：API 端點可能尚未實現
+      if (response.status === 404) {
+        setHighlights([])
+        return
+      }
+      
       if (!response.ok) {
         throw new Error('Failed to load highlights')
       }
@@ -47,7 +53,11 @@ export function useHighlights(fileId: string) {
 
       setHighlights(textHighlights)
     } catch (err) {
-      console.error('[useHighlights] Failed to load highlights:', err)
+      // 🎯 靜默處理錯誤，避免 console 噪音
+      if (err instanceof Error && !err.message.includes('Failed to load highlights')) {
+        console.error('[useHighlights] Failed to load highlights:', err)
+      }
+      setHighlights([])
     } finally {
       setLoading(false)
     }

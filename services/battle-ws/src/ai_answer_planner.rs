@@ -86,35 +86,34 @@ pub fn p_correct(base_success: f64, m_ai: f64, user_factor: f64) -> f64 {
     p.clamp(0.15, 0.95)
 }
 
-/// 採樣反應時間（毫秒）
-/// 
-/// 反應時間與 m_ai 和 user_factor 相關：
-/// - m_ai 高（AI 強）：反應更快
-/// - user_factor 高（用戶強）：AI 反應更快（更有挑戰性）
-/// 
-/// 基礎反應時間：1500-3000ms
-/// 調整後：800-4000ms
-pub fn sample_rt(m_ai: f64, user_factor: f64) -> u64 {
+/// 採樣反應時間（毫秒）- 根據題目時限動態取樣
+///
+/// 目標：AI 平均作答時間維持在「題目時限的 2/3」左右，
+/// 同時保留 DDA 調整與隨機波動。
+pub fn sample_rt(m_ai: f64, user_factor: f64, question_time_limit: i32) -> u64 {
     let mut rng = rand::thread_rng();
-    
-    // 基礎反應時間範圍
-    let base_min = 1500u64;
-    let base_max = 3000u64;
-    
-    // 調整係數：m_ai 和 user_factor 越高，反應越快
-    let speed_factor = (m_ai * user_factor).min(1.5);
-    let adjusted_min = (base_min as f64 / speed_factor) as u64;
-    let adjusted_max = (base_max as f64 / speed_factor) as u64;
-    
-    // 確保範圍合理：先 clamp 到 [800, 4000]，然後確保 min <= max
-    let min_rt = adjusted_min.max(800).min(4000);
-    let max_rt = adjusted_max.max(800).min(4000);
-    
-    // 確保 min_rt <= max_rt（防止空範圍）
-    let final_min = min_rt.min(max_rt);
-    let final_max = min_rt.max(max_rt);
-    
-    rng.gen_range(final_min..=final_max)
+
+    // 以題目時限為基準（毫秒）
+    let clamped_limit = question_time_limit.max(10) as u64 * 1000; // 至少給 10 秒的配置
+    let target_avg = (clamped_limit as f64 * (2.0 / 3.0)).max(6000.0); // 至少 6 秒
+
+    // 調整係數：m_ai 和 user_factor 控制速度，限制範圍避免極端
+    let speed_factor = (m_ai * user_factor).clamp(0.7, 1.35);
+    let mut center = (target_avg / speed_factor).clamp(5000.0, clamped_limit as f64 * 0.9); // 至少 5 秒
+
+    // 以中心值建立取樣區間，約 ±25%
+    let spread_lower = (center * 0.75).max(4000.0); // 至少 4 秒
+    let spread_upper = (center * 1.25).min(clamped_limit as f64 * 0.97);
+
+    // 確保上下界有效
+    let final_min = spread_lower.min(spread_upper);
+    let final_max = spread_lower.max(spread_upper);
+
+    let base_rt = rng.gen_range(final_min as u64..=final_max as u64);
+    let jitter = rng.gen_range(0.9..=1.1);
+    center = (base_rt as f64 * jitter).clamp(4000.0, clamped_limit as f64 * 0.98); // 至少 4 秒
+
+    center as u64
 }
 
 pub fn compute_signed_streak(results: &[bool]) -> i32 {
@@ -225,13 +224,14 @@ pub fn plan_answer(
     );
     
     // 4. 基礎成功率（根據題目難度）
+    // 🎮 調整：降低基礎成功率，讓 AI 更接近人類水平
     let base_success = match question.difficulty {
-        1 => 0.85,
-        2 => 0.80,
-        3 => 0.75,
-        4 => 0.70,
-        5 => 0.65,
-        _ => 0.75,
+        1 => 0.80, // 簡單題：80% 基礎成功率
+        2 => 0.75, // 較簡單：75%
+        3 => 0.70, // 中等：70%
+        4 => 0.65, // 困難：65%
+        5 => 0.60, // 超難：60%
+        _ => 0.70,
     };
     
     // 5. 計算答對概率
@@ -282,16 +282,66 @@ pub fn plan_answer(
         "A".to_string()
     };
     
-    // 9. 採樣反應時間
-    let reaction_ms = sample_rt(m_ai, user_factor);
+    // 9. 採樣基礎反應時間
+    let mut reaction_ms = sample_rt(m_ai, user_factor, question.time_limit);
+    let mut adjusted_will_be_correct = will_be_correct;
+
+    // 🎮 遊戲化調整 1: 根據題目難度微調時間
+    let difficulty_multiplier = match question.difficulty {
+        1 => 0.85,  // 簡單題快一點 (5-8 秒)
+        2 => 1.0,   // 較簡單 (6-9 秒)
+        3 => 1.15,  // 中等正常 (7-10 秒)
+        4 => 1.3,   // 困難慢一點 (8-12 秒)
+        5 => 1.5,   // 超難很慢 (9-14 秒)
+        _ => 1.15,
+    };
+    reaction_ms = (reaction_ms as f64 * difficulty_multiplier) as u64;
+
+    // 🎮 遊戲化調整 2: 根據 AI 最近表現調整（模擬情緒）
+    if let Some(&last_ai_result) = match_record.ai_match_history.last() {
+        if !last_ai_result {
+            // AI 剛答錯，這題會更謹慎（+25% 時間）
+            reaction_ms = (reaction_ms as f64 * 1.25) as u64;
+        } else if match_record.ai_match_history.len() >= 3 {
+            // 檢查是否連對 3 題
+            let recent_3 = &match_record.ai_match_history[match_record.ai_match_history.len()-3..];
+            if recent_3.iter().all(|&r| r) {
+                // 連對 3 題，建立信心（-15% 時間）
+                reaction_ms = (reaction_ms as f64 * 0.85) as u64;
+            }
+        }
+    }
+
+    // 🎮 遊戲化調整 3: 關鍵回合（最後 2 題）增加緊張感
+    let total_questions = match_record.questions.len();
+    if total_questions >= 3 && question_index >= total_questions - 2 {
+        // 最後兩題，AI 會更謹慎（+20% 時間）
+        reaction_ms = (reaction_ms as f64 * 1.2) as u64;
+    }
+
+    // Tutorial 模式：只調整準確度，保留我們的時間調整邏輯
+    if let Some(plan) = match_record.tutorial_plan.clone() {
+        if plan.force_last_question_wrong && question_index == total_questions.saturating_sub(1) {
+            adjusted_will_be_correct = false;
+        } else if match_record.tutorial_ai_correct >= plan.target_correct {
+            adjusted_will_be_correct = false;
+        }
+        // ⚠️ 注意：我們不再覆蓋 reaction_ms，保留上面的遊戲化調整
+        // 只確保在 tutorial 的範圍內
+        reaction_ms = reaction_ms.max(plan.reaction_range_ms.0).min(plan.reaction_range_ms.1);
+    }
+
+    // 最終限制：確保不超過題目時限 98%，且不少於 4 秒
+    let limit_cap = ((question.time_limit.max(5) as f64) * 1000.0 * 0.98) as u64;
+    reaction_ms = reaction_ms.clamp(4000, limit_cap.max(5000)); // 至少 4 秒，上限至少 5 秒
     
     info!(
         "AI plan: q={}, correct={}, p={:.2}, m_ai={:.2}, user_factor={:.2}, rt={}ms",
-        question_index, will_be_correct, p, m_ai, user_factor, reaction_ms
+        question_index, adjusted_will_be_correct, p, m_ai, user_factor, reaction_ms
     );
     
     AiPlan {
-        will_be_correct,
+        will_be_correct: adjusted_will_be_correct,
         choice_index,
         reaction_ms,
         answer,
@@ -492,10 +542,10 @@ mod tests {
 
     #[test]
     fn test_sample_rt_範圍() {
-        // 測試反應時間在合理範圍內（800-4000ms）
+        // 測試反應時間在合理範圍內（2-12 秒）
         for _ in 0..100 {
-            let rt = sample_rt(0.8, 1.0);
-            assert!(rt >= 800 && rt <= 4000, "反應時間應在 800-4000ms，實際: {}ms", rt);
+            let rt = sample_rt(0.8, 1.0, 30);
+            assert!(rt >= 2000 && rt <= 29400, "反應時間應在 2000-29400ms，實際: {}ms", rt);
         }
     }
 
@@ -506,8 +556,8 @@ mod tests {
         let mut rt_high_m: Vec<u64> = Vec::new();
         
         for _ in 0..50 {
-            rt_low_m.push(sample_rt(0.5, 1.0));   // 低 m_ai
-            rt_high_m.push(sample_rt(1.0, 1.0));  // 高 m_ai
+            rt_low_m.push(sample_rt(0.5, 1.0, 20));   // 低 m_ai
+            rt_high_m.push(sample_rt(1.0, 1.0, 20));  // 高 m_ai
         }
         
         let avg_low: f64 = rt_low_m.iter().sum::<u64>() as f64 / rt_low_m.len() as f64;
@@ -523,8 +573,8 @@ mod tests {
         let mut rt_high_factor: Vec<u64> = Vec::new();
         
         for _ in 0..50 {
-            rt_low_factor.push(sample_rt(0.8, 0.7));   // 低 user_factor（用戶弱）
-            rt_high_factor.push(sample_rt(0.8, 1.3));  // 高 user_factor（用戶強）
+            rt_low_factor.push(sample_rt(0.8, 0.7, 25));   // 低 user_factor（用戶弱）
+            rt_high_factor.push(sample_rt(0.8, 1.3, 25));  // 高 user_factor（用戶強）
         }
         
         let avg_low: f64 = rt_low_factor.iter().sum::<u64>() as f64 / rt_low_factor.len() as f64;
@@ -537,11 +587,11 @@ mod tests {
     fn test_sample_rt_極端值() {
         // 極端值測試：確保不會超出範圍
         for _ in 0..20 {
-            let rt_min = sample_rt(1.5, 1.5); // 最大 speed_factor
-            let rt_max = sample_rt(0.3, 0.5); // 最小 speed_factor
-            
-            assert!(rt_min >= 800, "最小反應時間應 >= 800ms，實際: {}ms", rt_min);
-            assert!(rt_max <= 4000, "最大反應時間應 <= 4000ms，實際: {}ms", rt_max);
+            let rt_min = sample_rt(1.5, 1.5, 15); // 最大 speed_factor
+            let rt_max = sample_rt(0.3, 0.5, 40); // 最小 speed_factor
+
+            assert!(rt_min >= 2000, "最小反應時間應 >= 2000ms，實際: {}ms", rt_min);
+            assert!(rt_max <= 39200, "最大反應時間應 <= 題目時限，實際: {}ms", rt_max);
         }
     }
 
@@ -576,7 +626,7 @@ mod tests {
         
         // 驗證計劃結構
         assert!(plan.choice_index < question.options.len(), "choice_index 應在有效範圍內");
-        assert!(plan.reaction_ms >= 800 && plan.reaction_ms <= 4000, "反應時間應在合理範圍");
+        assert!(plan.reaction_ms >= 2000 && plan.reaction_ms <= 9800, "反應時間應在合理範圍（不超過題目時限）");
         assert!(["A", "B", "C", "D"].contains(&plan.answer.as_str()), "答案應為 A/B/C/D");
     }
 

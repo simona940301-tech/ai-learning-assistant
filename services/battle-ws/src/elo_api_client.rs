@@ -2,11 +2,49 @@
 /// 
 /// Calls Next.js API to update Elo rankings after battle completion
 
+use std::env;
 use serde::{Deserialize, Serialize};
+use serde_json;
+use reqwest::header;
 use tracing::{info, error, warn};
 
-const UPDATE_ELO_API_URL: &str = "http://localhost:3000/api/play/battle/update-elo";
-const USER_STATUS_API_URL: &str = "http://localhost:3000/api/play/user/status";
+fn api_base() -> String {
+    env::var("NEXTJS_API_URL").unwrap_or_else(|_| "http://localhost:3000".to_string())
+}
+
+fn update_elo_url() -> String {
+    with_vercel_bypass_url(format!("{}/api/play/battle/update-elo", api_base()))
+}
+
+fn user_status_url() -> String {
+    with_vercel_bypass_url(format!("{}/api/play/user/status", api_base()))
+}
+
+fn internal_api_key() -> Option<String> {
+    env::var("INTERNAL_API_KEY")
+        .or_else(|_| env::var("NEXTJS_INTERNAL_API_KEY"))
+        .ok()
+}
+
+fn apply_vercel_bypass(mut request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+    if let Ok(token) = env::var("VERCEL_PROTECTION_BYPASS") {
+        request = request
+            .header("x-vercel-protection-bypass", token.clone())
+            .header(header::COOKIE, format!("x-vercel-protection-bypass={}", token));
+    }
+    request
+}
+
+fn with_vercel_bypass_url(url: String) -> String {
+    if let Ok(token) = env::var("VERCEL_PROTECTION_BYPASS") {
+        format!(
+            "{}?x-vercel-protection-bypass={}&x-vercel-set-bypass-cookie=true",
+            url, token
+        )
+    } else {
+        url
+    }
+}
 
 #[derive(Debug, Serialize)]
 struct UpdateEloRequest {
@@ -103,12 +141,13 @@ pub async fn update_elo_rankings(
 
     // Make HTTP request
     let client = reqwest::Client::new();
-    let response = match client
-        .post(UPDATE_ELO_API_URL)
-        .json(&request)
-        .send()
-        .await
-    {
+    let mut req = client.post(update_elo_url()).json(&request);
+    if let Some(key) = internal_api_key() {
+        req = req.header("x-internal-api-key", key);
+    }
+    req = apply_vercel_bypass(req);
+
+    let response = match req.send().await {
         Ok(resp) => resp,
         Err(e) => {
             error!("Failed to send Elo update request: {}", e);
@@ -155,20 +194,55 @@ pub async fn update_elo_rankings(
     Ok(())
 }
 
+fn internal_elo_url(user_id: &str) -> String {
+    with_vercel_bypass_url(format!("{}/api/internal/elo/{}", api_base(), user_id))
+}
+
+#[derive(Debug, Deserialize)]
+struct EloResponse {
+    success: bool,
+    data: Option<EloData>,
+}
+
+#[derive(Debug, Deserialize)]
+struct EloData {
+    elo: i32,
+}
+
 /// Get user Elo from Next.js API
 /// 
 /// Returns current Elo (default 1000 if API fails)
 pub async fn get_user_elo(user_id: &str) -> f64 {
     let client = reqwest::Client::new();
+    let mut req = client.get(internal_elo_url(user_id));
     
-    // Note: This is a simplified approach. In production, you might want to:
-    // 1. Cache Elo in Redis
-    // 2. Pass Elo in WebSocket message
-    // 3. Use a dedicated Elo lookup API
-    
-    // For now, we'll use a default value and log a warning
-    // The Elo will be fetched from DB when updating after battle
-    warn!("get_user_elo called but not fully implemented. Using default 1000 for user {}", user_id);
+    if let Some(key) = internal_api_key() {
+        req = req.header("x-internal-api-key", key);
+    }
+    req = apply_vercel_bypass(req);
+
+    match req.send().await {
+        Ok(resp) => {
+            if resp.status().is_success() {
+                match resp.json::<EloResponse>().await {
+                    Ok(json) => {
+                        if json.success {
+                            if let Some(data) = json.data {
+                                info!("Fetched Elo for {}: {}", user_id, data.elo);
+                                return data.elo as f64;
+                            }
+                        }
+                    }
+                    Err(e) => warn!("Failed to parse Elo response for {}: {}", user_id, e),
+                }
+            } else {
+                warn!("Failed to fetch Elo for {}: status {}", user_id, resp.status());
+            }
+        }
+        Err(e) => warn!("Failed to fetch Elo for {}: {}", user_id, e),
+    }
+
+    // Fallback to default
     1000.0
 }
 

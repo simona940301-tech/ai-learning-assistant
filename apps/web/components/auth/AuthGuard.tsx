@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { PremiumLoader } from '@/components/ui/premium-loader'
+import { supabaseBrowserClient } from '@/lib/supabase'
 
 interface AuthGuardProps {
   children: React.ReactNode
@@ -44,10 +45,12 @@ export function AuthGuard({
         return
       }
 
-      // 🎯 額外安全檢查：確保不是 Mock User
+      // 🚨 Critical: 強制阻擋所有 Mock User - 無例外
       if (user.email === 'dev@test.com' || user.id === 'e770f9cd-52a7-43de-b983-70f6f78d2f53') {
-        console.warn('[AuthGuard] 檢測到 Mock User，重導向到登入')
-        router.push(redirectTo)
+        console.warn('[AuthGuard] 🚨 強制阻擋 Mock User，執行登出')
+        // 強制登出 Mock User
+        supabaseBrowserClient.auth.signOut()
+        router.push('/onboarding')
         return
       }
 
@@ -69,9 +72,9 @@ export function AuthGuard({
       return <PremiumLoader message="重導向到登入頁面..." className="bg-background" />
     }
 
-    // 檢測到 Mock User，顯示載入中（等待重導向）
+    // 🚨 Critical: 強制阻擋 Mock User 渲染
     if (user.email === 'dev@test.com' || user.id === 'e770f9cd-52a7-43de-b983-70f6f78d2f53') {
-      return <PremiumLoader message="重導向到登入頁面..." className="bg-background" />
+      return <PremiumLoader message="正在登出 Mock User..." className="bg-background" />
     }
   }
 

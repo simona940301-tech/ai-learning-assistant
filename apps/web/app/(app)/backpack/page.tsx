@@ -1,13 +1,25 @@
-import React, { Suspense } from 'react'
+'use client'
+
+import React from 'react'
 import { BackpackContentV3 } from './BackpackContentV3'
-import { getCurrentUser } from '@/lib/auth/getCurrentUser'
+import { useAuth } from '@/lib/auth-context'
+import { PremiumLoader } from '@/components/ui/premium-loader'
 
-export default async function BackpackPage() {
-  const { user, errorType } = await getCurrentUser()
+/**
+ * 背包頁面 - Client Component
+ * 使用客戶端認證檢查，與 AuthGuard 保持一致
+ */
+export default function BackpackPage() {
+  const { user, loading, hasValidSession } = useAuth()
 
-  if (!user) {
-    const isInvalidJwt = errorType === 'invalid-jwt'
-    const message = isInvalidJwt
+  // 載入中狀態
+  if (loading) {
+    return <PremiumLoader message="檢查登入狀態..." className="bg-background" />
+  }
+
+  // 未登入或無效 session
+  if (!user || !hasValidSession) {
+    const message = !hasValidSession
       ? '登入狀態失效，請重新整理頁面或重新登入。'
       : '請登入後再使用背包功能。'
 
@@ -16,7 +28,7 @@ export default async function BackpackPage() {
         <div className="mx-auto max-w-2xl px-4 pt-16">
           <div
             className={`rounded-2xl border p-6 text-sm ${
-              isInvalidJwt
+              !hasValidSession
                 ? 'border-destructive/30 bg-destructive/5 text-destructive'
                 : 'border-border bg-card text-muted-foreground'
             }`}
@@ -28,11 +40,10 @@ export default async function BackpackPage() {
     )
   }
 
+  // 已登入，顯示背包內容
   return (
     <main className="min-h-screen bg-background pb-20">
-      <Suspense fallback={<div className="p-4">載入中...</div>}>
-        <BackpackContentV3 />
-      </Suspense>
+      <BackpackContentV3 />
     </main>
   )
 }

@@ -45,30 +45,30 @@ export interface ThemeColors {
 // ========================================
 
 export const darkTheme: ThemeColors = {
-  bg: '#0E1116',
-  card: '#141A20',
-  cardHover: '#1A2028',
-  accent: '#6EC1E4',
-  accentHover: '#8ED1EC',
-  text: '#F1F5F9',
-  textSecondary: '#A9B7C8',
-  textTertiary: '#64748B',
-  border: '#1F2937',
-  borderHover: '#374151',
-  shadow: '0 4px 16px rgba(110, 193, 228, 0.08)',
-  shadowHover: '0 6px 24px rgba(110, 193, 228, 0.12)',
+  bg: '#120F0C',
+  card: '#191511',
+  cardHover: '#201B16',
+  accent: '#528555',
+  accentHover: '#6A9D70',
+  text: '#F6F1E8',
+  textSecondary: '#D5CAB8',
+  textTertiary: '#A99680',
+  border: '#3B3026',
+  borderHover: '#4A3A2E',
+  shadow: '0 4px 16px rgba(64, 46, 32, 0.30)',
+  shadowHover: '0 6px 24px rgba(64, 46, 32, 0.40)',
   success: '#10B981',
   warning: '#F59E0B',
   error: '#EF4444',
   // Badges
-  badgeBg: 'rgba(110, 193, 228, 0.1)',
-  badgeBorder: 'rgba(110, 193, 228, 0.3)',
+  badgeBg: 'rgba(83, 64, 52, 0.25)',
+  badgeBorder: 'rgba(83, 64, 52, 0.45)',
   // Toast
-  toastBg: 'rgba(20, 26, 32, 0.95)',
-  toastBorder: 'rgba(110, 193, 228, 0.2)',
+  toastBg: 'rgba(25, 21, 17, 0.95)',
+  toastBorder: 'rgba(83, 64, 52, 0.40)',
   // Mini card (slightly darker than card)
-  miniCardBg: '#0E1116',
-  miniCardBorder: '#1F2937',
+  miniCardBg: '#14100D',
+  miniCardBorder: '#3B3026',
 }
 
 // ========================================
@@ -76,30 +76,30 @@ export const darkTheme: ThemeColors = {
 // ========================================
 
 export const lightTheme: ThemeColors = {
-  bg: '#FFFFFF',
-  card: '#F8FAFC',
-  cardHover: '#F1F5F9',
-  accent: '#007AFF',
-  accentHover: '#0051D5',
-  text: '#0E1116',
-  textSecondary: '#475569',
-  textTertiary: '#94A3B8',
-  border: '#E2E8F0',
-  borderHover: '#CBD5E1',
-  shadow: '0 4px 16px rgba(0, 122, 255, 0.08)',
-  shadowHover: '0 6px 24px rgba(0, 122, 255, 0.12)',
+  bg: '#FAF6E9',
+  card: '#FFFDF5',
+  cardHover: '#F2EBDB',
+  accent: '#528555',
+  accentHover: '#6A9D70',
+  text: '#2D2219',
+  textSecondary: '#5C4A38',
+  textTertiary: '#8A7660',
+  border: '#E0D0B8',
+  borderHover: '#CBB8A1',
+  shadow: '0 4px 16px rgba(83, 64, 52, 0.25)',
+  shadowHover: '0 6px 24px rgba(83, 64, 52, 0.35)',
   success: '#059669',
   warning: '#D97706',
   error: '#DC2626',
   // Badges
-  badgeBg: 'rgba(0, 122, 255, 0.08)',
-  badgeBorder: 'rgba(0, 122, 255, 0.25)',
+  badgeBg: 'rgba(83, 64, 52, 0.15)',
+  badgeBorder: 'rgba(83, 64, 52, 0.35)',
   // Toast
-  toastBg: 'rgba(255, 255, 255, 0.95)',
-  toastBorder: 'rgba(0, 122, 255, 0.2)',
+  toastBg: 'rgba(255, 253, 245, 0.95)',
+  toastBorder: 'rgba(83, 64, 52, 0.25)',
   // Mini card (slightly darker than card)
-  miniCardBg: '#F1F5F9',
-  miniCardBorder: '#CBD5E1',
+  miniCardBg: '#F2EBDB',
+  miniCardBorder: '#E0D0B8',
 }
 
 // ========================================

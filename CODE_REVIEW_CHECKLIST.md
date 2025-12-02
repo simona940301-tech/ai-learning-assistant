@@ -25,9 +25,15 @@
 
 ### 響應格式檢查
 - [ ] ✅ 使用 `ApiResponseBuilder` 構建響應
-- [ ] ✅ 成功響應：`ok(data)`
+- [ ] ✅ 成功響應：`ok(data)` 或 `okWithTransform(dbData)`
 - [ ] ✅ 錯誤響應：`fail(errorCode, message)`
 - [ ] ❌ 沒有手動構建響應對象
+
+### 字段映射檢查 🆕
+- [ ] ✅ 使用 `okWithTransform()` 自動轉換數據庫格式
+- [ ] ✅ 或使用 `dbToApiFormat()` 處理複雜轉換
+- [ ] ❌ 沒有手動轉換 snake_case → camelCase
+- [ ] ✅ API 響應統一使用 camelCase 格式
 
 ### 錯誤處理檢查
 - [ ] ✅ 使用統一的錯誤處理

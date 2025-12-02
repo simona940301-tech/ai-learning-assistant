@@ -7,6 +7,8 @@ import AnySubjectSolver from '@/components/ask/AnySubjectSolver'
 import SummaryCard from '@/components/ask/SummaryCard'
 import { installGlobalFetchGuard } from '@/lib/api-client'
 
+const TAB_STORAGE_KEY = 'ask_active_tab'
+
 export default function AskPage() {
   const [activeTab, setActiveTab] = useState<'solve' | 'summary'>('solve')
 
@@ -21,6 +23,27 @@ export default function AskPage() {
     console.log('✅ [ForceSolver] Solver-only mode active');
   }, [])
 
+  // Restore last selected tab (or ?tab=summary) to prevent jumpbacks on refresh/hot-reload
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const tabParam = params.get('tab')
+    const saved = (tabParam || localStorage.getItem(TAB_STORAGE_KEY)) as 'solve' | 'summary' | null
+    if (saved === 'solve' || saved === 'summary') {
+      setActiveTab(saved)
+    }
+  }, [])
+
+  const handleTabChange = (tab: 'solve' | 'summary') => {
+    setActiveTab(tab)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(TAB_STORAGE_KEY, tab)
+      const url = new URL(window.location.href)
+      url.searchParams.set('tab', tab)
+      window.history.replaceState({}, '', url.toString())
+    }
+  }
+
   return (
     <div className="relative flex min-h-screen flex-col bg-background text-foreground">
       <motion.div
@@ -28,7 +51,7 @@ export default function AskPage() {
         initial={{ opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <ModeTabs active={activeTab} onChange={setActiveTab} />
+        <ModeTabs active={activeTab} onChange={handleTabChange} />
       </motion.div>
 
       <main className="flex-1 overflow-y-auto pt-24 pb-12">

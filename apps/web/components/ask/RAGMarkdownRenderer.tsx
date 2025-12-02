@@ -5,17 +5,21 @@ import remarkGfm from 'remark-gfm'
 import { cn } from '@/lib/utils'
 
 interface RAGMarkdownRendererProps {
-    markdown: string
+    content?: string
+    markdown?: string
     subject?: string
+    className?: string
 }
 
 /**
  * Unified Markdown renderer for RAG analysis results
  * Based on ExplainCardV2/MarkdownExplain design patterns
  */
-export function RAGMarkdownRenderer({ markdown, subject }: RAGMarkdownRendererProps) {
+export function RAGMarkdownRenderer({ content, markdown, subject, className }: RAGMarkdownRendererProps) {
+    const text = content ?? markdown ?? ''
+
     return (
-        <div className="prose prose-sm max-w-none">
+        <div className={cn("prose prose-sm max-w-none", className)}>
             <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
@@ -109,7 +113,7 @@ export function RAGMarkdownRenderer({ markdown, subject }: RAGMarkdownRendererPr
                     },
                 }}
             >
-                {markdown}
+                {text}
             </ReactMarkdown>
         </div>
     )

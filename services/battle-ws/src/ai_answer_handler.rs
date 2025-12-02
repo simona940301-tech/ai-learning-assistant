@@ -5,7 +5,9 @@ use crate::battle_models::{Match, MatchState, ServerMessage, Question};
 use crate::ai_answer_planner::plan_answer;
 use crate::match_logic::{process_answer_submission, check_battle_end, generate_battle_result_event, get_final_score, get_winner};
 use crate::battle_event_sender::send_battle_event_to_api;
+use crate::progression_api_client;
 use crate::match_postscript::{self, PostscriptCtx};
+use futures_util::future::BoxFuture;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::{sleep, Duration};
@@ -18,14 +20,14 @@ use chrono::Utc;
 type Matches = Arc<RwLock<HashMap<String, Match>>>;
 type Connections = Arc<RwLock<HashMap<String, tokio::sync::broadcast::Sender<ServerMessage>>>>;
 
-/// 啟動新回合（RoundStarted）
+/// 啟動新回合（RoundStarted）- 內部實現
 /// 
 /// 流程：
 /// 1. 發送 RoundStarted 消息
 /// 2. 如果是 PVE 模式，規劃 AI 答案
 /// 3. 發送 OpponentThinking 消息
 /// 4. Spawn 延遲任務發送 AI 答案
-pub async fn start_round(
+async fn start_round_impl(
     match_id: String,
     question_index: usize,
     matches: Matches,
@@ -43,7 +45,8 @@ pub async fn start_round(
             let q = match_record.questions[question_index].clone();
             let is_pve = match_record.player2_id == "AI" 
                 || match_record.match_type == "PVE_TRAINING" 
-                || match_record.match_type == "PVE_CHALLENGE";
+                || match_record.match_type == "PVE_CHALLENGE"
+                || match_record.match_type == "ONBOARDING";
             
             (q, is_pve, match_record.player1_id.clone(), match_record.player2_id.clone())
         } else {
@@ -70,6 +73,20 @@ pub async fn start_round(
             start_ai_answer_flow(match_id_clone, question_index, question, matches_clone, connections_clone).await;
         });
     }
+}
+
+/// 啟動新回合（RoundStarted）- 公開接口
+/// 
+/// 這是公開接口，內部調用 start_round_impl
+pub fn start_round(
+    match_id: String,
+    question_index: usize,
+    matches: Matches,
+    connections: Connections,
+) -> BoxFuture<'static, ()> {
+    Box::pin(async move {
+        start_round_impl(match_id, question_index, matches, connections).await;
+    })
 }
 
 /// 啟動 AI 答題流程
@@ -198,6 +215,9 @@ async fn submit_ai_answer(
         
         // 更新 AI 答題歷史
         match_record.ai_match_history.push(will_be_correct);
+        if will_be_correct {
+            match_record.tutorial_ai_correct += 1;
+        }
         
         // 檢查對戰是否結束
         if check_battle_end(&match_record) {
@@ -206,15 +226,15 @@ async fn submit_ai_answer(
                 &match_record,
                 match_record.match_type.clone(),
             );
-            
+
             let event_clone = battle_result_event.clone();
             tokio::spawn(async move {
                 send_battle_event_to_api(event_clone).await;
             });
-            
+
             let final_score = get_final_score(&match_record);
             let winner = get_winner(&match_record);
-            
+
             match_record.state = MatchState::Finished;
 
             let postscript_ctx = PostscriptCtx {
@@ -225,7 +245,13 @@ async fn submit_ai_answer(
             let cards = match_postscript::generate_retest_cards(&postscript_ctx);
             let retest_suggestions = match_postscript::summarize_cards(&cards);
             let recall_overlay = match_postscript::recall_overlay(&postscript_ctx);
-            
+
+            if let Some(payload) = progression_api_client::build_payload(&match_record) {
+                tokio::spawn(async move {
+                    progression_api_client::apply_battle_progression(payload).await;
+                });
+            }
+
             // 發送 BATTLE_END
             let battle_end = ServerMessage::BattleEnd {
                 winner,
@@ -234,7 +260,7 @@ async fn submit_ai_answer(
                 retest_suggestions,
                 recall_overlay,
             };
-            
+
             let players = vec![match_record.player1_id.clone(), match_record.player2_id.clone()];
             drop(matches_guard);
             broadcast_to_players(&match_id, &players, &battle_end, &connections).await;
@@ -246,13 +272,42 @@ async fn submit_ai_answer(
                 player1_score,
                 player2_score,
             };
-            
+
             let players = vec![match_record.player1_id.clone(), match_record.player2_id.clone()];
+
+            // 🎯 關鍵修復：檢查是否雙方都已回答
+            let both_answered = match_record.player1_answers[question_index].is_some()
+                && match_record.player2_answers[question_index].is_some();
+
+            // 獲取下一題索引（如果雙方都回答了，current_question 應該已經推進）
+            let next_index = match_record.current_question;
+            let total_questions = match_record.questions.len();
+
             drop(matches_guard);
             broadcast_to_players(&match_id, &players, &round_resolved, &connections).await;
-            
-            // 注意：下一輪的啟動由 ws_handler.rs 中的 SubmitAnswer 處理
-            // 這裡不啟動下一輪，避免循環依賴
+
+            // 🎯 關鍵修復：只有在雙方都回答後才啟動下一輪
+            // 使用延遲調用和 Box::pin 打破循環依賴
+            if both_answered && next_index < total_questions {
+                info!("AI answered q{}, both players answered, advancing to q{}", question_index, next_index);
+
+                // 使用延遲調用打破循環依賴
+                // 通過使用 tokio::spawn 和明確的模塊路徑來打破循環
+                let matches_clone = matches.clone();
+                let connections_clone = connections.clone();
+                let match_id_clone = match_id.clone();
+                let next_index_clone = next_index;
+                
+                // 直接 spawn 已裝箱的 future，避免 async fn 之間的循環類型推導
+                tokio::spawn(crate::ai_answer_handler::start_round(
+                    match_id_clone,
+                    next_index_clone,
+                    matches_clone,
+                    connections_clone,
+                ));
+            } else if !both_answered {
+                info!("AI answered q{}, waiting for player to answer", question_index);
+            }
         }
     }
 }

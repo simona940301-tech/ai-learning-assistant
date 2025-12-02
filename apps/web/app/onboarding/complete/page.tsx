@@ -45,6 +45,14 @@ export default function OnboardingCompletePage() {
   const completeOnboarding = async () => {
     if (!user) return
 
+    // 🚨 Critical: 強制阻擋 Mock User
+    if (user.id === 'e770f9cd-52a7-43de-b983-70f6f78d2f53' || user.email === 'dev@test.com') {
+      console.warn('[Complete] 🚨 強制阻擋 Mock User，執行登出')
+      await supabaseBrowserClient.auth.signOut()
+      setLoading(false)
+      return
+    }
+
     try {
       // 1. Get session data for plan generation
       const { data: session } = await supabaseBrowserClient
@@ -120,15 +128,31 @@ export default function OnboardingCompletePage() {
         }
       }
 
-      // 4. Update session status
+      // 4. Update session status - 🔧 改為 upsert 避免衝突
       if (session) {
-        await supabaseBrowserClient
-          .from('onboarding_sessions')
-          .update({
+        try {
+          const updateData = {
             status: 'completed',
             completed_at: new Date().toISOString(),
-          })
-          .eq('id', session.id)
+            // 保留可能存在的 challenge 資料，避免覆蓋
+          }
+          
+          // 使用更寬鬆的更新策略，允許部分失敗
+          const { error: sessionUpdateError } = await supabaseBrowserClient
+            .from('onboarding_sessions')
+            .update(updateData)
+            .eq('id', session.id)
+          
+          if (sessionUpdateError) {
+            console.warn('[Complete] Session update failed (non-critical):', sessionUpdateError)
+            // 不拋出錯誤，繼續執行其他步驟
+          } else {
+            console.log('[Complete] ✅ Session updated successfully')
+          }
+        } catch (sessionError) {
+          console.warn('[Complete] Session update exception (non-critical):', sessionError)
+          // 繼續執行，不讓 session 更新失敗阻礙整個流程
+        }
       }
 
       // 5. Update profile - mark onboarding as completed

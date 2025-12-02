@@ -15,12 +15,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// 🎯 修復：徹底停用 Mock User 直到真正需要時才啟用
-const USE_MOCK_USER = false && (
-  process.env.NODE_ENV === 'development' && 
-  process.env.NEXT_PUBLIC_DISABLE_MOCK_USER !== 'true' &&
-  process.env.NEXT_PUBLIC_ENABLE_REAL_AUTH_TEST !== 'true'
-)
+// 🔒 Complete Mock User Shutdown - 徹底停用 Mock User 
+const USE_MOCK_USER = false
 
 const MOCK_USER_ID = 'e770f9cd-52a7-43de-b983-70f6f78d2f53'
 
@@ -94,8 +90,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         options:
           typeof window !== 'undefined'
             ? {
-                redirectTo: `${window.location.origin}/auth/callback`,
-              }
+              redirectTo: `${window.location.origin}/auth/callback`,
+            }
             : undefined,
       })
       if (error) {
@@ -108,85 +104,74 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
 
   useEffect(() => {
-    // 🎯 修復：Mock user 模式改為可選，而非強制
-    if (USE_MOCK_USER) {
-      const mode = process.env.NODE_ENV === 'development' ? 'Development' : 'Preview'
-      console.log(`[AuthProvider] 🔧 ${mode} mode: Auto-login as`, MOCK_USER_ID)
-      const mockUser = {
-        id: MOCK_USER_ID,
-        email: 'dev@test.com',
-        created_at: new Date().toISOString(),
-        app_metadata: {},
-        user_metadata: {},
-        aud: 'authenticated',
-      } as User
-      setUser(mockUser)
-      setHasValidSession(false) // Mock user 沒有真實 session
-      setLoading(false)
-      return
-    }
+    // 🔒 強制停用 Mock User - 避免認證循環
+    console.log('[AuthProvider] 🔄 Initializing real auth only...')
 
-    // 🎯 修復：生產模式使用真實 Supabase 認證
+    let mounted = true
+
+    // 🎯 簡化認證初始化，避免循環調用
     async function initAuth() {
       try {
-        // 先檢查 session
-        const sessionValid = await validateSession()
-        
-        // 再獲取用戶
+        if (!mounted) return
+
+        // 直接獲取用戶，不要額外的 session 驗證
         const { data: { user: currentUser }, error } = await supabaseBrowser.auth.getUser()
-        
+
+        if (!mounted) return
+
         if (error) {
-          console.error('[AuthProvider] Error getting user:', error)
+          // 靜默處理錯誤，避免控制台噪音
+          if (!error.message.includes('Auth session missing')) {
+            console.warn('[AuthProvider] Auth error:', error.message)
+          }
           setUser(null)
           setHasValidSession(false)
         } else {
           setUser(currentUser)
-          // 只有當用戶存在且 session 有效時才算完全認證
-          setHasValidSession(!!currentUser && sessionValid)
+          setHasValidSession(!!currentUser)
         }
       } catch (err) {
-        console.error('[AuthProvider] Auth initialization error:', err)
-        setUser(null)
-        setHasValidSession(false)
+        if (mounted) {
+          console.error('[AuthProvider] Auth initialization error:', err)
+          setUser(null)
+          setHasValidSession(false)
+        }
       } finally {
-        setLoading(false)
+        if (mounted) {
+          setLoading(false)
+        }
       }
     }
 
     initAuth()
 
-    // 🎯 監聽認證狀態變化
+    // 🎯 簡化狀態變化監聽
     const {
       data: { subscription },
-    } = supabaseBrowser.auth.onAuthStateChange(async (event, session) => {
+    } = supabaseBrowser.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return
+
       console.log('[AuthProvider] Auth state changed:', event, { hasSession: !!session })
-      
+
       setUser(session?.user ?? null)
-      
-      // 每次狀態變化都重新驗證 session
-      if (session?.user) {
-        const sessionValid = await validateSession()
-        setHasValidSession(sessionValid)
-      } else {
-        setHasValidSession(false)
-      }
-      
+      setHasValidSession(!!session?.user)
       setLoading(false)
     })
 
     return () => {
+      mounted = false
       subscription.unsubscribe()
     }
-  }, [validateSession])
+  }, [])
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      loading, 
-      signIn, 
-      signUp, 
+    <AuthContext.Provider value={{
+      user,
+      loading,
+      signIn,
+      signUp,
       signInWithOAuth,
-      hasValidSession 
+      hasValidSession
     }}>
       {children}
     </AuthContext.Provider>

@@ -20,10 +20,10 @@ const ActionDuo = ({ onSave, onRetry, isSaving, isRetrying, savedStatus }: Actio
     >
       <button
         onClick={onSave}
-        disabled={isSaving}
+        disabled={isSaving || savedStatus === 'saved'}
         className={cn(
           'flex flex-1 items-center justify-center gap-2 rounded-full border border-[#6EC1E4]/30 bg-[#182028] px-6 py-3 text-sm font-semibold text-[#6EC1E4] shadow-[0_6px_18px_rgba(0,0,0,0.35)] transition hover:border-[#6EC1E4]/60 hover:shadow-[0_0_14px_rgba(110,193,228,0.35)]',
-          isSaving && 'opacity-80'
+          (isSaving || savedStatus === 'saved') && 'opacity-80 cursor-not-allowed'
         )}
       >
         {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}

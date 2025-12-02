@@ -14,6 +14,7 @@ interface ContentCardProps {
   isEditMode?: boolean
   isSelected?: boolean
   onToggleSelect?: () => void
+  isSelectMode?: boolean // 🎯 Phase 3: 多選模式
 }
 
 export function ContentCard({
@@ -25,7 +26,10 @@ export function ContentCard({
   isEditMode = false,
   isSelected = false,
   onToggleSelect,
+  isSelectMode = false,
 }: ContentCardProps) {
+  // 🎯 Phase 3: 選擇模式或編輯模式都顯示選擇框
+  const showCheckbox = isEditMode || isSelectMode
   const getFileIcon = () => {
     switch (item.type) {
       case 'pdf':
@@ -46,17 +50,17 @@ export function ContentCard({
       whileTap={{ scale: 0.98 }}
     >
       <div
-        onClick={isEditMode ? onToggleSelect : onClick}
+        onClick={showCheckbox ? onToggleSelect : onClick}
         className={cn(
           'flex items-start gap-3 p-3 rounded-lg',
           'border border-border bg-card',
           'hover:bg-muted/50 transition-colors',
           'cursor-pointer',
-          isEditMode && isSelected && 'border-primary bg-primary/10'
+          showCheckbox && isSelected && 'border-primary bg-primary/10'
         )}
       >
         {/* Left Icon / Checkbox */}
-        {isEditMode ? (
+        {showCheckbox ? (
           <div
             onClick={(e) => {
               e.stopPropagation()
@@ -91,8 +95,8 @@ export function ContentCard({
             <span>{getRelativeTime(item.updated_at)}</span>
           </div>
 
-          {/* Layer 3: Ask CTA (only in normal mode) */}
-          {!isEditMode && (
+          {/* Layer 3: Ask CTA (only in normal mode, not in select/edit mode) */}
+          {!showCheckbox && (
             <div className="flex items-center justify-end">
               <button
                 onClick={(e) => {

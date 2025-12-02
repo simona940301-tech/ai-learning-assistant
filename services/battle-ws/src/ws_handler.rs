@@ -12,6 +12,7 @@ use crate::match_logic::{
 use crate::lobby_timer::start_lobby_confirm_timer;
 use crate::redis_pool::{get_redis_pool, MatchPool};
 use crate::battle_event_sender::send_battle_event_to_api;
+use crate::progression_api_client;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};
@@ -48,14 +49,21 @@ impl BattleServer {
     async fn handle_start_match(
         &self,
         user_id: String,
-        match_type: String,
+        mut match_type: String,
         subject: Option<String>,
         contract_amount: Option<i32>,
         is_ugc_deceiver_mode: bool,
         time_limit: i32,
     ) -> Option<ServerMessage> {
+        if !match_type.starts_with("PVE") {
+            if progression_api_client::should_force_tutorial(&user_id).await {
+                info!("Routing {} to tutorial match", user_id);
+                match_type = "PVE_TUTORIAL".to_string();
+            }
+        }
         // PVE 模式檢測：優先處理，不需要 Redis 匹配
-        if match_type == "PVE_TRAINING" || match_type == "PVE_CHALLENGE" {
+        // 支援三種 PVE 模式：PVE_TRAINING, PVE_CHALLENGE, ONBOARDING
+        if match_type == "PVE_TRAINING" || match_type == "PVE_CHALLENGE" || match_type == "ONBOARDING" {
             info!("PVE mode detected: {}, handling directly", match_type);
             return self.handle_pve_match(user_id, match_type, subject, time_limit).await;
         }
@@ -72,9 +80,8 @@ impl BattleServer {
 
         let match_pool = MatchPool::new(redis_pool);
         
-        // TODO: 獲取用戶 Elo（暫時使用默認值 1000）
-        // 未來應該從 Next.js API 或 WebSocket 消息中獲取
-        let elo = 1000.0;
+        // 獲取用戶 Elo
+        let elo = crate::elo_api_client::get_user_elo(&user_id).await;
 
         // P4: 嘗試在 Redis 匹配池中查找對手
         match match_pool.find_match(&user_id, elo, &match_type, subject.as_deref()).await {
@@ -164,37 +171,69 @@ impl BattleServer {
         let match_id = Uuid::new_v4().to_string();
 
         // Step 1: 從 Next.js API 獲取題目
-        // 優先嘗試從 seed_questions 表獲取官方題目
-        let questions = match crate::pve_api_client::fetch_seed_questions(
-            subject.as_deref(),
-            None, // 不指定難度，隨機選擇
-            10,   // numQuestions
-        ).await {
-            Ok(qs) => {
-                info!("✅ Successfully fetched {} seed questions from database", qs.len());
-                qs
+        // ONBOARDING 模式：使用固定的 3 題訓練題目
+        // PVE_TRAINING/PVE_CHALLENGE：使用動態題目（包含 DDA 預備池）
+        let (raw_questions, raw_pool) = if match_type == "ONBOARDING" {
+            // ONBOARDING: 獲取固定的 3 題訓練題目
+            info!("Fetching ONBOARDING questions (fixed 3 questions)");
+            match crate::onboarding_api_client::fetch_onboarding_questions().await {
+                Ok(questions) => {
+                    info!("✅ Loaded {} onboarding questions", questions.len());
+                    (questions, HashMap::new()) // ONBOARDING 不需要 DDA pool
+                }
+                Err(e) => {
+                    warn!("Failed to fetch onboarding questions: {}, using fallback", e);
+                    // Fallback: 使用硬編碼的 3 題
+                    (self.generate_mock_questions(time_limit), HashMap::new())
+                }
             }
-            Err(e) => {
-                warn!("Failed to fetch seed questions: {}, trying PVE questions API", e);
-                // 回退方案 1：嘗試 PVE questions API（從題包獲取）
-                match crate::pve_api_client::fetch_pve_questions(
-                    &user_id,
-                    subject.as_deref(),
-                    true, // focusOnWeakness
-                    10,   // numQuestions
-                ).await {
-                    Ok(qs) => {
-                        info!("✅ Successfully fetched {} questions from PVE API", qs.len());
-                        qs
-                    }
-                    Err(e2) => {
-                        warn!("Failed to fetch PVE questions: {}, falling back to mock questions", e2);
-                        // 回退方案 2：使用 mock questions
-                        self.generate_mock_questions(time_limit)
-                    }
+        } else {
+            // PVE_TRAINING/PVE_CHALLENGE: 使用動態題目
+            match crate::pve_api_client::fetch_pve_questions(
+                &user_id,
+                subject.as_deref(),
+                true,
+                10,
+            ).await {
+                Ok(bundle) => {
+                    info!("✅ Loaded {} DDA-ready questions", bundle.questions.len());
+                    (bundle.questions, bundle.dda_pool)
+                }
+                Err(e) => {
+                    warn!("Failed to fetch PVE questions: {}, fallback to seed package", e);
+                    let fallback = crate::pve_api_client::fetch_seed_questions(
+                        subject.as_deref(),
+                        None,
+                        10,
+                    )
+                    .await
+                    .unwrap_or_else(|_| self.generate_mock_questions(time_limit));
+                    (fallback, HashMap::new())
                 }
             }
         };
+
+        // 統一使用玩家選擇的作答時間
+        let questions: Vec<Question> = raw_questions
+            .into_iter()
+            .map(|mut q| {
+                q.time_limit = time_limit;
+                q
+            })
+            .collect();
+        let dda_pool: HashMap<i32, Vec<Question>> = raw_pool
+            .into_iter()
+            .map(|(diff, bucket)| {
+                let normalized = bucket
+                    .into_iter()
+                    .map(|mut q| {
+                        q.time_limit = time_limit;
+                        q
+                    })
+                    .collect();
+                (diff, normalized)
+            })
+            .collect();
 
         // Step 2: 創建 in-memory Match 對象
         let mut match_record = Match::new_with_config_and_type(
@@ -206,9 +245,12 @@ impl BattleServer {
             false, // PVE 不使用 UGC 迷惑模式
             match_type.clone(),
         );
+        match_record.dda_pool = dda_pool;
 
         // PVE 模式：AI 自動確認，跳過 lobby 確認流程
         match_record.player2_confirmed = true;
+        match_record.player1_confirmed = true; // PVE 模式：玩家也自動確認，直接開始
+        match_record.state = MatchState::InBattle; // 直接設置為對戰中狀態
 
         // Step 3: 將 Match 存入 in-memory HashMap
         self.matches.write().await.insert(match_id.clone(), match_record.clone());
@@ -235,19 +277,42 @@ impl BattleServer {
             }
         });
 
-        // Step 5: 啟動服務端權威計時器（PVE 直接進入對戰）
-        let matches_clone = self.matches.clone();
+        // Step 5: PVE 模式直接返回 MATCH_FOUND，然後異步發送 ROUND_STARTED
+        // 立即返回 MATCH_FOUND 給客戶端
+        info!("✅ Returning MATCH_FOUND for PVE match {}", match_id);
+
+        // 異步發送 ROUND_STARTED（在 MATCH_FOUND 發送後）
         let connections_clone = self.connections.clone();
         let match_id_clone = match_id.clone();
+        let questions_clone = questions.clone();
+        let user_id_clone = user_id.clone();
         tokio::spawn(async move {
-            start_lobby_confirm_timer(match_id_clone, matches_clone, connections_clone).await;
+            // 給前端足夠時間處理 MATCH_FOUND 並更新 React 狀態
+            // 增加到 500ms 確保狀態更新完成
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+            // 使用 ai_answer_handler::start_round 統一處理回合開始邏輯
+            // 這會自動發送 ROUND_STARTED 並啟動 AI 答題流程
+            let matches_clone = self.matches.clone();
+            let connections_clone = self.connections.clone();
+            let match_id_clone = match_id.clone();
+            
+            // 直接調用 start_round (它返回 BoxFuture)
+            crate::ai_answer_handler::start_round(
+                match_id_clone,
+                0, // 第一題
+                matches_clone,
+                connections_clone,
+            ).await;
+            
+            info!("✅ Started round 0 for PVE match {} - battle begins!", match_id);
         });
 
-        // Step 6: 返回 LobbyConfirming 消息
-        Some(ServerMessage::LobbyConfirming {
-            match_id: match_id.clone(),
-            countdown: 15, // PVE 仍需要確認流程（讓玩家準備）
-            players: vec![user_id.clone(), "AI".to_string()],
+        // PVE 模式直接返回 MATCH_FOUND（包含 match_type）
+        Some(ServerMessage::MatchFound {
+            match_id,
+            question_list: questions,
+            match_type: Some(match_type.clone()),
         })
     }
 
@@ -265,44 +330,10 @@ impl BattleServer {
     ) -> Option<ServerMessage> {
         warn!("Using fallback match logic for user: {} (match_type: {})", user_id, match_type);
         
-        // 如果是 PVE 模式，允許繼續（不需要匹配）
-        if match_type == "PVE_TRAINING" || match_type == "PVE_CHALLENGE" {
-            info!("PVE mode detected, creating single-player match");
-            
-            let match_id = Uuid::new_v4().to_string();
-            let questions = self.generate_mock_questions(time_limit);
-            
-            // PVE 模式：player2_id 設為 "AI" 或空字符串
-            // P11: 使用帶配置和類型的構造函數
-            let match_record = Match::new_with_config_and_type(
-                match_id.clone(),
-                user_id.clone(),
-                "AI".to_string(), // PVE 對手標識
-                questions.clone(),
-                contract_amount,
-                is_ugc_deceiver_mode,
-                match_type.clone(),
-            );
-            
-            // PVE 模式：AI 自動確認
-            let mut match_record = match_record;
-            match_record.player2_confirmed = true;
-            
-            self.matches.write().await.insert(match_id.clone(), match_record);
-            
-            // P5: 啟動服務端權威計時器
-            let matches_clone = self.matches.clone();
-            let connections_clone = self.connections.clone();
-            let match_id_clone = match_id.clone();
-            tokio::spawn(async move {
-                start_lobby_confirm_timer(match_id_clone, matches_clone, connections_clone).await;
-            });
-            
-            return Some(ServerMessage::LobbyConfirming {
-                match_id: match_id.clone(),
-                countdown: 15,
-                players: vec![user_id.clone(), "AI".to_string()],
-            });
+        // 如果是 PVE 模式（包含 ONBOARDING），直接調用 handle_pve_match（會跳過 lobby timer）
+        if match_type == "PVE_TRAINING" || match_type == "PVE_CHALLENGE" || match_type == "ONBOARDING" {
+            info!("PVE mode detected in fallback, delegating to handle_pve_match");
+            return self.handle_pve_match(user_id, match_type, None, time_limit).await;
         }
         
         // PVP 模式但 Redis 不可用：返回錯誤消息
@@ -350,10 +381,11 @@ impl BattleServer {
                         warn!("[WSHandler] ⚠️ User {} is not player1 or player2 in match {}", user_id, match_id);
                     }
                     
-                    // PVE 模式：如果 player2_id 是 "AI"，只需要 player1 確認即可
+                    // PVE 模式：如果 player2_id 是 "AI" 或 match_type 是 PVE/ONBOARDING，只需要 player1 確認即可
                     let is_pve = match_record.player2_id == "AI" 
                         || match_record.match_type == "PVE_TRAINING" 
-                        || match_record.match_type == "PVE_CHALLENGE";
+                        || match_record.match_type == "PVE_CHALLENGE"
+                        || match_record.match_type == "ONBOARDING";
                     
                     // 檢查是否雙方都已確認（PVE 模式只需要 player1）
                     let both_confirmed = if is_pve {
@@ -446,6 +478,7 @@ impl BattleServer {
                 info!("Answer submitted: match={}, q={}, answer={}", match_id, question_index, answer);
                 
                 let mut matches = self.matches.write().await;
+                let mut pending_deck_update: Option<(usize, Vec<Question>, Vec<String>)> = None;
                 if let Some(mut match_record) = matches.get_mut(&match_id) {
                     // 檢查是否已經回答過（競態條件處理）
                     let already_answered = if user_id == match_record.player1_id {
@@ -461,10 +494,11 @@ impl BattleServer {
                         });
                     }
                     
-                    // 如果是玩家答題且是 PVE 模式，取消 AI 任務（如果 AI 還沒答）
+                    // 如果是玩家答題且是 PVE 模式（包含 ONBOARDING），取消 AI 任務（如果 AI 還沒答）
                     let is_pve = match_record.player2_id == "AI" 
                         || match_record.match_type == "PVE_TRAINING" 
-                        || match_record.match_type == "PVE_CHALLENGE";
+                        || match_record.match_type == "PVE_CHALLENGE"
+                        || match_record.match_type == "ONBOARDING";
                     
                     if is_pve && user_id == match_record.player1_id {
                         if match_record.player2_answers.get(question_index).and_then(|a| a.as_ref()).is_none() {
@@ -551,6 +585,12 @@ impl BattleServer {
                                 }
                             });
                         }
+
+                        if let Some(payload) = progression_api_client::build_payload(&match_record) {
+                            tokio::spawn(async move {
+                                progression_api_client::apply_battle_progression(payload).await;
+                            });
+                        }
                         
                         match_record.state = MatchState::Finished;
 
@@ -563,7 +603,9 @@ impl BattleServer {
                         let retest_suggestions = match_postscript::summarize_cards(&cards);
                         let recall_overlay = match_postscript::recall_overlay(&postscript_ctx);
                         
-                        Some(ServerMessage::BattleEnd {
+                        drop(matches);
+                        
+                        return Some(ServerMessage::BattleEnd {
                             winner,
                             final_score,
                             battle_result_event,
@@ -571,31 +613,71 @@ impl BattleServer {
                             recall_overlay,
                         })
                     } else {
+                        // PVE DDA 調整
+                        if is_pve && question_index >= 4 && match_record.dda_adjusted_at.is_none() {
+                            if let Some((start_index, updated_questions)) = apply_pve_dynamic_questions(match_record) {
+                                pending_deck_update = Some((start_index, updated_questions.clone(), vec![match_record.player1_id.clone()]));
+                            }
+                        }
+
                         // 繼續對戰
-                        // 如果是 PVE 模式且玩家答題，檢查是否需要啟動下一輪
+                        // 🎯 關鍵修復：只有在雙方都回答後才啟動下一輪
+                        // match_logic.rs 的 process_answer_submission 會在雙方都回答後更新 current_question
+                        // 所以我們需要檢查 current_question 是否已經推進到下一題
                         if is_pve && user_id == match_record.player1_id {
-                            let next_index = match_record.current_question;
-                            let total_questions = match_record.questions.len();
-                            
-                            if next_index < total_questions {
-                                let matches_clone = self.matches.clone();
-                                let connections_clone = self.connections.clone();
-                                let match_id_clone = match_id.clone();
-                                tokio::spawn(async move {
-                                    crate::ai_answer_handler::start_round(
+                            // 檢查雙方是否都回答了當前問題
+                            let both_answered = match_record.player1_answers[question_index].is_some()
+                                && match_record.player2_answers[question_index].is_some();
+
+                            if both_answered {
+                                // 雙方都回答了，current_question 應該已經更新到下一題
+                                let next_index = match_record.current_question;
+                                let total_questions = match_record.questions.len();
+
+                                info!("PVE: Both answered q{}, advancing to q{}/{}", question_index, next_index, total_questions);
+
+                                if next_index < total_questions {
+                                    let matches_clone = self.matches.clone();
+                                    let connections_clone = self.connections.clone();
+                                    let match_id_clone = match_id.clone();
+                                    tokio::spawn(crate::ai_answer_handler::start_round(
                                         match_id_clone,
                                         next_index,
                                         matches_clone,
                                         connections_clone,
-                                    ).await;
-                                });
+                                    ));
+                                }
+                            } else {
+                                // 只有玩家回答了，AI 還沒回答，等待 AI
+                                info!("PVE: Player answered q{}, waiting for AI to answer", question_index);
                             }
                         }
                         
                         let (tempo_label, arousal_score) = build_tempo_hint(&match_record);
                         match_record.arousal_level = arousal_score;
 
-                        Some(ServerMessage::AnswerResult {
+                        drop(matches);
+
+                        // 處理 pending_deck_update（如果有的話）
+                        if let Some((start_index, questions, players)) = pending_deck_update {
+                            let connections_clone = self.connections.clone();
+                            let match_id_clone = match_id.clone();
+                            tokio::spawn(async move {
+                                let update_msg = ServerMessage::QuestionDeckUpdate {
+                                    match_id: match_id_clone,
+                                    start_index,
+                                    questions,
+                                };
+                                let map = connections_clone.read().await;
+                                for pid in players {
+                                    if let Some(tx) = map.get(&pid) {
+                                        let _ = tx.send(update_msg.clone());
+                                    }
+                                }
+                            });
+                        }
+
+                        return Some(ServerMessage::AnswerResult {
                             player1_score,
                             player2_score,
                             server_timestamp,
@@ -701,6 +783,60 @@ fn generate_mock_questions(&self, time_limit: i32) -> Vec<Question> {
         ]
     }
 }
+
+fn pull_question_from_pool(pool: &mut HashMap<i32, Vec<Question>>, diff: i32) -> Option<Question> {
+    if diff < 1 || diff > 5 {
+        return None;
+    }
+    pool.get_mut(&diff).and_then(|bucket| bucket.pop())
+}
+
+fn apply_pve_dynamic_questions(match_record: &mut Match) -> Option<(usize, Vec<Question>)> {
+    if match_record.dda_pool.is_empty() || match_record.dda_adjusted_at.is_some() {
+        return None;
+    }
+    let checkpoint = 5;
+    if match_record.questions.len() <= checkpoint {
+        return None;
+    }
+    let mut wrong_answers = 0;
+    let mut difficulty_sum = 0;
+    for idx in 0..checkpoint {
+        let question = match_record.questions.get(idx)?;
+        difficulty_sum += question.difficulty;
+        let answered_correctly = match_record.player1_answers[idx]
+            .as_ref()
+            .map(|answer| answer.trim().eq_ignore_ascii_case(&question.correct_answer))
+            .unwrap_or(false);
+        if !answered_correctly {
+            wrong_answers += 1;
+        }
+    }
+    let avg_diff = (difficulty_sum as f32 / checkpoint as f32).round() as i32;
+    let mut target_diff = avg_diff;
+    if wrong_answers >= 3 {
+        target_diff = (avg_diff - 1).max(1);
+    } else if wrong_answers <= 1 {
+        target_diff = (avg_diff + 1).min(5);
+    }
+
+    let mut replacements = Vec::new();
+    for idx in checkpoint..match_record.questions.len() {
+        let mut replacement = pull_question_from_pool(&mut match_record.dda_pool, target_diff);
+        if replacement.is_none() {
+            replacement = pull_question_from_pool(&mut match_record.dda_pool, target_diff - 1)
+                .or_else(|| pull_question_from_pool(&mut match_record.dda_pool, target_diff + 1));
+        }
+        if let Some(new_question) = replacement {
+            match_record.questions[idx] = new_question.clone();
+            replacements.push(new_question);
+        }
+    }
+
+    match_record.dda_adjusted_at = Some(checkpoint);
+    Some((checkpoint, replacements))
+}
+
 
 fn collect_user_correctness(match_record: &Match) -> Vec<bool> {
     match_record

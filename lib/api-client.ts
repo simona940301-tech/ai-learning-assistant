@@ -20,6 +20,7 @@ const ALLOWED_ENDPOINTS = [
   /^\/api\/heartbeat/,
   /^\/api\/label\//,
   /^\/api\/health/,
+  /^\/api\/internal\//, // Internal admin APIs (with auth middleware)
 ]
 
 // Blocked legacy endpoints

@@ -80,7 +80,7 @@ export async function generateQuestions(
   request: QuestionGenerationRequest
 ): Promise<GeneratedQuestion[]> {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' }) // ⚡ Use 2.5 Flash
 
     const subjectTemplate = SUBJECT_TEMPLATES[request.subject as keyof typeof SUBJECT_TEMPLATES]
     if (!subjectTemplate) {

@@ -35,7 +35,7 @@ export interface HintResponse {
  */
 export async function generateHint(request: HintRequest): Promise<HintResponse> {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' }) // ⚡ Use 2.5 Flash
 
     // Determine hint level based on attempts
     const attempts = request.userAttempts || 0

@@ -148,30 +148,14 @@ pub fn process_answer_submission(
     // 更新當前題目索引
     // PVE 模式：只要 player1 回答就推進到下一題
     // PVP 模式：需要兩個玩家都回答才推進
-    let is_pve = match_record.player2_id == "AI" 
-        || match_record.match_type == "PVE_TRAINING" 
-        || match_record.match_type == "PVE_CHALLENGE";
-    
-    if is_pve {
-        // PVE 模式：player1 回答後立即推進到下一題
-        // 注意：必須是 player1 且當前題目索引匹配
-        if is_player1 {
-            // 如果當前題目索引小於問題索引，說明已經推進過了
-            if match_record.current_question <= question_index {
-                match_record.current_question = question_index + 1;
-                info!("PVE mode: Question {} answered by player1, advancing current_question to {}", question_index, match_record.current_question);
-            }
-        }
-    } else {
-        // PVP 模式：需要兩個玩家都回答當前題目才推進
-        if match_record.current_question == question_index {
-            let both_answered = match_record.player1_answers[question_index].is_some() 
-                && match_record.player2_answers[question_index].is_some();
-            
-            if both_answered {
-                match_record.current_question += 1;
-                info!("PVP mode: Both players answered question {}, advancing to question {}", question_index, match_record.current_question);
-            }
+    // 下一題必須等待雙方（玩家與 AI）都回答，確保動畫節奏一致
+    if match_record.current_question == question_index {
+        let both_answered = match_record.player1_answers[question_index].is_some() 
+            && match_record.player2_answers[question_index].is_some();
+        
+        if both_answered {
+            match_record.current_question += 1;
+            info!("Round {} resolved, advancing to question {}", question_index, match_record.current_question);
         }
     }
     

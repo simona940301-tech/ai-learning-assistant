@@ -35,12 +35,12 @@ export function OcrTextLayer({ pageNumber, bboxes, viewport }: OcrTextLayerProps
     bboxes.forEach((bbox, index) => {
       if (!bbox.text || bbox.text.trim().length === 0) return
       
-      // Convert normalized coordinates (0-1) to pixel positions
-      // 使用 Math.ceil() 向上取整 + 1 像素安全邊界，確保完全覆蓋
-      const left = Math.ceil(bbox.x * viewport.width)
-      const top = Math.ceil(bbox.y * viewport.height)
-      const width = Math.ceil(bbox.width * viewport.width) + 1 // +1 像素安全邊界
-      const height = Math.ceil(bbox.height * viewport.height) + 1 // +1 像素安全邊界
+      // 🎯 頂尖修復：使用 layoutViewport 將歸一化座標轉換為像素位置
+      // layoutViewport 與 Canvas CSS 尺寸一致，確保 OCR 文字層與 Canvas 完美對齊
+      const left = Math.floor(bbox.x * viewport.width)
+      const top = Math.floor(bbox.y * viewport.height)
+      const width = Math.ceil(bbox.width * viewport.width)
+      const height = Math.ceil(bbox.height * viewport.height)
       
       const span = document.createElement('span')
       span.textContent = bbox.text
@@ -73,9 +73,10 @@ export function OcrTextLayer({ pageNumber, bboxes, viewport }: OcrTextLayerProps
     textLayerDiv.appendChild(fragment)
   }, [bboxes, viewport, pageNumber])
   
-  // 計算安全尺寸：使用 Math.ceil() 向上取整 + 1 像素安全邊界
-  const safeWidth = Math.ceil(viewport.width) + 1
-  const safeHeight = Math.ceil(viewport.height) + 1
+  // 🎯 頂尖修復：使用 layoutViewport 的精確尺寸（與 Canvas CSS 尺寸一致）
+  // 不再需要 +1 像素安全邊界，因為我們使用精確的 layoutViewport 尺寸
+  const safeWidth = Math.floor(viewport.width)
+  const safeHeight = Math.floor(viewport.height)
   
   return (
     <div
@@ -85,8 +86,8 @@ export function OcrTextLayer({ pageNumber, bboxes, viewport }: OcrTextLayerProps
         position: 'absolute',
         left: 0,
         top: 0,
-        width: `${safeWidth}px`, // 強制擴展尺寸 + 1 像素安全邊界
-        height: `${safeHeight}px`, // 強制擴展尺寸 + 1 像素安全邊界
+        width: `${safeWidth}px`, // 使用 layoutViewport 的精確尺寸
+        height: `${safeHeight}px`, // 使用 layoutViewport 的精確尺寸
         pointerEvents: 'auto',
         userSelect: 'text',
         WebkitUserSelect: 'text', // React requires capitalized vendor prefix

@@ -13,7 +13,7 @@ interface ModeTabsProps {
 
 const ModeTabs = ({ active, onChange }: ModeTabsProps) => {
   return (
-    <div className="relative mx-auto flex w-full max-w-md items-center justify-center gap-3 rounded-full bg-background/60 p-1.5">
+    <div className="relative mx-auto flex w-full max-w-md items-center justify-center gap-3">
       {TABS.map(({ key, label }) => {
         const isActive = key === active
         return (
@@ -22,22 +22,14 @@ const ModeTabs = ({ active, onChange }: ModeTabsProps) => {
             onClick={() => onChange(key)}
             data-tab={key}
             className={cn(
-              'relative flex-1 rounded-full px-6 py-2.5 text-base font-medium transition-all duration-200',
+              'relative flex-1 px-6 py-2.5 text-[15px] font-medium transition-all duration-200',
+              'border-b-[1px]',
               isActive
-                ? 'text-primary-foreground'
-                : 'text-foreground/60 hover:text-foreground/80'
+                ? 'text-foreground border-[#D3BFA8]'
+                : 'text-foreground/60 hover:text-foreground/80 border-transparent'
             )}
           >
-            <AnimatePresence>
-              {isActive && (
-                <motion.span
-                  layoutId="ask-tab-pill"
-                  className="absolute inset-0 rounded-full bg-primary shadow-md"
-                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                />
-              )}
-            </AnimatePresence>
-            <span className="relative z-10">{label}</span>
+            <span>{label}</span>
           </button>
         )
       })}

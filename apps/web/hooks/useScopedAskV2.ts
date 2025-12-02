@@ -13,6 +13,7 @@ export interface ScopedAskResult {
   answer: string
   citations: ScopedAskCitation[]
   confidenceLow: boolean
+  sessionId?: string // New: Session ID for multi-turn chat
 }
 
 /**
@@ -23,13 +24,14 @@ export function useScopedAskV2(fileId: string | null) {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<ScopedAskResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [sessionId, setSessionId] = useState<string | null>(null) // Track session
 
   const ask = useCallback(async (
     prompt: string,
     selection?: {
       page_index: number
-      start: number
-      end: number
+      start?: number
+      end?: number
       quote: string
       prefix?: string
       suffix?: string
@@ -42,12 +44,16 @@ export function useScopedAskV2(fileId: string | null) {
 
     setLoading(true)
     setError(null)
-    setResult(null)
+    // Don't clear result immediately for chat continuity if session exists
+    if (!sessionId) {
+      setResult(null)
+    }
 
     try {
       track('backpack.reader.ask.submit', {
         file_id: fileId,
         has_selection: !!selection,
+        session_id: sessionId,
       })
 
       const response = await fetch('/api/backpack/ask', {
@@ -58,14 +64,15 @@ export function useScopedAskV2(fileId: string | null) {
           file_id: fileId,
           selection: selection ? {
             page_index: selection.page_index,
-            start: selection.start,
-            end: selection.end,
+            start: selection.start ?? -1,
+            end: selection.end ?? -1,
             quote: selection.quote,
             prefix: selection.prefix,
             suffix: selection.suffix,
           } : undefined,
           prompt,
           top_k: 6,
+          session_id: sessionId, // Send existing session ID
         }),
       })
 
@@ -80,6 +87,7 @@ export function useScopedAskV2(fileId: string | null) {
       let answer = ''
       const citations: ScopedAskCitation[] = []
       let confidenceLow = false
+      let newSessionId = sessionId
 
       if (reader) {
         while (true) {
@@ -93,38 +101,45 @@ export function useScopedAskV2(fileId: string | null) {
             if (line.startsWith('data: ')) {
               try {
                 const data = JSON.parse(line.slice(6))
-                
+
                 if (data.type === 'token') {
                   answer += data.content || ''
-                  setResult({
+                  setResult(prev => ({
                     answer,
-                    citations,
+                    citations: prev?.citations || [], // Keep existing citations? Or replace? Usually accumulate for streaming answer
                     confidenceLow,
-                  })
+                    sessionId: newSessionId || undefined
+                  }))
                 } else if (data.type === 'citation') {
                   citations.push({
                     page_index: data.page_index || 0,
                     text: data.text || '',
                     score: data.score,
                   })
-                  setResult({
+                  setResult(prev => ({
                     answer,
                     citations,
                     confidenceLow,
-                  })
+                    sessionId: newSessionId || undefined
+                  }))
+                } else if (data.type === 'session') {
+                  newSessionId = data.session_id
+                  setSessionId(newSessionId)
                 } else if (data.type === 'confidence') {
                   confidenceLow = data.low === true
-                  setResult({
+                  setResult(prev => ({
                     answer,
                     citations,
                     confidenceLow,
-                  })
+                    sessionId: newSessionId || undefined
+                  }))
                 } else if (data.type === 'done') {
                   track('backpack.reader.ask.complete', {
                     file_id: fileId,
                     answer_length: answer.length,
                     citations_count: citations.length,
                     confidence_low: confidenceLow,
+                    session_id: newSessionId
                   })
                 }
               } catch (e) {
@@ -140,7 +155,9 @@ export function useScopedAskV2(fileId: string | null) {
           answer: data.answer || '',
           citations: data.citations || [],
           confidenceLow: data.confidence_low || false,
+          sessionId: data.session_id
         })
+        if (data.session_id) setSessionId(data.session_id)
       }
     } catch (err) {
       console.error('[useScopedAsk] Error:', err)
@@ -152,11 +169,12 @@ export function useScopedAskV2(fileId: string | null) {
     } finally {
       setLoading(false)
     }
-  }, [fileId])
+  }, [fileId, sessionId])
 
   const clear = useCallback(() => {
     setResult(null)
     setError(null)
+    setSessionId(null) // Clear session on explicit clear
   }, [])
 
   return {
@@ -165,5 +183,6 @@ export function useScopedAskV2(fileId: string | null) {
     result,
     error,
     clear,
+    sessionId
   }
 }

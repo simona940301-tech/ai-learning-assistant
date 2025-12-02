@@ -1,5 +1,6 @@
 use crate::battle_models::BattleResultEvent;
 use std::env;
+use reqwest::header;
 use tracing::{info, warn, error};
 
 // ============================================
@@ -15,6 +16,16 @@ pub async fn send_battle_event_to_api(event: BattleResultEvent) {
         .unwrap_or_else(|_| "http://localhost:3000/api/play/battle/events".to_string());
     
     let api_key = env::var("BATTLE_EVENTS_API_KEY").ok();
+    let vercel_bypass = env::var("VERCEL_PROTECTION_BYPASS").ok();
+
+    let endpoint = if let Some(token) = &vercel_bypass {
+        format!(
+            "{}?x-vercel-protection-bypass={}&x-vercel-set-bypass-cookie=true",
+            api_url, token
+        )
+    } else {
+        api_url
+    };
 
     // 構建請求體
     let request_body = serde_json::json!({
@@ -43,11 +54,16 @@ pub async fn send_battle_event_to_api(event: BattleResultEvent) {
         }
     };
 
-    let mut request = client.post(&api_url).json(&request_body);
+    let mut request = client.post(&endpoint).json(&request_body);
 
     // 添加 API Key（如果配置了）
     if let Some(key) = api_key {
         request = request.header("x-api-key", key);
+    }
+    if let Some(token) = vercel_bypass {
+        request = request
+            .header("x-vercel-protection-bypass", token.clone())
+            .header(header::COOKIE, format!("x-vercel-protection-bypass={}", token));
     }
 
     match request.send().await {
@@ -71,4 +87,3 @@ pub async fn send_battle_event_to_api(event: BattleResultEvent) {
         }
     }
 }
-

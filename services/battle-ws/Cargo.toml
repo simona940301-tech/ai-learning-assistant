@@ -13,7 +13,7 @@ uuid = { version = "1.6", features = ["v4", "serde"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # P4: Redis 客戶端（Week 2 使用）
-redis = { version = "0.24", features = ["tokio-comp"] }
+redis = { version = "0.24", features = ["tokio-comp", "tls-native-tls", "tokio-native-tls-comp"] }
 chrono = { version = "0.4", features = ["serde"] }
 lazy_static = "1.4"
 # P9: HTTP 客戶端（用於發送戰鬥事件）
@@ -23,3 +23,10 @@ dotenvy = "0.15"
 # DDA AI 答題系統
 rand = { version = "0.8", features = ["std_rng"] }
 
+# Telemetry (Protobuf)
+prost = "0.12"
+prost-types = "0.12"
+bytes = "1.5"
+
+[build-dependencies]
+prost-build = "0.12"

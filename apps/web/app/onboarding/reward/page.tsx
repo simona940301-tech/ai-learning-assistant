@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { Button } from '@/components/ui/button'
@@ -43,9 +43,74 @@ export default function OnboardingRewardPage() {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [isAnonymous, setIsAnonymous] = useState(false)
 
-  // Fetch rewards and generate tasks
+  // 🛡️ Enterprise-Grade Auth Protection - Mock User Detection & Onboarding Status Check
+  const checkAuthAndRedirect = useCallback(async () => {
+    // 🚨 Critical: 強制阻擋所有 Mock User - 無例外
+    if (user && (user.id === 'e770f9cd-52a7-43de-b983-70f6f78d2f53' || user.email === 'dev@test.com')) {
+      console.warn('[Reward] 🚨 強制阻擋 Mock User，執行登出')
+      await supabaseBrowserClient.auth.signOut()
+      router.push('/onboarding')
+      return
+    }
+
+    if (!user) return
+
+    try {
+      // Session 驗證 - 確保有效登入
+      const { data: sessionData, error: sessionError } = await supabaseBrowserClient.auth.getSession()
+      if (sessionError || !sessionData?.session) {
+        console.warn('[Reward] Invalid session, redirecting to login')
+        router.push('/onboarding')
+        return
+      }
+
+      // Onboarding 狀態檢查 - 與架構一致
+      const { data, error } = await supabaseBrowserClient
+        .from('profiles')
+        .select('onboarding_completed')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      if (error) {
+        console.error('[Reward] Profile query error:', error)
+        router.push('/onboarding')
+        return
+      }
+
+      if (data?.onboarding_completed) {
+        console.log('[Reward] ✅ User completed onboarding, redirecting to home')
+        router.push('/home')
+        return
+      }
+
+      console.log('[Reward] ✅ Auth verified, continuing with reward page')
+    } catch (error) {
+      console.error('[Reward] Auth check failed:', error)
+      router.push('/onboarding')
+    }
+  }, [user, router])
+
+  // 🎯 Optimized: 只在認證狀態改變時執行，避免無限循環
+  useEffect(() => {
+    if (!authLoading) {
+      checkAuthAndRedirect()
+    }
+  }, [authLoading, user?.id, checkAuthAndRedirect]) // 只監聽 user.id 避免物件變化
+
+  // 🚀 Smart Data Initialization - Mock User Safe + Performance Optimized
   useEffect(() => {
     async function init() {
+      console.log('[Reward] 🔄 Starting init function...')
+      console.log('[Reward] User state:', { hasUser: !!user, userId: user?.id, authLoading })
+      
+      // 🚨 Critical: 強制阻擋 Mock User 資料庫操作
+      if (user && (user.id === 'e770f9cd-52a7-43de-b983-70f6f78d2f53' || user.email === 'dev@test.com')) {
+        console.warn('[Reward] 🚨 Mock User detected in init, aborting all operations')
+        await supabaseBrowserClient.auth.signOut()
+        setLoading(false)
+        return
+      }
+
       try {
         // 從 sessionStorage 讀取資料
         const storedScore = sessionStorage.getItem('onboarding_challenge_score')
@@ -55,6 +120,8 @@ export default function OnboardingRewardPage() {
         const score = storedScore ? parseInt(storedScore, 10) : 0
         const results = storedResults ? JSON.parse(storedResults) : []
         const questions = storedQuestions ? JSON.parse(storedQuestions) : []
+
+        console.log('[Reward] Session data:', { score, results: results.length, questions: questions.length })
 
         setPlayerScore(score)
         setXpEarned(20 + score * 10)
@@ -132,21 +199,27 @@ export default function OnboardingRewardPage() {
           })
         }
 
+        console.log('[Reward] ✅ All processing completed')
         setLoading(false)
       } catch (error) {
-        console.error('[Reward] Error:', error)
+        console.error('[Reward] ❌ Error in init:', error)
+        // Graceful fallback - 即使出錯也要顯示基本獎勵
         const fallbackScore = sessionStorage.getItem('onboarding_challenge_score')
         const score = fallbackScore ? parseInt(fallbackScore, 10) : 0
         setPlayerScore(score)
         setXpEarned(20 + score * 10)
         setCoinsEarned(score >= 5 ? 100 : score >= 4 ? 80 : score >= 3 ? 60 : 40)
         setTasks(getDefaultTasks())
+        console.log('[Reward] 🔧 Fallback completed')
         setLoading(false)
       }
     }
 
+    // 🎯 Prevention: 避免重複執行
+    if (!loading) return
+    
     init()
-  }, [user, authLoading])
+  }, [user?.id, authLoading, loading]) // 加入 loading 依賴確保只執行一次
 
   const handleRegister = () => {
     // 導向註冊頁面，並帶上資料
