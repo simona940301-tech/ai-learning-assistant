@@ -1,17 +1,24 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Loader2, BookmarkPlus, Check, Sparkles } from 'lucide-react'
+import { Loader2, BookmarkPlus, Check, Sparkles, FileText } from 'lucide-react'
+import { experimental_useObject as useObject } from '@ai-sdk/react'
 import { FileAnalysis } from '@/lib/types'
 import { detectSubject, type SubjectTag } from '@/lib/utils/detect-subject'
 import { RAGMarkdownRenderer } from './RAGMarkdownRenderer'
 import { cn } from '@/lib/utils'
+import { GSATAnalysisSchema } from '@/lib/schemas/gsat-analysis-schema'
 
 interface ProgressiveAnalysisCardProps {
-    analysisId: string
-    fileName: string
+    documentId?: string
+    relatedDocIds?: string[]
+    subject?: string
+    selectedDocIds?: string[]
+    initialText?: string
+    fileName?: string
     onAnalysisUpdate?: (analysis: FileAnalysis) => void
+    onAnalysisComplete?: (result: any) => void
 }
 
 const SUBJECT_KEYWORDS: Array<{ tag: SubjectTag; keywords: string[] }> = [
@@ -22,18 +29,62 @@ const SUBJECT_KEYWORDS: Array<{ tag: SubjectTag; keywords: string[] }> = [
     { tag: '自然', keywords: ['自然', 'science', 'physics', 'chemistry', 'biology', 'earth'] },
 ]
 
+// Remove inline options (A./B./C./D.) from content to avoid duplicate rendering with options array
+function cleanQuestionContent(raw?: string): string {
+    if (!raw) return ''
+    let text = raw
+    // Remove lines that start with option labels
+    text = text
+        .split(/\r?\n/)
+        .filter(line => !/^\s*[A-D][\.\、\)]\s+/i.test(line.trim()))
+        .join('\n')
+
+    // Also remove trailing inline segments that start with option labels (same line)
+    text = text.replace(/\s*[A-D][\.\、\)]\s+.*$/gm, '')
+
+    return text.trim()
+}
+
+// Strip leading option label like "A. ", "B、", "C)" from option text
+function normalizeOptionText(raw?: string): string {
+    if (!raw) return ''
+    return raw.replace(/^\s*[A-D][\.\、\)]\s+/i, '').trim()
+}
+
+// Ensure multi-select questions render exactly 5 options (pad or trim) and never blank
+function normalizeOptions(options: string[] = [], isMulti: boolean): string[] {
+    if (!isMulti) return options
+    const arr = [...options]
+    if (arr.length > 5) return arr.slice(0, 5)
+    while (arr.length < 5) arr.push('（缺少選項）')
+    return arr.map(opt => opt && opt.trim() ? opt : '（缺少選項）')
+}
+
 export default function ProgressiveAnalysisCard({
-    analysisId,
+    documentId,
+    relatedDocIds = [],
+    subject,
+    selectedDocIds = [],
+    initialText,
     fileName,
-    onAnalysisUpdate
+    onAnalysisUpdate,
+    onAnalysisComplete
 }: ProgressiveAnalysisCardProps) {
+    const hasStartedRef = useRef(false)
+    const completionFiredRef = useRef(false)
     const [analysis, setAnalysis] = useState<FileAnalysis | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [isSaving, setIsSaving] = useState(false)
     const [saveSuccess, setSaveSuccess] = useState(false)
+    const [documentNames, setDocumentNames] = useState<Record<string, string>>({})
+
+    const { object, error: streamError, isLoading, submit } = useObject({
+        api: '/api/rag/analyze-object',
+        schema: GSATAnalysisSchema,
+    })
 
     const resolveSubjectTag = (): SubjectTag => {
-        const normalized = (analysis?.detectedSubject || '').toLowerCase()
+        const normalized = (analysis?.detectedSubject || subject || '').toLowerCase()
         const matched = SUBJECT_KEYWORDS.find(({ keywords }) =>
             keywords.some(keyword => normalized.includes(keyword))
         )
@@ -47,6 +98,99 @@ export default function ProgressiveAnalysisCard({
         return detectSubject(fallbackText || '綜合題')
     }
 
+    // Fetch document names for source attribution
+    useEffect(() => {
+        const allDocIds = selectedDocIds.length > 0
+            ? selectedDocIds
+            : [documentId, ...relatedDocIds].filter(Boolean) as string[]
+
+        if (allDocIds.length === 0) return
+
+        const fetchDocumentNames = async () => {
+            try {
+                const response = await fetch(`/api/rag/upload?ids=${allDocIds.join(',')}`)
+                const data = await response.json()
+
+                if (data.success && data.documents) {
+                    const nameMap: Record<string, string> = {}
+                    data.documents.forEach((doc: any) => {
+                        nameMap[doc.id] = doc.filename
+                    })
+                    setDocumentNames(nameMap)
+                    console.log('[ProgressiveAnalysisCard] 📄 Document names loaded:', nameMap)
+                }
+            } catch (err) {
+                console.error('[ProgressiveAnalysisCard] Failed to fetch document names:', err)
+            }
+        }
+
+        fetchDocumentNames()
+    }, [selectedDocIds, documentId, relatedDocIds])
+
+    // Kick off analysis via AI SDK hook (Vercel streamObject protocol)
+    useEffect(() => {
+        if (hasStartedRef.current) return
+
+        const allDocIds = selectedDocIds.length > 0
+            ? selectedDocIds
+            : [documentId, ...relatedDocIds].filter(Boolean) as string[]
+
+        if (!initialText && allDocIds.length === 0) {
+            setError('沒有可分析的文件')
+            return
+        }
+
+        hasStartedRef.current = true
+        setError(null)
+        setAnalysis(null)
+
+        if (allDocIds.length > 0) {
+            submit({
+                documentId: allDocIds[0],
+                relatedDocIds: allDocIds.slice(1),
+                subject,
+            })
+        } else if (initialText) {
+            submit({
+                text: initialText,
+                subject,
+            })
+        }
+    }, [documentId, relatedDocIds, selectedDocIds, subject, initialText, submit])
+
+    // Bridge streamed object into FileAnalysis shape
+    useEffect(() => {
+        if (!object) return
+
+        const transformed: FileAnalysis = {
+            id: object.analysisID || documentId || 'analysis',
+            status: object.examPrediction && object.examPrediction.length > 0 ? 'prediction_ready' : 'analysis_ready',
+            processingTimeMs: 0,
+            quickSummary: object.summary,
+            detectedSubject: object.subject,
+            detectedTopics: object.topics,
+            coreConcepts: object.keyConcepts,
+            structuredNotes: object.summary,
+            examPredictions: object.examPrediction,
+        }
+
+        setAnalysis(transformed)
+        setError(null)
+        onAnalysisUpdate?.(transformed)
+
+        if (!completionFiredRef.current && (transformed.examPredictions?.length || transformed.structuredNotes)) {
+            completionFiredRef.current = true
+            onAnalysisComplete?.(transformed)
+        }
+    }, [object, documentId, onAnalysisComplete, onAnalysisUpdate])
+
+    // Surface stream errors
+    useEffect(() => {
+        if (!streamError) return
+        console.error('[ProgressiveAnalysisCard] Stream error:', streamError)
+        setError(streamError.message || '分析失敗，請稍後再試')
+    }, [streamError])
+
     // Handle save to backpack
     const handleSaveToNotebook = async () => {
         if (!analysis) return
@@ -56,15 +200,13 @@ export default function ProgressiveAnalysisCard({
 
         try {
             const subjectTag = resolveSubjectTag()
-            // Use structuredNotes directly as it now contains the full unified markdown
             const note_md = analysis.structuredNotes || analysis.quickSummary || ''
 
-            // Use backpack API - auth context will resolve user_id
             const response = await fetch('/api/backpack/save', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    user_id: 'auto', // Will be resolved from auth context in API
+                    user_id: 'auto',
                     question: fileName || '文件分析',
                     canonical_skill: subjectTag,
                     note_md
@@ -89,56 +231,6 @@ export default function ProgressiveAnalysisCard({
         }
     }
 
-    // Real-time updates via Server-Sent Events (SSE)
-    useEffect(() => {
-        const sseUrl = `/api/rag/upload-elite/stream?analysisId=${analysisId}`;
-        console.log('[ProgressiveAnalysisCard] 📡 Connecting to SSE:', sseUrl);
-        const eventSource = new EventSource(sseUrl);
-
-        eventSource.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                const transformed = {
-                    id: data.id,
-                    status: data.status,
-                    processingTimeMs: data.processing_time_ms,
-                    quickSummary: data.quick_summary,
-                    detectedSubject: data.detected_subject,
-                    detectedTopics: data.detected_topics,
-                    coreConcepts: data.core_concepts,
-                    keyInsights: data.key_insights,
-                    suggestedQuestions: data.suggested_questions,
-                    structuredNotes: data.structured_notes,
-                    examPredictions: data.exam_predictions,
-                    weakPoints: data.weak_points,
-                    studyRoadmap: data.study_roadmap,
-                    errorMessage: data.error_message
-                };
-
-                setAnalysis(prev => ({
-                    ...prev,
-                    ...transformed,
-                    quickSummary: transformed.quickSummary || prev?.quickSummary,
-                    structuredNotes: transformed.structuredNotes || prev?.structuredNotes,
-                    examPredictions: transformed.examPredictions || prev?.examPredictions,
-                }));
-
-                onAnalysisUpdate?.(transformed);
-            } catch (e) {
-                console.error('[ProgressiveAnalysisCard] SSE parse error:', e);
-            }
-        };
-
-        eventSource.onerror = (err) => {
-            console.error('[ProgressiveAnalysisCard] SSE error, falling back to polling', err);
-            eventSource.close();
-        };
-
-        return () => {
-            eventSource.close();
-        };
-    }, [analysisId, onAnalysisUpdate]);
-
     // Error state
     if (error || analysis?.status === 'failed') {
         return (
@@ -151,7 +243,7 @@ export default function ProgressiveAnalysisCard({
     }
 
     // Initial Loading
-    if (!analysis) {
+    if (!analysis && (isLoading || documentId || initialText)) {
         return (
             <div className="flex flex-col items-center justify-center py-12 space-y-4">
                 <Loader2 className="w-8 h-8 animate-spin text-muted-foreground/50" />
@@ -160,9 +252,18 @@ export default function ProgressiveAnalysisCard({
         )
     }
 
-    const isComplete = analysis.status === 'prediction_ready' || analysis.status === 'analysis_ready'
-    const hasContent = !!analysis.structuredNotes || !!analysis.quickSummary
+    const isComplete = analysis?.status === 'prediction_ready' || analysis?.status === 'analysis_ready'
+    const hasContent = !!analysis?.structuredNotes || !!analysis?.quickSummary || (analysis?.examPredictions?.length ?? 0) > 0
 
+    // Display selected documents info
+    const allDocIds = selectedDocIds.length > 0
+        ? selectedDocIds
+        : [documentId, ...relatedDocIds].filter(Boolean) as string[]
+
+    const displayDocuments = allDocIds.map(id => documentNames[id] || id).filter(Boolean)
+
+    // Derived flags
+    const isAnalyzing = isLoading && !analysis
     return (
         <div className="w-full max-w-4xl mx-auto space-y-8">
             {/* Status Header - Minimalist */}
@@ -175,6 +276,16 @@ export default function ProgressiveAnalysisCard({
                     <span className="text-sm font-medium text-muted-foreground">
                         {isComplete ? '分析完成' : '正在分析...'}
                     </span>
+
+                    {/* Show document count if multiple */}
+                    {displayDocuments.length > 1 && (
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20">
+                            <FileText className="w-3.5 h-3.5 text-blue-600" />
+                            <span className="text-xs font-medium text-blue-600">
+                                {displayDocuments.length} 個文件
+                            </span>
+                        </div>
+                    )}
                 </div>
 
                 {hasContent && (
@@ -195,9 +306,28 @@ export default function ProgressiveAnalysisCard({
                 )}
             </div>
 
+            {/* Document List - Show when multiple documents */}
+            {displayDocuments.length > 1 && (
+                <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex flex-wrap gap-2 px-1"
+                >
+                    {displayDocuments.map((docName, idx) => (
+                        <div
+                            key={idx}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card border border-border text-sm"
+                        >
+                            <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+                            <span className="text-muted-foreground">{docName}</span>
+                        </div>
+                    ))}
+                </motion.div>
+            )}
+
             {/* Content Area - Minimalist & Unified */}
             <AnimatePresence mode="wait">
-                {analysis.structuredNotes ? (
+                {analysis?.structuredNotes ? (
                     <motion.div
                         key="full-analysis"
                         initial={{ opacity: 0, y: 20 }}
@@ -207,11 +337,11 @@ export default function ProgressiveAnalysisCard({
                         className="bg-card/50 backdrop-blur-sm rounded-3xl p-8 md:p-12 shadow-sm border border-border/50"
                     >
                         <RAGMarkdownRenderer
-                            markdown={analysis.structuredNotes}
-                            subject={analysis.detectedSubject}
+                            content={analysis.structuredNotes}
+                            subject={analysis.detectedSubject || subject}
                         />
                     </motion.div>
-                ) : analysis.quickSummary ? (
+                ) : analysis?.quickSummary ? (
                     <motion.div
                         key="preview"
                         initial={{ opacity: 0, y: 20 }}
@@ -224,8 +354,8 @@ export default function ProgressiveAnalysisCard({
                             <span className="text-sm font-medium">快速預覽</span>
                         </div>
                         <RAGMarkdownRenderer
-                            markdown={analysis.quickSummary}
-                            subject={analysis.detectedSubject}
+                            content={analysis.quickSummary}
+                            subject={analysis.detectedSubject || subject}
                         />
                         <div className="mt-8 flex items-center justify-center gap-2 text-sm text-muted-foreground animate-pulse">
                             <Loader2 className="w-4 h-4 animate-spin" />
@@ -246,11 +376,153 @@ export default function ProgressiveAnalysisCard({
                         </div>
                         <div className="space-y-2">
                             <h3 className="text-lg font-medium text-foreground">正在深入分析文件</h3>
-                            <p className="text-sm text-muted-foreground">AI 正在閱讀並整理重點，請稍候...</p>
+                            <p className="text-sm text-muted-foreground">
+                                {displayDocuments.length > 1
+                                    ? `AI 正在整合 ${displayDocuments.length} 個文件的內容...`
+                                    : 'AI 正在閱讀並整理重點，請稍候...'}
+                            </p>
                         </div>
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* Exam Predictions */}
+            {(analysis?.examPredictions?.length ?? 0) > 0 && (
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4 }}
+                    className="space-y-4"
+                >
+                    <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-primary" />
+                        <h3 className="text-lg font-semibold text-[#6C4A2D]">考題預測</h3>
+                    </div>
+                    <div className="space-y-3">
+                        {analysis.examPredictions!.map((item, idx) => (
+                            <div
+                                key={idx}
+                                className="rounded-[10px] bg-[#F8F1E7] px-5 py-5 space-y-4"
+                            >
+                                {item.type === 'question_set' || (item as any).questions ? (
+                                    <>
+                                        <div className="text-sm font-semibold text-[#6C4A2D]">
+                                            題組 {idx + 1}
+                                        </div>
+                                        {'context' in item && item.context && (
+                                            <p className="text-[16px] leading-[1.6] tracking-[0.2px] text-[#6C4A2F]">
+                                                {item.context}
+                                            </p>
+                                        )}
+                                        {'questions' in item && Array.isArray(item.questions) && (
+                                            <div className="space-y-4">
+                                                {item.questions.map((q: any, qIdx: number) => {
+                                                    const questionText = cleanQuestionContent(q.question)
+                                                    return (
+                                                        <div key={qIdx} className="space-y-3">
+                                                            <div className="flex items-center gap-3">
+                                                                <span className="text-[14px] font-semibold text-[#6C4A2D]">{qIdx + 1}.</span>
+                                                                <span className="text-[15px] leading-[1.6] tracking-[0.2px] text-[#6C4A2D]">
+                                                                    {questionText}
+                                                                </span>
+                                                                {q.difficulty && (
+                                                                    <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-[#E8DCC9] text-[#8C6B4A] border border-[#E8DCC8]">
+                                                                        {q.difficulty}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            {Array.isArray(q.options) && q.options.length > 0 && (
+                                                                <div className="space-y-2.5 pt-1">
+                                                                    {normalizeOptions(q.options, q.questionType === '多選').map((opt: string, oIdx: number) => {
+                                                                        const label = String.fromCharCode(65 + oIdx)
+                                                                        const optionText = normalizeOptionText(opt)
+                                                                    return (
+                                                                        <div
+                                                                            key={oIdx}
+                                                                            className="flex items-center gap-3 rounded-lg px-3 py-2 bg-[#F1E8DB]"
+                                                                            >
+                                                                                <span className="font-bold text-[#8C6B4A]">{label}</span>
+                                                                                <span className="text-[15px] leading-[1.5] tracking-[0.2px] text-[#6C4A2D]">
+                                                                                    {optionText}
+                                                                                </span>
+                                                                            </div>
+                                                                        )
+                                                                    })}
+                                                                </div>
+                                                            )}
+                                                            {q.answer && (
+                                                                <p className="text-sm text-[#6C4A2D]">
+                                                                    答案：{q.answer}
+                                                                </p>
+                                                            )}
+                                                            {q.analysis && (
+                                                                <p className="text-[14px] leading-[1.5] tracking-[0.2px] text-[#9E7F63]">
+                                                                    解析：{q.analysis}
+                                                                </p>
+                                                            )}
+                                                            <div className="h-px bg-[rgba(0,0,0,0.06)]" />
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    (() => {
+                                        const questionText = cleanQuestionContent((item as any).question)
+                                        return (
+                                            <>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs font-medium text-[#6C4A2D]">題目 {idx + 1}</span>
+                                                    {'difficulty' in item && (item as any).difficulty && (
+                                                        <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-[#E8DCC9] text-[#8C6B4A] border border-[#E8DCC8]">
+                                                            {(item as any).difficulty}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {questionText && (
+                                                    <p className="text-[15px] leading-[1.6] tracking-[0.2px] text-[#6C4A2F]">
+                                                        {questionText}
+                                                    </p>
+                                                )}
+                                                {'options' in item && Array.isArray((item as any).options) && (
+                                                    <div className="space-y-2.5 pt-1">
+                                                        {normalizeOptions((item as any).options, (item as any).questionType === '多選').map((opt: string, oIdx: number) => {
+                                                            const label = String.fromCharCode(65 + oIdx)
+                                                            const optionText = normalizeOptionText(opt)
+                                                            return (
+                                                                <div
+                                                                    key={oIdx}
+                                                                    className="flex items-center gap-3 rounded-lg px-3 py-2 bg-[#F1E8DB]"
+                                                                >
+                                                                    <span className="font-bold text-[#8C6B4A]">{label}</span>
+                                                                    <span className="text-[15px] leading-[1.5] tracking-[0.2px] text-[#6C4A2D]">
+                                                                        {optionText}
+                                                                    </span>
+                                                                </div>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                )}
+                                                {'answer' in item && (
+                                                    <p className="text-sm text-[#6C4A2D]">
+                                                        答案：{(item as any).answer}
+                                                    </p>
+                                                )}
+                                                {'analysis' in item && (
+                                                    <p className="text-[14px] leading-[1.5] tracking-[0.2px] text-[#9E7F63]">
+                                                        解析：{(item as any).analysis}
+                                                    </p>
+                                                )}
+                                            </>
+                                        )
+                                    })()
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </motion.div>
+            )}
         </div>
     )
 }

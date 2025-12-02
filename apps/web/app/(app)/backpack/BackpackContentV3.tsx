@@ -9,11 +9,14 @@ import { ErrorBookCard } from '@/components/backpack/ErrorBookCard'
 import { QuestionSetCard } from '@/components/backpack/QuestionSetCard'
 import { TypeTabs } from '@/components/backpack/TypeTabs'
 import { Button } from '@/components/ui/button'
-import { Plus, Book, Store, Edit2, Trash2, X } from 'lucide-react'
+import { Plus, Book, Store, Edit2, Trash2, X, Sparkles, CheckSquare } from 'lucide-react'
 import { useAsk } from '@/lib/ask-context'
 import type { BackpackFile } from '@/lib/types'
 import { NoteViewerModal } from '@/components/backpack/NoteViewerModal'
+// 🎯 Phase 2: 使用簡化版 PDF Reader（無選取/註解功能）
+import { BackpackReaderSimple as BackpackReader } from '@/components/backpack/BackpackReaderSimple'
 import { StoreModal } from '@/components/store/StoreModal'
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { handleApiError } from '@/lib/error-handler'
 import { EmptyState } from '@/components/ui/empty-state'
 import { SkeletonList } from '@/components/ui/skeleton'
@@ -85,6 +88,13 @@ export function BackpackContentV3() {
   const [selectedErrorBookIds, setSelectedErrorBookIds] = useState<Set<string>>(new Set())
   const [showCloudLinkInput, setShowCloudLinkInput] = useState(false)
   const [cloudLinkUrl, setCloudLinkUrl] = useState('')
+  const [isUploading, setIsUploading] = useState(false)
+  const [viewingFile, setViewingFile] = useState<BackpackFile | null>(null) // 🎯 新增：追蹤正在查看的檔案（PDF/圖片）
+  const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null) // 🎯 本地預覽 URL（用於上傳前預覽）
+  
+  // 🎯 Phase 3: 多選模式（用於匯入到重點統整）
+  const [isSelectMode, setIsSelectMode] = useState(false)
+  const [selectedForSummary, setSelectedForSummary] = useState<Set<string>>(new Set())
 
   // Load data based on content type
   const loadData = useCallback(async () => {
@@ -105,9 +115,14 @@ export function BackpackContentV3() {
           setErrorBookItems(data.items || [])
         }
       } else if (contentType === 'book') {
-        const response = await fetch('/api/question-sets/user', { credentials: 'include' })
+        // 🎯 修復：使用正確的 API 路徑 /api/user/question-sets
+        const response = await fetch('/api/user/question-sets', { credentials: 'include' })
         const data = await response.json().catch(() => ({}))
-        if (response.ok && data.sets) {
+        if (response.ok && data.data?.sets) {
+          // API 使用 Api.success() 格式，數據在 data.data 中
+          setQuestionSetItems(data.data.sets || [])
+        } else if (response.ok && data.sets) {
+          // 兼容舊格式
           setQuestionSetItems(data.sets || [])
         }
       }
@@ -187,9 +202,12 @@ export function BackpackContentV3() {
 
   const handleImportToAsk = (fileId: string, taskType: 'summary' | 'solve') => {
     const file = items.find((f) => f.id === fileId)
-    if (!file) return
+    if (!file) {
+      toast.error('找不到檔案')
+      return
+    }
     
-    // 如果是解題模式，構建特殊 prompt 要求不同解釋
+    // 🎯 如果是解題模式且有內容，構建特殊 prompt 要求不同解釋
     if (taskType === 'solve' && file.content) {
       // 提取題目（從 markdown 中提取第一個標題後的內容）
       const questionMatch = file.content.match(/#\s*(.+?)\n\n(?:##[^\n]+\n\n)?(.+?)(?=\n\n##|\n\n---|$)/s)
@@ -203,18 +221,76 @@ export function BackpackContentV3() {
       return
     }
     
+    // 🎯 匯入檔案到 Ask Context
+    console.log('[Backpack] Importing file to Ask:', { fileId, taskType, file })
     importFromBackpack([file], taskType)
-    toast.success(`已匯入「${file.name}」到 Ask`)
+    toast.success(`已匯入「${file.title}」到 Ask`)
     router.push('/ask')
+  }
+
+  // 🎯 Phase 3: 多選後跳轉到重點統整 Tab
+  const handleBatchSummary = () => {
+    if (selectedForSummary.size === 0) {
+      toast.error('請先選擇檔案')
+      return
+    }
+
+    // 獲取選中的檔案
+    const selectedFiles = items.filter((f) => selectedForSummary.has(f.id))
+    
+    if (selectedFiles.length === 0) {
+      toast.error('找不到選中的檔案')
+      return
+    }
+
+    console.log('[Backpack] 🚀 Importing files to Summary Tab:', selectedFiles.length, 'files')
+    
+    // 匯入到 Ask Context
+    importFromBackpack(selectedFiles, 'summary')
+    
+    // 清除選擇狀態
+    setIsSelectMode(false)
+    setSelectedForSummary(new Set())
+    
+    toast.success(`已匯入 ${selectedFiles.length} 個檔案，跳轉到重點統整...`)
+    
+    // 🎯 跳轉到 Ask 頁面的 Summary Tab
+    router.push('/ask?tab=summary')
+  }
+
+  // 🎯 Phase 3: 切換檔案選擇
+  const toggleFileSelection = (fileId: string) => {
+    setSelectedForSummary((prev) => {
+      const next = new Set(prev)
+      if (next.has(fileId)) {
+        next.delete(fileId)
+      } else {
+        next.add(fileId)
+      }
+      return next
+    })
   }
 
   const handleFileClick = (file: BackpackFile) => {
     trackManualOrganize() // 🎯 記錄手動整理操作，達到 3 次後自動觸發引導
     if (file.is_notebook_entry && file.content) {
+      // 筆記類型：使用 NoteViewerModal
       setViewingNote(file)
       return
     }
-    // Handle other file types
+    
+    // 🎯 處理上傳的檔案（PDF、圖片等）
+    if (file.file_url) {
+      // 檢查檔案類型
+      if (file.type === 'pdf' || file.type === 'image') {
+        setViewingFile(file)
+      } else {
+        // 其他類型（如 text），嘗試在新視窗開啟
+        window.open(file.file_url, '_blank')
+      }
+    } else {
+      toast.error('檔案 URL 不存在，無法開啟')
+    }
   }
 
   const handleErrorBookClick = (item: any) => {
@@ -287,21 +363,6 @@ export function BackpackContentV3() {
             ))}
           </div>
 
-          {/* Upload Button - Only in note mode */}
-          {contentType === 'note' && (
-            <div className="mt-4 flex justify-center">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowUpload(!showUpload)}
-                className="h-8 px-3 text-xs"
-              >
-                <Plus className="h-3 w-3 mr-1.5" strokeWidth={1.75} />
-                上傳檔案
-              </Button>
-            </div>
-          )}
-
           {/* Store Button - Only in book mode */}
           {contentType === 'book' && (
             <div className="mt-4 flex justify-center">
@@ -338,7 +399,7 @@ export function BackpackContentV3() {
       {/* First Layer: Type Tabs */}
       <TypeTabs activeType={contentType} onTypeChange={handleTypeChange} />
 
-      {/* Back Button and Edit Mode Toggle */}
+      {/* Back Button and Action Buttons */}
       <div className="px-4 py-3 border-b border-border flex items-center justify-between">
         <div className="flex items-center">
           <Button
@@ -353,13 +414,71 @@ export function BackpackContentV3() {
             {subjectInfo?.name}
           </span>
         </div>
-        {filteredItems.length > 0 && (
+        
+        {/* 🎯 Phase 3: 選擇模式和編輯模式按鈕 */}
+        {filteredItems.length > 0 && contentType === 'note' && (
+          <div className="flex items-center gap-2">
+            {/* 選擇模式按鈕 */}
+            <Button
+              variant={isSelectMode ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                setIsSelectMode(!isSelectMode)
+                if (isSelectMode) {
+                  setSelectedForSummary(new Set())
+                }
+                // 退出編輯模式
+                if (isEditMode) {
+                  setIsEditMode(false)
+                  setSelectedNoteIds(new Set())
+                }
+              }}
+              className="h-8 px-3 text-xs"
+            >
+              <CheckSquare className="h-3 w-3 mr-1.5" />
+              {isSelectMode ? '取消選擇' : '選擇檔案'}
+            </Button>
+            
+            {/* 編輯按鈕 */}
+            {!isSelectMode && (
+              <Button
+                variant="ghost"
+                size="sm"
+                data-action="batch-organize"
+                onClick={() => {
+                  recordOperation()
+                  setIsEditMode(!isEditMode)
+                  if (isEditMode) {
+                    setSelectedNoteIds(new Set())
+                    setSelectedErrorBookIds(new Set())
+                  }
+                }}
+                className="h-8 px-3 text-xs"
+              >
+                {isEditMode ? (
+                  <>
+                    <X className="h-3 w-3 mr-1.5" />
+                    取消
+                  </>
+                ) : (
+                  <>
+                    <Edit2 className="h-3 w-3 mr-1.5" />
+                    編輯
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        )}
+        
+        {/* 錯題本和題本的編輯按鈕 */}
+        {filteredItems.length > 0 && contentType !== 'note' && (
           <Button
             variant="ghost"
             size="sm"
             data-action="batch-organize"
             onClick={() => {
-              recordOperation() // 🎯 記錄操作
+              recordOperation()
               setIsEditMode(!isEditMode)
               if (isEditMode) {
                 setSelectedNoteIds(new Set())
@@ -382,6 +501,24 @@ export function BackpackContentV3() {
           </Button>
         )}
       </div>
+      
+      {/* 🎯 Phase 3: 選擇模式 - 統整按鈕 */}
+      {isSelectMode && (
+        <div className="px-4 py-3 border-b border-border bg-primary/5 flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">
+            已選擇 {selectedForSummary.size} 個檔案
+          </span>
+          <Button
+            size="sm"
+            onClick={handleBatchSummary}
+            disabled={selectedForSummary.size === 0}
+            className="h-8 px-4 text-xs bg-primary hover:bg-primary/90"
+          >
+            <Sparkles className="h-3 w-3 mr-1.5" />
+            統整
+          </Button>
+        </div>
+      )}
 
       {/* Batch Delete Bar (when in edit mode) */}
       {isEditMode && (
@@ -458,28 +595,56 @@ export function BackpackContentV3() {
           />
         ) : (
           <div className="space-y-4">
+            {/* 🎯 上傳按鈕 - 在檔案列表視圖中也顯示（僅筆記模式） */}
+            {contentType === 'note' && (
+              <div className="flex justify-center pb-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowUpload(!showUpload)}
+                  className="h-8 px-3 text-xs"
+                >
+                  <Plus className="h-3 w-3 mr-1.5" strokeWidth={1.75} />
+                  上傳檔案
+                </Button>
+              </div>
+            )}
+            
             {contentType === 'note' &&
               filteredItems.map((item) => (
                 <ContentCard
                   key={item.id}
                   item={item}
-                  onClick={() => handleFileClick(item)}
+                  onClick={() => {
+                    // 🎯 Phase 3: 選擇模式下切換選中狀態
+                    if (isSelectMode) {
+                      toggleFileSelection(item.id)
+                    } else {
+                      handleFileClick(item)
+                    }
+                  }}
                   onImportToAsk={(type) => handleImportToAsk(item.id, type)}
                   getRelativeTime={getRelativeTime}
                   subjectName={subjectInfo?.name || ''}
                   isEditMode={isEditMode}
-                  isSelected={selectedNoteIds.has(item.id)}
+                  isSelected={isSelectMode ? selectedForSummary.has(item.id) : selectedNoteIds.has(item.id)}
                   onToggleSelect={() => {
-                    setSelectedNoteIds((prev) => {
-                      const next = new Set(prev)
-                      if (next.has(item.id)) {
-                        next.delete(item.id)
-                      } else {
-                        next.add(item.id)
-                      }
-                      return next
-                    })
+                    if (isSelectMode) {
+                      toggleFileSelection(item.id)
+                    } else {
+                      setSelectedNoteIds((prev) => {
+                        const next = new Set(prev)
+                        if (next.has(item.id)) {
+                          next.delete(item.id)
+                        } else {
+                          next.add(item.id)
+                        }
+                        return next
+                      })
+                    }
                   }}
+                  // 🎯 Phase 3: 傳遞選擇模式狀態
+                  isSelectMode={isSelectMode}
                 />
               ))}
             {contentType === 'wrong' &&
@@ -537,6 +702,53 @@ export function BackpackContentV3() {
         }}
       />
 
+      {/* 🎯 檔案查看器 Modal（PDF 和圖片） */}
+      {viewingFile && (
+        <Dialog open={!!viewingFile} onOpenChange={(open) => !open && setViewingFile(null)}>
+          <DialogContent className="max-w-[95vw] h-[95vh] p-0 gap-0 overflow-hidden bg-background/95 backdrop-blur-xl border-none shadow-2xl">
+            <DialogTitle className="sr-only">{viewingFile.title}</DialogTitle>
+            <DialogDescription className="sr-only">
+              {viewingFile.type === 'pdf' ? 'PDF 檔案檢視器' : viewingFile.type === 'image' ? '圖片檢視器' : '檔案檢視器'}
+            </DialogDescription>
+            {viewingFile.type === 'pdf' && viewingFile.file_url ? (
+              <BackpackReader
+                fileId={viewingFile.id}
+                fileUrl={
+                  viewingFile.id.startsWith('preview-')
+                    ? viewingFile.file_url // 🎯 本地預覽：直接使用本地 URL
+                    : `/api/backpack/file-url?file_id=${viewingFile.id}` // 服務器檔案：使用 API
+                }
+                fileName={viewingFile.title}
+                onClose={() => {
+                  // 🎯 清理本地 URL（如果是預覽）
+                  if (localPreviewUrl) {
+                    URL.revokeObjectURL(localPreviewUrl)
+                    setLocalPreviewUrl(null)
+                  }
+                  setViewingFile(null)
+                }}
+              />
+            ) : viewingFile.type === 'image' && viewingFile.file_url ? (
+              <div className="relative w-full h-full flex items-center justify-center bg-black/50">
+                <img
+                  src={viewingFile.file_url}
+                  alt={viewingFile.title}
+                  className="max-w-full max-h-full object-contain"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setViewingFile(null)}
+                  className="absolute top-4 right-4 bg-background/80 hover:bg-background"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : null}
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* Upload Area */}
       {showUpload && contentType === 'note' && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-end">
@@ -552,8 +764,9 @@ export function BackpackContentV3() {
                   size="sm"
                   onClick={() => document.getElementById('backpack-file-input')?.click()}
                   className="flex-1"
+                  disabled={isUploading}
                 >
-                  選擇檔案
+                  {isUploading ? '上傳中...' : '選擇檔案'}
                 </Button>
                 <Button
                   variant="outline"
@@ -564,6 +777,7 @@ export function BackpackContentV3() {
                     setShowCloudLinkInput(true)
                   }}
                   className="flex-1"
+                  disabled={isUploading}
                 >
                   雲端連結
                 </Button>
@@ -573,6 +787,7 @@ export function BackpackContentV3() {
                 size="sm"
                 onClick={() => setShowUpload(false)}
                 className="w-full"
+                disabled={isUploading}
               >
                 取消
               </Button>
@@ -582,6 +797,7 @@ export function BackpackContentV3() {
               type="file"
               accept=".pdf,.txt,.jpg,.jpeg,.png,.gif,.doc,.docx"
               className="hidden"
+              disabled={isUploading}
               onChange={async (e) => {
                 const file = e.target.files?.[0]
                 if (!file) return
@@ -595,9 +811,103 @@ export function BackpackContentV3() {
                   return
                 }
 
-                // TODO: Handle file upload
-                toast.success('檔案上傳功能開發中...')
-                setShowUpload(false)
+                // 🎯 頂尖優化：創建本地預覽（零延遲，立即顯示）
+                const localUrl = URL.createObjectURL(file)
+                setLocalPreviewUrl(localUrl)
+                
+                // 判斷檔案類型
+                let fileType: 'text' | 'pdf' | 'image' = 'text'
+                if (file.type.startsWith('image/')) {
+                  fileType = 'image'
+                } else if (file.type === 'application/pdf') {
+                  fileType = 'pdf'
+                } else if (file.type.startsWith('text/')) {
+                  fileType = 'text'
+                }
+
+                // 如果是 PDF 或圖片，立即顯示本地預覽
+                if (fileType === 'pdf' || fileType === 'image') {
+                  const previewFile: BackpackFile = {
+                    id: `preview-${Date.now()}`,
+                    user_id: '',
+                    subject: (selectedSubject || 'math') as any,
+                    type: fileType,
+                    title: file.name,
+                    content: null,
+                    file_url: localUrl, // 使用本地 URL
+                    file_size: file.size,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                  }
+                  setViewingFile(previewFile)
+                  setShowUpload(false) // 關閉上傳面板，顯示預覽
+                }
+
+                // 🎯 實現檔案上傳功能（背景上傳）
+                setIsUploading(true)
+                try {
+                  const formData = new FormData()
+                  formData.append('file', file)
+                  formData.append('subject', selectedSubject || 'math')
+                  formData.append('title', file.name)
+
+                  const response = await fetch('/api/backpack/upload', {
+                    method: 'POST',
+                    credentials: 'include',
+                    body: formData,
+                  })
+
+                  if (!response.ok) {
+                    const data = await response.json().catch(() => ({}))
+                    const errorMessage = data.message || data.error || '上傳失敗'
+                    throw new Error(errorMessage)
+                  }
+
+                  const result = await response.json()
+                  
+                  // 上傳成功，清理本地 URL 並切換到服務器 URL
+                  if (localUrl) {
+                    URL.revokeObjectURL(localUrl)
+                    setLocalPreviewUrl(null)
+                  }
+                  
+                  // 重新載入數據
+                  await loadData()
+                  
+                  // 如果正在預覽，更新為服務器版本
+                  if (viewingFile && viewingFile.id.startsWith('preview-')) {
+                    const uploadedFile = result.item
+                    if (uploadedFile) {
+                      setViewingFile({
+                        ...uploadedFile,
+                        file_url: uploadedFile.file_url,
+                      })
+                    }
+                  }
+                  
+                  toast.success('檔案上傳成功！')
+                  
+                  // 記錄操作（用於引導系統）
+                  recordOperation('upload-file', { fileId: result.fileId || result.item?.id })
+                } catch (err) {
+                  console.error('[Backpack] Upload failed:', err)
+                  const errorMessage = err instanceof Error ? err.message : '上傳失敗'
+                  toast.error(errorMessage)
+                  setError(errorMessage)
+                  
+                  // 上傳失敗時，清理本地預覽
+                  if (localUrl) {
+                    URL.revokeObjectURL(localUrl)
+                    setLocalPreviewUrl(null)
+                  }
+                  if (viewingFile && viewingFile.id.startsWith('preview-')) {
+                    setViewingFile(null)
+                  }
+                } finally {
+                  setIsUploading(false)
+                  // 重置 input，允許上傳相同檔案
+                  e.target.value = ''
+                }
               }}
             />
           </div>
