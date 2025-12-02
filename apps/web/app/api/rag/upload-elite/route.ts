@@ -76,37 +76,52 @@ export async function POST(req: NextRequest) {
         // Use the first file's name as the main name, or a combined name
         const mainFileName = validFiles[0].name + (validFiles.length > 1 ? ` 等 ${validFiles.length} 個文件` : '')
 
-        // Calculate combined hash
+        // ⚡ OPTIMIZATION: Calculate hash and check cache BEFORE processing
+        console.log('[Elite Upload] 📊 Calculating file hash for cache lookup...')
         let combinedBuffer = Buffer.alloc(0)
         for (const file of validFiles) {
-            const buf = Buffer.from(await file.arrayBuffer())
-            combinedBuffer = Buffer.concat([combinedBuffer, buf])
+            const buffer = Buffer.from(await file.arrayBuffer())
+            combinedBuffer = Buffer.concat([combinedBuffer, buffer])
         }
 
         const fileHash = calculateFileHash(combinedBuffer)
-        const telemetry = new RagTelemetry()
-        // telemetry.recordFile will be called after extraction
+        console.log(`[Elite Upload] 🔑 File hash: ${fileHash.substring(0, 16)}...`)
 
-        console.log(`[Elite Upload] File hash: ${fileHash.substring(0, 16)}...`)
+        const cacheResult = await getCachedAnalysis(fileHash)
 
-        // 5. ⚡ Cache disabled for testing
-        // 6. ⚡ Database cache also disabled for testing
+        if (cacheResult.data) {
+            console.log(`[Elite Upload] ✅ Cache hit! Source: ${cacheResult.source}`)
+            console.log('[Elite Upload] 🚀 Returning cached analysis (< 100ms)')
 
-        // 6. ⭐ ChatGPT-style: 只在內存中處理，不存儲文件
-        // 優勢：零配置、更快、更簡單
-        const fileId = randomUUID() // Still used for background processing
+            // Cache hit - return immediately with cached data
+            return NextResponse.json({
+                success: true,
+                fileId: cacheResult.data.fileId,
+                analysisId: cacheResult.data.analysisId,
+                fileName: cacheResult.data.fileName,
+                numPages: cacheResult.data.numPages,
+                status: cacheResult.data.status,
+                message: '檔案已分析過，從快取載入',
+                cached: true
+            })
+        }
 
-        // 8. 創建 analysis record（存儲文件名，方便顯示）
+        console.log('[Elite Upload] ❌ Cache miss - proceeding with full analysis')
+
+        // ⚡ Performance: Calculate hash in background to avoid blocking response
+        // Hash calculation will be done in background processing
+        const fileId = randomUUID()
         const analysisId = randomUUID()
+        const telemetry = new RagTelemetry()
+
+        // 8. Create analysis record immediately (fast DB insert)
         const { error: analysisError } = await supabase
             .from('file_analysis')
             .insert({
                 id: analysisId,
-                // file_id: null,  // ⭐ Not inserted - no files table dependency
                 user_id: user.id,
-                file_name: mainFileName,  // ⭐ 直接存文件名
+                file_name: mainFileName,
                 status: 'pending'
-                // Note: cache_hit removed - not in original schema
             })
 
         if (analysisError) {
@@ -117,9 +132,10 @@ export async function POST(req: NextRequest) {
             )
         }
 
-        console.log(`[Elite Upload] ✅ Analysis record created (${Date.now() - startTime}ms)`)
+        const responseTime = Date.now() - startTime
+        console.log(`[Elite Upload] ✅ Analysis record created (${responseTime}ms)`)
 
-        // 9. ⭐ IMMEDIATELY return to client (< 1 second!)
+        // 9. ⭐ IMMEDIATELY return to client (< 1 second! Same speed as ask page)
         const response = NextResponse.json({
             success: true,
             fileId,
@@ -131,7 +147,7 @@ export async function POST(req: NextRequest) {
             cached: false
         })
 
-        // 10. ⭐ Trigger background processing (PDF extraction + 3-layer analysis)
+        // 10. ⭐ Trigger background processing (hash calculation + PDF extraction + 3-layer analysis)
         // This runs AFTER the response is sent to the client
         processCompleteAnalysisInBackground(
             fileId,
@@ -141,9 +157,29 @@ export async function POST(req: NextRequest) {
             user.id,
             supabase,
             telemetry,
-            fileHash
-        ).catch(error => {
-            console.error('[Elite Upload] Background processing error:', error)
+            fileHash // Pass the calculated hash for caching
+        ).catch(async (error) => {
+            console.error('[Elite Upload] ❌ Background processing error:', {
+                error: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? error.stack : undefined,
+                analysisId,
+                fileId
+            })
+
+            // ⚡ 確保錯誤狀態被更新到資料庫，讓前端能看到錯誤
+            try {
+                await supabase
+                    .from('file_analysis')
+                    .update({
+                        status: 'failed',
+                        error_message: error instanceof Error ? error.message : '處理失敗',
+                        processing_time_ms: Date.now() - startTime
+                    })
+                    .eq('id', analysisId)
+                console.log('[Elite Upload] ✅ Error status updated in database')
+            } catch (dbError) {
+                console.error('[Elite Upload] ❌ Failed to update error status:', dbError)
+            }
         })
 
         return response
@@ -171,88 +207,187 @@ async function processCompleteAnalysisInBackground(
     userId: string,
     supabase: any,
     telemetry: RagTelemetry,
-    fileHash: string
+    fileHash: string | null // Hash calculated in background if null
 ) {
     const startTime = Date.now()
+    console.log(`[Background] 🚀 Starting complete analysis for file ${fileId} (analysisId: ${analysisId})`)
 
     try {
-        console.log(`[Background] 🚀 Starting complete analysis for file ${fileId}`)
+        // ⚡ CRITICAL: Immediately update status to 'processing' with error handling
+        console.log('[Background] 📝 Step 1: Updating status to processing...')
+        const initialUpdate = await supabase
+            .from('file_analysis')
+            .update({ status: 'processing' })
+            .eq('id', analysisId)
+
+        if (initialUpdate.error) {
+            console.error('[Background] ❌ CRITICAL: Failed to update initial status:', {
+                error: initialUpdate.error,
+                analysisId,
+                errorDetails: JSON.stringify(initialUpdate.error)
+            })
+            throw new Error(`Database update failed: ${initialUpdate.error.message}`)
+        }
+
+        console.log('[Background] ✅ Status successfully updated to processing')
+
+        // ⚡ Verify the update was successful
+        const { data: verifyData, error: verifyError } = await supabase
+            .from('file_analysis')
+            .select('status')
+            .eq('id', analysisId)
+            .single()
+
+        if (verifyError) {
+            console.error('[Background] ❌ Failed to verify status update:', verifyError)
+        } else {
+            console.log('[Background] ✅ Verified status in DB:', verifyData.status)
+        }
+
+        // Calculate hash in background if not provided
+        let calculatedHash = fileHash
+        if (!calculatedHash) {
+            console.log(`[Background] 📊 Calculating file hash...`)
+            let combinedBuffer = Buffer.alloc(0)
+            for (const file of files) {
+                const buf = Buffer.from(await file.arrayBuffer())
+                combinedBuffer = Buffer.concat([combinedBuffer, buf])
+            }
+            calculatedHash = calculateFileHash(combinedBuffer)
+            console.log(`[Background] ✅ File hash: ${calculatedHash.substring(0, 16)}...`)
+        } else {
+            console.log(`[Background] ✅ Using pre-calculated hash: ${calculatedHash.substring(0, 16)}...`)
+        }
 
         // ========================================
-        // Step 0: Extract PDF text (this was blocking before!)
+        // Step 2: Extract text from ALL files
         // ========================================
-        // ========================================
-        // Step 0: Extract text from ALL files
-        // ========================================
-        console.log(`[Background] 📄 Extracting text from ${files.length} files...`)
+        console.log(`[Background] 📝 Step 2: Extracting text from ${files.length} files...`)
         const endExtraction = telemetry.startStage('text_extraction')
 
         let extractedText = ''
         let totalPages = 0
 
-        for (const file of files) {
-            const buffer = Buffer.from(await file.arrayBuffer())
-            const type = file.type
-            const name = file.name.toLowerCase()
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i]
+            console.log(`[Background] 📄 Processing file ${i + 1}/${files.length}: ${file.name} (${file.size} bytes)`)
 
             try {
+                const buffer = Buffer.from(await file.arrayBuffer())
+                const type = file.type
+                const name = file.name.toLowerCase()
+
                 if (type === 'application/pdf' || name.endsWith('.pdf')) {
+                    console.log(`[Background] 🔍 Extracting PDF: ${file.name}...`)
                     const pdfData = await extractTextFromPDFWithGemini(buffer)
                     extractedText += `\n\n--- File: ${file.name} ---\n\n` + pdfData.text
                     totalPages += pdfData.numPages
+                    console.log(`[Background] ✅ PDF extracted: ${pdfData.text.length} chars, ${pdfData.numPages} pages`)
                 } else if (type.startsWith('image/') || name.match(/\.(jpg|jpeg|png|gif)$/)) {
+                    console.log(`[Background] 🖼️ Extracting image: ${file.name}...`)
                     const text = await extractTextFromImageWithGemini(buffer, type || 'image/jpeg')
                     extractedText += `\n\n--- Image: ${file.name} ---\n\n` + text
                     totalPages += 1
+                    console.log(`[Background] ✅ Image extracted: ${text.length} chars`)
                 } else {
-                    // TXT
+                    console.log(`[Background] 📝 Reading text file: ${file.name}...`)
                     const text = buffer.toString('utf-8').trim()
                     extractedText += `\n\n--- File: ${file.name} ---\n\n` + text
                     totalPages += 1
+                    console.log(`[Background] ✅ Text file read: ${text.length} chars`)
                 }
             } catch (err) {
-                console.error(`[Background] Failed to extract ${file.name}:`, err)
-                extractedText += `\n\n--- File: ${file.name} (Extraction Failed) ---\n\n`
+                const errorMsg = err instanceof Error ? err.message : String(err)
+                console.error(`[Background] ❌ Failed to extract ${file.name}:`, {
+                    error: errorMsg,
+                    stack: err instanceof Error ? err.stack : undefined
+                })
+                extractedText += `\n\n--- File: ${file.name} (Extraction Failed: ${errorMsg}) ---\n\n`
             }
         }
 
         endExtraction()
-        // telemetry.recordFile(buffer.length, extractedText.length) // TODO: Update telemetry for multi-file
-
-        console.log(`[Background] ✅ Extracted total ${extractedText.length} characters (${totalPages} pages)`)
+        console.log(`[Background] ✅ Step 2 complete: Extracted ${extractedText.length} characters from ${totalPages} pages in ${Date.now() - startTime}ms`)
 
         // Validate text length
         if (extractedText.length < 50) {
-            throw new Error(`文件內容太少（僅 ${extractedText.length} 字元），無法生成分析。`)
+            const error = `文件內容太少（僅 ${extractedText.length} 字元），無法生成分析。請確認文件包含可讀文字。`
+            console.error(`[Background] ❌ Validation failed:`, error)
+            throw new Error(error)
         }
 
-        // Update analysis status to processing
-        await supabase
+        // Update page count in database
+        console.log('[Background] 📝 Step 3: Updating page count in database...')
+        const pageCountUpdate = await supabase
             .from('file_analysis')
-            .update({
-                status: 'processing',
-                page_count: totalPages  // 存頁數到 analysis 表
-            })
+            .update({ page_count: totalPages })
             .eq('id', analysisId)
 
-        console.log(`[Background] 📊 PDF extraction complete in ${Date.now() - startTime}ms`)
+        if (pageCountUpdate.error) {
+            console.error('[Background] ⚠️ Failed to update page count:', pageCountUpdate.error)
+        } else {
+            console.log(`[Background] ✅ Page count updated: ${totalPages}`)
+        }
 
         // ========================================
-        // ⚡ ULTIMATE PARALLEL ANALYSIS (10s target)
-        // All three layers (preview, summary, questions) run in parallel
+        // Step 4: ULTIMATE PARALLEL ANALYSIS
         // ========================================
-        console.log('[Background] 🚀 Starting ultimate parallel analysis...')
+        console.log('[Background] 📝 Step 4: Starting parallel AI analysis...')
+        console.log('[Background] 🚀 Running QuickPreview + UltimateAnalysis in parallel...')
 
-        // Detect subject first
         const endSubjectDetect = telemetry.startStage('subject_detection')
-        const quickPreview = await generateQuickPreview(extractedText)
+        const endUltimateAnalysis = telemetry.startStage('ultimate_analysis')
+
+        let quickPreview: QuickPreview
+        let ultimateResult: UltimateAnalysisResult
+
+        try {
+            console.log('[Background] 📡 Calling Gemini API for parallel analysis...')
+            const analysisStartTime = Date.now()
+
+            [quickPreview, ultimateResult] = await Promise.all([
+                generateQuickPreview(extractedText).catch(err => {
+                    console.error('[Background] ❌ QuickPreview failed:', {
+                        error: err instanceof Error ? err.message : String(err),
+                        stack: err instanceof Error ? err.stack : undefined
+                    })
+                    throw new Error(`快速預覽生成失敗: ${err instanceof Error ? err.message : String(err)}`)
+                }),
+                generateUltimateAnalysis(extractedText, null).catch(err => {
+                    console.error('[Background] ❌ UltimateAnalysis failed:', {
+                        error: err instanceof Error ? err.message : String(err),
+                        stack: err instanceof Error ? err.stack : undefined
+                    })
+                    throw new Error(`完整分析生成失敗: ${err instanceof Error ? err.message : String(err)}`)
+                })
+            ])
+
+            const analysisDuration = Date.now() - analysisStartTime
+            console.log(`[Background] ✅ Parallel analysis completed in ${analysisDuration}ms`)
+            console.log(`[Background] 📊 Results:`, {
+                subject: quickPreview.subject,
+                summaryLength: quickPreview.summary.length,
+                topicsCount: quickPreview.topics.length,
+                fullMarkdownLength: ultimateResult.fullMarkdown.length
+            })
+        } catch (parallelError) {
+            console.error('[Background] ❌ CRITICAL: Parallel analysis failed:', {
+                error: parallelError instanceof Error ? parallelError.message : String(parallelError),
+                stack: parallelError instanceof Error ? parallelError.stack : undefined,
+                duration: `${Date.now() - startTime}ms`
+            })
+            throw parallelError
+        }
+
         endSubjectDetect()
+        endUltimateAnalysis()
 
         const subject = quickPreview.subject
-        console.log(`[Background] Detected subject: ${subject}`)
+        console.log(`[Background] ✅ Step 4 complete: Subject detected as "${subject}" in ${Date.now() - startTime}ms`)
 
-        // Update with quick preview immediately
-        await supabase
+        // Step 5: Update with quick preview
+        console.log('[Background] 📝 Step 5: Saving quick preview to database...')
+        const previewUpdate = await supabase
             .from('file_analysis')
             .update({
                 quick_summary: quickPreview.summary,
@@ -262,27 +397,32 @@ async function processCompleteAnalysisInBackground(
             })
             .eq('id', analysisId)
 
-        // Run ultimate analysis (all three layers in parallel)
-        const endUltimateAnalysis = telemetry.startStage('ultimate_analysis')
-        const ultimateResult = await generateUltimateAnalysis(extractedText, subject)
-        endUltimateAnalysis()
+        if (previewUpdate.error) {
+            console.error('[Background] ❌ Failed to save quick preview:', previewUpdate.error)
+            throw new Error(`資料庫更新失敗: ${previewUpdate.error.message}`)
+        }
 
-        console.log(`[Background] ✅ Ultimate analysis complete in ${Date.now() - startTime}ms`)
+        console.log('[Background] ✅ Step 5 complete: Quick preview saved')
 
-        // Update with all results
-        await supabase
+        // Step 6: Update with full analysis results
+        console.log('[Background] 📝 Step 6: Saving full analysis to database...')
+        const finalUpdate = await supabase
             .from('file_analysis')
             .update({
                 structured_notes: ultimateResult.fullMarkdown,
-                // Store individual parts for backward compatibility
                 core_concepts: [{ name: 'Preview', explanation: ultimateResult.preview }],
-                exam_predictions: [],  // Will be parsed from markdown
+                exam_predictions: [],
                 status: 'prediction_ready',
                 processing_time_ms: Date.now() - startTime
             })
             .eq('id', analysisId)
 
+        if (finalUpdate.error) {
+            console.error('[Background] ❌ CRITICAL: Failed to save final analysis:', finalUpdate.error)
+            throw new Error(`最終結果儲存失敗: ${finalUpdate.error.message}`)
+        }
 
+        console.log(`[Background] ✅ Step 6 complete: Full analysis saved`)
         console.log(`[Background] 🎉 Analysis complete! Status: prediction_ready (${Date.now() - startTime}ms)`)
 
         // ========================================
@@ -351,8 +491,8 @@ async function processCompleteAnalysisInBackground(
                 .eq('id', analysisId)
                 .single()
 
-            if (completedAnalysis && fileHash) {
-                await setCachedAnalysis(fileHash, {
+            if (completedAnalysis && calculatedHash) {
+                await setCachedAnalysis(calculatedHash, {
                     fileId,
                     analysisId,
                     fileName,

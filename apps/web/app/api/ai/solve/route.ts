@@ -61,7 +61,10 @@ export async function POST(request: NextRequest) {
         },
         { role: 'user', content: prompt },
       ],
-      { model: 'gemini-1.5-flash', temperature: 0.25 }
+      {
+        useCase: 'quick', // ⚡ Use 2.5 Flash for fast response
+        temperature: 0.25
+      }
     )
 
     return Api.success(result)

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getApiUser } from '@/lib/api/auth'
 import { extractTextFromPDF, extractTextFromTXT, cleanText } from '@/lib/utils/text-extraction'
-import { generateSummary } from '@/lib/services/rag-summary'
+import { generateSummary, extractKeywords } from '@/lib/services/rag-summary'
+import { createContextCache } from '@/lib/services/context-cache-service'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -111,9 +112,27 @@ export async function POST(req: NextRequest) {
         let numPages: number | undefined
 
         if (fileName.endsWith('.pdf')) {
-            const pdfData = await extractTextFromPDF(buffer)
-            extractedText = pdfData.text
-            numPages = pdfData.numPages
+            try {
+                const pdfData = await extractTextFromPDF(buffer)
+                extractedText = pdfData.text
+                numPages = pdfData.numPages
+            } catch (pdfError) {
+                console.error('[RAG Upload] PDF extraction failed:', pdfError)
+                const errorMsg = pdfError instanceof Error ? pdfError.message : String(pdfError)
+                return NextResponse.json(
+                    {
+                        error: 'PDF_PARSE_ERROR',
+                        message: `PDF 解析失敗: ${errorMsg}`,
+                        debug: {
+                            fileName,
+                            fileSize,
+                            bufferSize: buffer.length,
+                            suggestion: '請確認檔案是有效的 PDF 格式，而非損壞或加密的文件'
+                        }
+                    },
+                    { status: 400 }
+                )
+            }
         } else {
             extractedText = extractTextFromTXT(buffer)
         }
@@ -205,16 +224,35 @@ export async function POST(req: NextRequest) {
 
         console.log('[RAG Upload] 數據插入成功，document ID:', docRecord?.id)
 
-        // 7. 生成摘要和關鍵詞（異步處理）
+        // 7. 🚀 優化：對於小文件，使用快速摘要策略
+        // 對於大文件（> 10KB），使用完整摘要；小文件使用簡單提取
+        const isLargeFile = cleanedText.length > 10000
+        let summary: string
+        let keywords: string[] = []
+        let theme: string = ''
+
         try {
-            const { summary, keywords, theme } = await generateSummary(cleanedText, {
-                numSentences: 5,
-                numKeywords: 10,
-            })
+            if (isLargeFile) {
+                // 大文件：使用完整摘要生成
+                const summaryResult = await generateSummary(cleanedText, {
+                    numSentences: 5,
+                    numKeywords: 10,
+                })
+                summary = summaryResult.summary
+                keywords = summaryResult.keywords
+                theme = summaryResult.theme
+            } else {
+                // 🚀 小文件：快速策略（提取前 200 字作為摘要）
+                summary = cleanedText.substring(0, 200).trim() + (cleanedText.length > 200 ? '...' : '')
+                // 簡單關鍵詞提取（從前 500 字提取）
+                const previewText = cleanedText.substring(0, 500)
+                const quickKeywords = await extractKeywords(previewText, 5).catch(() => [])
+                keywords = quickKeywords
+                theme = previewText.substring(0, 30).trim() + '...'
+                console.log('[RAG Upload] ⚡ Using fast summary strategy for small file')
+            }
 
             // 8. 更新資料庫記錄（狀態：ready）
-            // 注意：這裡我們暫時將 theme 存入 summary 欄位的前綴，或者需要 migration 添加 theme 欄位
-            // 為了 MVP 快速迭代，我們先只返回給前端，資料庫欄位稍後添加
             const { error: updateError } = await supabase
                 .from('rag_documents')
                 .update({
@@ -229,7 +267,41 @@ export async function POST(req: NextRequest) {
                 console.error('[RAG Upload] Database update error:', updateError)
             }
 
-            // 9. 返回成功結果
+            // 9. 🚀 優化：在背景創建 Context Cache（非阻塞）
+            // 這樣可以立即返回給用戶，Cache 在背景創建
+            Promise.resolve().then(async () => {
+                try {
+                    console.log('[RAG Upload] 🚀 Creating Context Cache in background...');
+                    const cacheResult = await createContextCache(
+                        docRecord.id,
+                        cleanedText,
+                        `${fileName}-${docRecord.id}`
+                    );
+
+                    if (cacheResult.success && cacheResult.cacheName) {
+                        // 更新資料庫記錄 Cache 資訊
+                        await supabase
+                            .from('rag_documents')
+                            .update({
+                                cache_name: cacheResult.cacheName,
+                                cache_expires_at: cacheResult.expiresAt?.toISOString(),
+                            })
+                            .eq('id', docRecord.id);
+
+                        console.log('[RAG Upload] ✅ Context Cache created in background:', cacheResult.cacheName);
+                    } else {
+                        console.log('[RAG Upload] ⚠️ Context Cache skipped:', cacheResult.error);
+                    }
+                } catch (cacheError) {
+                    // Cache 創建失敗不影響上傳流程
+                    console.warn('[RAG Upload] ⚠️ Context Cache creation failed (non-blocking):', cacheError);
+                }
+            }).catch((err) => {
+                // 完全忽略背景任務錯誤
+                console.warn('[RAG Upload] Background cache task error (ignored):', err);
+            });
+
+            // 10. 立即返回成功結果（不等待 Cache 創建）
             return NextResponse.json({
                 success: true,
                 document: {
@@ -240,6 +312,7 @@ export async function POST(req: NextRequest) {
                     theme, // 新增主題
                     numPages,
                     status: 'ready',
+                    // 注意：cacheName 會在背景創建後更新到資料庫
                 },
             })
         } catch (summaryError) {
@@ -290,11 +363,36 @@ export async function GET(req: NextRequest) {
             )
         }
 
-        const { data, error } = await supabase
+        // 🎯 NEW: Support hours parameter for 24-hour history filtering
+        // 🎯 NEW: Support ids parameter for fetching specific documents
+        const { searchParams } = new URL(req.url)
+        const hoursParam = searchParams.get('hours')
+        const idsParam = searchParams.get('ids')
+
+        let query = supabase
             .from('rag_documents')
             .select('*')
             .eq('user_id', user.id)
-            .order('uploaded_at', { ascending: false })
+
+        // Filter by specific IDs if provided
+        if (idsParam) {
+            const ids = idsParam.split(',').filter(Boolean)
+            if (ids.length > 0) {
+                query = query.in('id', ids)
+                console.log(`[RAG Upload] Fetching specific documents:`, ids)
+            }
+        }
+        // Otherwise filter by time if hours parameter provided
+        else if (hoursParam) {
+            const hours = parseInt(hoursParam)
+            const cutoffTime = new Date()
+            cutoffTime.setHours(cutoffTime.getHours() - hours)
+
+            query = query.gte('uploaded_at', cutoffTime.toISOString())
+            console.log(`[RAG Upload] Filtering documents from last ${hours} hours (since ${cutoffTime.toISOString()})`)
+        }
+
+        const { data, error } = await query.order('uploaded_at', { ascending: false })
 
         if (error) {
             console.error('[RAG Upload] Database query error:', error)

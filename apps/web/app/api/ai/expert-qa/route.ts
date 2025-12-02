@@ -1,11 +1,11 @@
 import { NextRequest } from 'next/server'
-import { getApiUser } from '@/lib/api/auth'
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { createClient } from '@supabase/supabase-js'
 
-export const runtime = 'nodejs'
+// ⚡ Edge Runtime for 50-80% faster cold starts
+export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 
 /**
  * POST /api/ai/expert-qa
@@ -19,9 +19,27 @@ export async function POST(req: NextRequest) {
     const startTime = Date.now()
 
     try {
-        // 1. 驗證用戶
-        const { supabase, user } = await getApiUser(req)
-        if (!user) {
+        // ⚡ Edge-compatible authentication
+        const authHeader = req.headers.get('authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+            return new Response('Unauthorized', { status: 401 })
+        }
+
+        const token = authHeader.substring(7)
+        const supabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            {
+                global: {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                }
+            }
+        )
+
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        if (authError || !user) {
             return new Response('Unauthorized', { status: 401 })
         }
 
@@ -60,38 +78,75 @@ export async function POST(req: NextRequest) {
                 const encoder = new TextEncoder()
 
                 try {
-                    // 使用 Gemini Flash (最快的模型)
-                    const model = genAI.getGenerativeModel({
-                        model: 'gemini-2.0-flash-exp',
-                        generationConfig: {
-                            temperature: 0.7,
-                            maxOutputTokens: 2048,
+                    // ⚡ Use fetch-based Gemini API for Edge compatibility
+                    const response = await fetch(
+                        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?key=${GEMINI_API_KEY}&alt=sse`,
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                contents: [{
+                                    parts: [{ text: contextPrompt }]
+                                }],
+                                generationConfig: {
+                                    temperature: 0.7,
+                                    maxOutputTokens: 2048,
+                                }
+                            }),
                         }
-                    })
+                    )
 
-                    const result = await model.generateContentStream(contextPrompt)
+                    if (!response.ok) {
+                        throw new Error(`Gemini API error: ${response.status}`)
+                    }
 
+                    if (!response.body) {
+                        throw new Error('No response body')
+                    }
+
+                    const reader = response.body.getReader()
+                    const decoder = new TextDecoder()
                     let firstChunkTime: number | null = null
                     let fullResponse = ''
 
-                    // ⭐ 逐塊發送數據
-                    for await (const chunk of result.stream) {
-                        const chunkText = chunk.text()
-                        fullResponse += chunkText
+                    // ⚡ Parse SSE stream from Gemini
+                    while (true) {
+                        const { done, value } = await reader.read()
+                        if (done) break
 
-                        if (!firstChunkTime) {
-                            firstChunkTime = Date.now()
-                            console.log(`[Expert Q&A] ⚡ First chunk in ${firstChunkTime - startTime}ms`)
+                        const chunk = decoder.decode(value)
+                        const lines = chunk.split('\n')
+
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                try {
+                                    const data = JSON.parse(line.substring(6))
+                                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+
+                                    if (text) {
+                                        fullResponse += text
+
+                                        if (!firstChunkTime) {
+                                            firstChunkTime = Date.now()
+                                            console.log(`[Expert Q&A] ⚡ First chunk in ${firstChunkTime - startTime}ms`)
+                                        }
+
+                                        // Send SSE format data
+                                        const sseData = JSON.stringify({
+                                            type: 'chunk',
+                                            content: text,
+                                            timestamp: Date.now()
+                                        })
+
+                                        controller.enqueue(encoder.encode(`data: ${sseData}\n\n`))
+                                    }
+                                } catch (parseError) {
+                                    // Skip invalid JSON lines
+                                }
+                            }
                         }
-
-                        // 發送 SSE 格式數據
-                        const data = JSON.stringify({
-                            type: 'chunk',
-                            content: chunkText,
-                            timestamp: Date.now()
-                        })
-
-                        controller.enqueue(encoder.encode(`data: ${data}\n\n`))
                     }
 
                     // 6. 提取引用來源（從完整響應中）

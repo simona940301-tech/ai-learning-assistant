@@ -107,7 +107,7 @@ no low resolution, no blurry output
     // For now, let's use Gemini's multimodal capabilities to analyze the image
     // and create a detailed pixel art description
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${GEMINI_API_KEY}`, // ⚡ Use 2.5 Pro for complex vision analysis
       {
         method: 'POST',
         headers: {

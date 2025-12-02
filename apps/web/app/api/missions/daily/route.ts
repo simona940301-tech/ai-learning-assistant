@@ -1,15 +1,17 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { getApiUser } from '@/lib/api/auth'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
     try {
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const { supabase, user, errorType } = await getApiUser(request)
 
         if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            return NextResponse.json(
+                { error: 'Unauthorized', code: errorType === 'invalid-jwt' ? 'INVALID_JWT' : 'UNAUTHENTICATED' },
+                { status: 401 }
+            )
         }
 
         // Call the database function to get or generate missions
@@ -46,13 +48,15 @@ export async function GET(request: Request) {
     }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
     try {
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const { supabase, user, errorType } = await getApiUser(request)
 
         if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            return NextResponse.json(
+                { error: 'Unauthorized', code: errorType === 'invalid-jwt' ? 'INVALID_JWT' : 'UNAUTHENTICATED' },
+                { status: 401 }
+            )
         }
 
         const { action } = await request.json()

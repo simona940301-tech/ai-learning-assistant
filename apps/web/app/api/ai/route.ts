@@ -15,7 +15,7 @@ interface AIRequest {
 
 // 學術白名單
 const ACADEMIC_WHITELIST = [
-  'arxiv.org', 'aclanthology.org', 'ieeexplore.ieee.org', 
+  'arxiv.org', 'aclanthology.org', 'ieeexplore.ieee.org',
   'dl.acm.org', 'pubmed.ncbi.nlm.nih.gov', 'jstor.org'
 ]
 
@@ -117,7 +117,7 @@ ${prompt ? `\n題目：${prompt}\n` : ''}
 function parseAIResponse(content: string, attachments: AttachedFile[]): AskResult {
   const references: Reference[] = []
   const unverified: string[] = []
-  
+
   // 提取引用
   const citationMatches = content.match(/\[A(\d+)\]/g) || []
   citationMatches.forEach(match => {
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
       : generateSolvePrompt(prompt, attachments, scholarMode, solveType)
 
     // 添加來源限制
-    const sourceRestriction = sourceMode === 'backpack' 
+    const sourceRestriction = sourceMode === 'backpack'
       ? '\n\n重要：只能引用附件內容，不得引用任何網頁或其他來源。'
       : `\n\n重要：只能引用附件內容或以下學術來源：${ACADEMIC_WHITELIST.join(', ')}`
 
@@ -201,7 +201,7 @@ export async function POST(request: NextRequest) {
 
 async function generateWithGemini(prompt: string): Promise<string> {
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, // ⚡ Use 2.5 Flash
     {
       method: 'POST',
       headers: {
@@ -261,12 +261,12 @@ function buildFallbackSummary(userPrompt: string, attachments: AttachedFile[], t
   const headline = type === 'summary' ? '## WHY/WHAT/HOW/CHECK 快速草稿' : '## 解題草稿'
   const tableRows = attachments.length
     ? attachments
-        .map((file, index) => {
-          const tag = `[A${index + 1}]`
-          const snippet = (file.content || '').replace(/\s+/g, ' ').slice(0, 120) || '已上傳，等待解析'
-          return `| ${tag} ${file.name} | ${snippet} |`
-        })
-        .join('\n')
+      .map((file, index) => {
+        const tag = `[A${index + 1}]`
+        const snippet = (file.content || '').replace(/\s+/g, ' ').slice(0, 120) || '已上傳，等待解析'
+        return `| ${tag} ${file.name} | ${snippet} |`
+      })
+      .join('\n')
     : '| — | 尚未提供附件，僅根據輸入生成草稿 |'
 
   const table = `| 來源 | 初步觀察 |\n| --- | --- |\n${tableRows}`

@@ -14,24 +14,55 @@ export const runtime = 'nodejs'
  */
 export async function GET(req: NextRequest) {
     try {
-        const { supabase, user } = await getApiUser(req)
+        // ⭐ Use getApiUser for consistent authentication (handles cookies automatically)
+        const { supabase, user, errorType } = await getApiUser(req)
+        
         if (!user) {
-            return new Response('Unauthorized', { status: 401 })
+            const message = errorType === 'invalid-jwt'
+                ? '登入狀態失效，請重新登入'
+                : errorType === 'unauthenticated'
+                ? '需要登入'
+                : '認證失敗'
+            
+            return new Response(
+                JSON.stringify({ error: 'UNAUTHORIZED', message }),
+                { 
+                    status: 401,
+                    headers: { 'Content-Type': 'application/json' }
+                }
+            )
         }
+
         const { searchParams } = new URL(req.url)
         const analysisId = searchParams.get('analysisId')
+        
         if (!analysisId) {
-            return new Response('Missing analysisId', { status: 400 })
+            return new Response(
+                JSON.stringify({ error: 'VALIDATION_ERROR', message: '缺少 analysisId 參數' }),
+                { 
+                    status: 400,
+                    headers: { 'Content-Type': 'application/json' }
+                }
+            )
         }
+
         // Verify that the analysis belongs to the user
-        const { data: analysis } = await supabase
+        const { data: analysis, error: analysisError } = await supabase
             .from('file_analysis')
             .select('id')
             .eq('id', analysisId)
             .eq('user_id', user.id)
             .single()
-        if (!analysis) {
-            return new Response('Not found', { status: 404 })
+
+        if (analysisError || !analysis) {
+            console.error('[SSE] Analysis not found or access denied:', analysisError)
+            return new Response(
+                JSON.stringify({ error: 'NOT_FOUND', message: '找不到分析記錄或無權限訪問' }),
+                { 
+                    status: 404,
+                    headers: { 'Content-Type': 'application/json' }
+                }
+            )
         }
 
         const encoder = new TextEncoder()
@@ -72,20 +103,32 @@ export async function GET(req: NextRequest) {
                     .subscribe()
                 // Cleanup when client disconnects
                 req.signal.addEventListener('abort', () => {
+                    console.log('[SSE] Client disconnected, cleaning up')
                     channel.unsubscribe()
                     controller.close()
                 })
             }
         })
+
         return new Response(stream, {
             headers: {
                 'Content-Type': 'text/event-stream',
-                'Cache-Control': 'no-cache',
-                Connection: 'keep-alive'
+                'Cache-Control': 'no-cache, no-transform',
+                'Connection': 'keep-alive',
+                'X-Accel-Buffering': 'no', // Disable nginx buffering
             }
         })
     } catch (error) {
-        console.error('[SSE] Error:', error)
-        return new Response('Internal Server Error', { status: 500 })
+        console.error('[SSE] Unexpected error:', error)
+        return new Response(
+            JSON.stringify({ 
+                error: 'INTERNAL_ERROR', 
+                message: error instanceof Error ? error.message : '伺服器錯誤' 
+            }),
+            { 
+                status: 500,
+                headers: { 'Content-Type': 'application/json' }
+            }
+        )
     }
 }

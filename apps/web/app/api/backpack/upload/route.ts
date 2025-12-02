@@ -69,9 +69,27 @@ export async function POST(req: NextRequest) {
     }
 
     // Upload to Supabase Storage
+    // 🎯 修復：清理檔案名稱，移除特殊字符和中文字符，避免 Supabase Storage key 錯誤
+    const sanitizeFileName = (name: string): string => {
+      // 獲取檔案擴展名
+      const ext = name.substring(name.lastIndexOf('.'))
+      // 移除擴展名，清理檔案名稱
+      const baseName = name.substring(0, name.lastIndexOf('.')) || name
+      // 只保留字母、數字、連字符和下劃線，其他字符替換為下劃線
+      const sanitized = baseName
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .replace(/_{2,}/g, '_') // 移除多個連續下劃線
+        .substring(0, 100) // 限制長度
+      // 如果清理後為空，使用預設名稱
+      const finalName = sanitized || 'file'
+      return `${finalName}${ext}`
+    }
+
     const timestamp = Date.now()
-    const fileName = `${user.id}/${timestamp}-${file.name}`
-    const filePath = `backpack_files/${fileName}`
+    const safeFileName = sanitizeFileName(file.name)
+    const fileName = `${user.id}/${timestamp}-${safeFileName}`
+    // ✅ FIX: Remove bucket name prefix from filePath - getPublicUrl() expects path without bucket name
+    const filePath = fileName
 
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('backpack_files')
@@ -91,10 +109,22 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Get public URL
-    const { data: urlData } = supabase.storage
+    // ✅ FIX: Store file path instead of public URL
+    // Since backpack_files bucket is NOT public, we need to generate signed URLs on demand
+    // Store the storage path, not the URL
+    const storagePath = filePath
+
+    // Generate a signed URL (valid for 1 year) for immediate use
+    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
       .from('backpack_files')
-      .getPublicUrl(filePath)
+      .createSignedUrl(storagePath, 365 * 24 * 60 * 60) // 1 year
+
+    if (signedUrlError) {
+      console.error('[Backpack Upload] Signed URL error:', signedUrlError)
+      // Fallback: use path-based format that can be converted to signed URL later
+    }
+
+    const fileUrl = signedUrlData?.signedUrl || `storage://backpack_files/${storagePath}`
 
     // Save to database
     const { data: dbData, error: dbError } = await supabase
@@ -104,7 +134,7 @@ export async function POST(req: NextRequest) {
         subject: subject || 'math',
         type: fileType,
         title: title || file.name,
-        file_url: urlData.publicUrl,
+        file_url: fileUrl,
         file_size: file.size,
         content: null,
       })
@@ -126,6 +156,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      fileId: dbData.id, // 🎯 添加 fileId 以兼容 BackpackUploader 組件
       item: dbData,
       message: 'File uploaded successfully',
     })

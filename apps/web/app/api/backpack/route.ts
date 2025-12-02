@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSupabaseClient, isMockModeEnabled } from '@/lib/api/auth'
-import { getCurrentUser } from '@/lib/auth/getCurrentUser'
+import { getSupabaseClient, isMockModeEnabled, getApiUser } from '@/lib/api/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,7 +12,8 @@ export const dynamic = 'force-dynamic'
 export async function GET(req: NextRequest) {
   try {
     const mockMode = isMockModeEnabled()
-    const { user, errorType } = await getCurrentUser()
+    // 🎯 修復：使用 getApiUser 替代 getCurrentUser，確保認證檢查一致
+    const { supabase, user, errorType } = await getApiUser(req)
 
     if (!user) {
       const message =
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    const supabase = getSupabaseClient(req)
+    // supabase 已經從 getApiUser 獲取
 
     const { searchParams } = new URL(req.url)
     const subject = searchParams.get('subject')
@@ -164,7 +164,8 @@ export async function GET(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
-    const { user, errorType } = await getCurrentUser()
+    // 🎯 修復：使用 getApiUser 替代 getCurrentUser
+    const { supabase, user, errorType } = await getApiUser(req)
 
     if (!user) {
       const message =
@@ -194,7 +195,7 @@ export async function DELETE(req: NextRequest) {
       )
     }
 
-    const supabase = getSupabaseClient(req)
+    // supabase 已經從 getApiUser 獲取
 
     // 刪除 backpack_items
     const { error: backpackError } = await supabase
