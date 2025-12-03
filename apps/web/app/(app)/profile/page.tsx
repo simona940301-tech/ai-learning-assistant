@@ -401,7 +401,7 @@ export default function ProfilePage() {
         open={editModalOpen}
         onOpenChange={setEditModalOpen}
         onAvatarUpdate={handleAvatarUpdate}
-        currentPresetId={currentPresetId}
+        currentPresetId={currentPresetId ?? undefined}
       />
     </>
   )

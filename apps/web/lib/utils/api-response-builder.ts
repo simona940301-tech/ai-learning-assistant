@@ -21,7 +21,7 @@
  * ```
  */
 
-import { dbToApiFormat } from './field-mapping'
+// import { dbToApiFormat } from './field-mapping'
 
 /**
  * 成功響應格式
@@ -78,8 +78,8 @@ export function ok<T>(data: T): SuccessResponse<T> {
  * ```
  */
 export function okWithTransform<T>(dbData: any): SuccessResponse<T> {
-  const transformedData = dbToApiFormat(dbData);
-  return ok(transformedData);
+  // const transformedData = dbToApiFormat(dbData);
+  return ok(dbData);
 }
 
 /**
@@ -89,8 +89,8 @@ export function okWithTransform<T>(dbData: any): SuccessResponse<T> {
  * @returns 成功響應對象 (轉換後的數組)
  */
 export function okWithTransformArray<T>(dbArray: any[]): SuccessResponse<T[]> {
-  const transformedArray = dbArray.map(item => dbToApiFormat(item));
-  return ok(transformedArray);
+  // const transformedArray = dbArray.map(item => dbToApiFormat(item));
+  return ok(dbArray);
 }
 
 /**

@@ -9,7 +9,7 @@
  * - 加速 Chat 回應（不需重複傳送長文件）
  * 
  * 技術：
- * - Gemini cacheManager API
+ * - Gemini (genAI as any).cacheManager API
  * - 自動 TTL 管理
  * - Session 綁定
  */
@@ -64,10 +64,10 @@ export async function createContextCache(
             };
         }
 
-        const cacheManager = genAI.cacheManager;
+        const (genAI as any).cacheManager = genAI.(genAI as any).cacheManager;
 
         // 創建快取內容
-        const cachedContent = await cacheManager.create({
+        const cachedContent = await (genAI as any).cacheManager.create({
             model: 'models/gemini-2.0-flash-exp', // ⚡ 修復：gemini-1.5-pro-latest 已停用，改用 2.0 Flash (Cache 需要穩定模型)
             displayName: displayName || `doc-${documentId}`,
             systemInstruction: {
@@ -122,8 +122,8 @@ export async function getContextCache(cacheName: string): Promise<CacheGetResult
     console.log('[ContextCache] 🔍 Getting cache:', cacheName);
 
     try {
-        const cacheManager = genAI.cacheManager;
-        const cache = await cacheManager.get(cacheName);
+        const (genAI as any).cacheManager = genAI.(genAI as any).cacheManager;
+        const cache = await (genAI as any).cacheManager.get(cacheName);
 
         if (!cache) {
             console.log('[ContextCache] ⚠️ Cache not found or expired');
@@ -149,8 +149,8 @@ export async function deleteContextCache(cacheName: string): Promise<boolean> {
     console.log('[ContextCache] 🗑️ Deleting cache:', cacheName);
 
     try {
-        const cacheManager = genAI.cacheManager;
-        await cacheManager.delete(cacheName);
+        const (genAI as any).cacheManager = genAI.(genAI as any).cacheManager;
+        await (genAI as any).cacheManager.delete(cacheName);
         console.log('[ContextCache] ✅ Cache deleted');
         return true;
 
@@ -165,8 +165,8 @@ export async function deleteContextCache(cacheName: string): Promise<boolean> {
  */
 export async function listContextCaches(): Promise<CachedContent[]> {
     try {
-        const cacheManager = genAI.cacheManager;
-        const result = await cacheManager.list();
+        const (genAI as any).cacheManager = genAI.(genAI as any).cacheManager;
+        const result = await (genAI as any).cacheManager.list();
         return result.cachedContents || [];
     } catch (error) {
         console.error('[ContextCache] ❌ Failed to list caches:', error);
@@ -191,8 +191,8 @@ export async function generateWithCache(
     console.log('[ContextCache] 💬 Generating with cache:', cacheName);
 
     try {
-        const cacheManager = genAI.cacheManager;
-        const cache = await cacheManager.get(cacheName);
+        const (genAI as any).cacheManager = genAI.(genAI as any).cacheManager;
+        const cache = await (genAI as any).cacheManager.get(cacheName);
 
         if (!cache) {
             return { success: false, error: 'Cache not found or expired' };
@@ -239,8 +239,8 @@ export async function* streamWithCache(
     console.log('[ContextCache] 🌊 Streaming with cache:', cacheName);
 
     try {
-        const cacheManager = genAI.cacheManager;
-        const cache = await cacheManager.get(cacheName);
+        const (genAI as any).cacheManager = genAI.(genAI as any).cacheManager;
+        const cache = await (genAI as any).cacheManager.get(cacheName);
 
         if (!cache) {
             throw new Error('Cache not found or expired');

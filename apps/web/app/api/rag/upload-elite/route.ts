@@ -345,6 +345,7 @@ async function processCompleteAnalysisInBackground(
             console.log('[Background] 📡 Calling Gemini API for parallel analysis...')
             const analysisStartTime = Date.now()
 
+            let quickPreview, ultimateResult;
             [quickPreview, ultimateResult] = await Promise.all([
                 generateQuickPreview(extractedText).catch(err => {
                     console.error('[Background] ❌ QuickPreview failed:', {
@@ -353,7 +354,7 @@ async function processCompleteAnalysisInBackground(
                     })
                     throw new Error(`快速預覽生成失敗: ${err instanceof Error ? err.message : String(err)}`)
                 }),
-                generateUltimateAnalysis(extractedText, null).catch(err => {
+                generateUltimateAnalysis(extractedText, undefined).catch(err => {
                     console.error('[Background] ❌ UltimateAnalysis failed:', {
                         error: err instanceof Error ? err.message : String(err),
                         stack: err instanceof Error ? err.stack : undefined
@@ -362,7 +363,7 @@ async function processCompleteAnalysisInBackground(
                 })
             ])
 
-            const analysisDuration = Date.now() - analysisStartTime
+            const analysisDuration = Number(Date.now()) - Number(analysisStartTime)
             console.log(`[Background] ✅ Parallel analysis completed in ${analysisDuration}ms`)
             console.log(`[Background] 📊 Results:`, {
                 subject: quickPreview.subject,

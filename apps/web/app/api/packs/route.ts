@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/api/auth';
 import type { PackListResponse, PackWithStatus } from '@plms/shared/types';
 import { getConfidenceBadge } from '@plms/shared/types';
-import { dbToApiFormat } from '@/lib/utils/field-mapping';
 
 /**
  * GET /api/packs
@@ -104,9 +103,6 @@ export async function GET(req: NextRequest) {
 
     // Transform to PackWithStatus (V2: Optimized with automatic field mapping)
     const packsWithStatus: PackWithStatus[] = (packs || []).map(pack => {
-      // ✨ 自動轉換所有 snake_case → camelCase 字段
-      const autoConverted = dbToApiFormat(pack);
-      
       return {
         ...autoConverted, // 自動處理: item_count→itemCount, has_explanation→hasExplanation 等
         // 只需手動處理業務邏輯和預設值

@@ -442,7 +442,7 @@ function PlayPageContent() {
 
         // 生成 RNG（使用 matchId + questionIndex 作為種子）
         const seed = (battleState.matchId?.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) || 0) + battleState.currentQuestionIndex
-        const { bonus: rngBonus } = generateRNGBonus(base, seed)
+        const rngBonus = generateRNGBonus()
 
         // 搶答加分（如果比對手先答對）
         const firstCorrectBonus = isCorrect && !battleState.opponentStatus ?

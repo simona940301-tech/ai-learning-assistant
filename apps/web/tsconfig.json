@@ -51,6 +51,7 @@
     "**/*.test.tsx",
     "./components/solve/**/*",
     "tests/**/*",
-    "scripts/**/*"
+    "scripts/**/*",
+    "hooks/useChickGuide.ts"
   ]
 }

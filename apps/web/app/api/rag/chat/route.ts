@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
         // 2. 如果有有效 Cache，使用 Cache 進行串流
         if (validCacheName) {
             try {
-                const cacheManager = genAI.cacheManager
+                const cacheManager = (genAI as any).cacheManager
                 const cache = await cacheManager.get(validCacheName)
 
                 if (cache) {

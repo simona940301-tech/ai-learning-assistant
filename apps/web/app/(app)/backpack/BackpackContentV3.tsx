@@ -210,7 +210,7 @@ export function BackpackContentV3() {
     // 🎯 如果是解題模式且有內容，構建特殊 prompt 要求不同解釋
     if (taskType === 'solve' && file.content) {
       // 提取題目（從 markdown 中提取第一個標題後的內容）
-      const questionMatch = file.content.match(/#\s*(.+?)\n\n(?:##[^\n]+\n\n)?(.+?)(?=\n\n##|\n\n---|$)/s)
+      const questionMatch = file.content.match(/#\s*(.+?)\n\n(?:##[^\n]+\n\n)?(.+?)(?=\n\n##|\n\n---|$)/)
       const questionText = questionMatch ? questionMatch[1] + '\n\n' + questionMatch[2] : file.title
       
       // 構建要求不同解釋的 prompt
@@ -888,7 +888,7 @@ export function BackpackContentV3() {
                   toast.success('檔案上傳成功！')
                   
                   // 記錄操作（用於引導系統）
-                  recordOperation('upload-file', { fileId: result.fileId || result.item?.id })
+                  recordOperation()
                 } catch (err) {
                   console.error('[Backpack] Upload failed:', err)
                   const errorMessage = err instanceof Error ? err.message : '上傳失敗'
