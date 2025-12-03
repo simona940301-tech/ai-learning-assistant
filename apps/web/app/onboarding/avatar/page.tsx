@@ -227,11 +227,11 @@ export default function OnboardingAvatarPage() {
                     <button
                       key={avatar.id}
                       onClick={() => handlePresetSelect(avatar)}
-                      className="group relative"
+                      className="group relative flex justify-center items-center"
                       disabled={saving}
                     >
                       <motion.div
-                        className={`relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl border-3 transition-all ${isSelected
+                        className={`relative flex h-24 w-24 items-center justify-center rounded-2xl border-3 transition-all ${isSelected
                             ? 'border-[#FED168] shadow-lg shadow-[#FED168]/30'
                             : 'border-[#E0D0B8] hover:border-[#FED168] hover:shadow-md'
                           }`}
@@ -241,30 +241,32 @@ export default function OnboardingAvatarPage() {
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                       >
-                        <img
-                          src={avatar.imageUrl}
-                          alt={avatar.name}
-                          className="h-full w-full object-contain rounded-xl"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                            const fallback = target.parentElement?.querySelector('.emoji-fallback');
-                            if (fallback) {
-                              (fallback as HTMLElement).style.display = 'flex';
-                            }
-                          }}
-                        />
-                        <div className="emoji-fallback absolute inset-0 flex items-center justify-center text-4xl" style={{ display: 'none' }}>
-                          {avatar.emoji}
+                        <div className="overflow-hidden rounded-xl w-full h-full flex items-center justify-center">
+                          <img
+                            src={avatar.imageUrl}
+                            alt={avatar.name}
+                            className="h-full w-full object-contain"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              const fallback = target.parentElement?.querySelector('.emoji-fallback');
+                              if (fallback) {
+                                (fallback as HTMLElement).style.display = 'flex';
+                              }
+                            }}
+                          />
+                          <div className="emoji-fallback absolute inset-0 flex items-center justify-center text-4xl" style={{ display: 'none' }}>
+                            {avatar.emoji}
+                          </div>
                         </div>
                         {isSelected && (
                           <motion.div
                             initial={{ scale: 0, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
-                            className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white shadow-lg"
+                            className="absolute right-0 top-0 translate-x-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white shadow-lg z-10"
                             style={{ backgroundColor: '#FED168' }}
                           >
-                            <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                             </svg>
                           </motion.div>

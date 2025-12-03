@@ -130,10 +130,9 @@ export async function POST(req: NextRequest) {
       await supabase.from('profiles').update(resetPayload).eq('id', user.id)
     } else if (currentEnergy !== dailyEnergy) {
       // If regeneration happened but no daily reset, persist the regenerated value
-      // This is important so we consume from the regenerated amount
-      const updatePayload: Record<string, any> = {
-        energy_last_updated_at: new Date().toISOString(),
-      }
+      // ⚠️ IMPORTANT: Do NOT update energy_last_updated_at here!
+      // We only update it when CONSUMING energy (below)
+      const updatePayload: Record<string, any> = {}
       if (hasDailyEnergy) {
         updatePayload.daily_energy = currentEnergy
       }
@@ -152,8 +151,11 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Consume energy
-    const updatePayload: Record<string, any> = {}
+    // Consume energy and update timestamp
+    // ✅ CRITICAL: Update energy_last_updated_at ONLY when consuming
+    const updatePayload: Record<string, any> = {
+      energy_last_updated_at: new Date().toISOString(), // ✅ This is the correct place!
+    }
     if (hasDailyEnergy) {
       updatePayload.daily_energy = currentEnergy - 1
     }

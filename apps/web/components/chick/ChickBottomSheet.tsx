@@ -3,11 +3,15 @@
 import * as Dialog from '@radix-ui/react-dialog'
 import Image from 'next/image'
 import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { getChickImagePath } from './chickImage'
 import type { ChickState } from '@/packages/server/chick/types'
 import { useChickStore } from '@/src/store/chickStore'
+import type { ChickMessage } from '@/src/store/chickStore'
 
 export function ChickBottomSheet() {
+  const router = useRouter()
+
   const {
     bottomSheetOpen,
     closeBottomSheet,
@@ -45,6 +49,44 @@ export function ChickBottomSheet() {
   }
 
   const imgSrc = getChickImagePath(chickState)
+
+  // 智能導航：根據訊息類型決定點擊後的行為
+  const handleMessageClick = async (message: ChickMessage) => {
+    // 先標記已讀
+    await markMessageRead(message.id)
+
+    // 根據訊息類型導航
+    switch (message.type) {
+      case 'IDLE_REVIEW_MISTAKES':
+        // 錯題複習提醒：跳轉到錯題本
+        closeBottomSheet()
+        router.push('/error-book')
+        break
+
+      case 'IDLE_ENCOURAGE_BATTLE':
+        // 對戰鼓勵：跳轉到對戰頁面
+        closeBottomSheet()
+        router.push('/play')
+        break
+
+      case 'S1':
+      case 'S2':
+      case 'S3':
+        // 狀態警告：關閉訊息列表（用戶可能需要照顧小雞）
+        // 這些訊息通常是「我快變笨了」、「我需要休息」等
+        closeBottomSheet()
+        break
+
+      default:
+        // 其他訊息：只標記已讀，不做額外動作
+        break
+    }
+  }
+
+  // 判斷訊息是否有導航動作（顯示箭頭提示）
+  const hasAction = (messageType: string) => {
+    return ['IDLE_REVIEW_MISTAKES', 'IDLE_ENCOURAGE_BATTLE'].includes(messageType)
+  }
 
   return (
     <Dialog.Root open={bottomSheetOpen} onOpenChange={open => (open ? null : closeBottomSheet())}>
@@ -84,20 +126,29 @@ export function ChickBottomSheet() {
             {messages.map(message => {
               const isUnread = !message.readAt
               const created = new Date(message.createdAt ?? '').toLocaleString()
+              const showAction = hasAction(message.type)
+
               return (
                 <button
                   key={message.id}
                   type="button"
-                  onClick={() => void markMessageRead(message.id)}
+                  onClick={() => void handleMessageClick(message)}
                   className={`w-full rounded-xl border p-3 text-left transition ${
                     isUnread
-                      ? 'border-blue-200 bg-blue-50 text-neutral-900 dark:border-blue-500/40 dark:bg-blue-950/30'
-                      : 'border-neutral-200 bg-neutral-50 text-neutral-600 dark:border-neutral-800 dark:bg-neutral-900'
-                  }`}
+                      ? 'border-blue-200 bg-blue-50 text-neutral-900 hover:bg-blue-100 dark:border-blue-500/40 dark:bg-blue-950/30 dark:hover:bg-blue-950/40'
+                      : 'border-neutral-200 bg-neutral-50 text-neutral-600 hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:bg-neutral-800'
+                  } ${showAction ? 'cursor-pointer' : ''}`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <span className="text-sm">{message.text}</span>
-                    {isUnread && <span className="mt-0.5 h-2 w-2 rounded-full bg-blue-500" />}
+                    <div className="flex items-center gap-1.5">
+                      {isUnread && <span className="mt-0.5 h-2 w-2 rounded-full bg-blue-500" />}
+                      {showAction && (
+                        <span className="text-blue-500 dark:text-blue-400" aria-label="點擊查看">
+                          →
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">{created}</p>
                 </button>

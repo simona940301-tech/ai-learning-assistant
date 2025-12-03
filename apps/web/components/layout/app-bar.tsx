@@ -37,12 +37,12 @@ export function AppBar({
       <header className="sticky top-0 z-40 border-b border-[#E2D4C7] bg-[#F7F2EC]">
         <div className={`mx-auto flex items-center justify-between px-4 ${maxWidthClass}`} style={{ paddingTop: '12px', paddingBottom: '14px' }}>
           {/* 左：等級組（Level Unit）- 給予足夠寬度讓 XP bar 顯示 */}
-          <div className="flex-1 min-w-0 max-w-[200px]">
+          <div className="flex-1 min-w-0 max-w-[320px]">
             <LevelBar />
           </div>
 
           {/* 右：Candy Crush 風格能量膠囊 */}
-          <div className="flex items-center flex-shrink-0">
+          <div className="flex items-center flex-shrink-0 justify-end min-w-[200px]">
             <EnergyPill />
           </div>
         </div>

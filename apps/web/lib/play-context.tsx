@@ -261,7 +261,9 @@ export function PlayProvider({ children }: { children: React.ReactNode }) {
       })
       if (response.ok) {
         const data = await response.json()
-        if (data.success) {
+        const payload = data?.data ?? data
+
+        if (data.success && payload) {
           // 同時獲取用戶的精靈頭像presetId
           let presetId = null
           if (user?.id) {
@@ -274,13 +276,26 @@ export function PlayProvider({ children }: { children: React.ReactNode }) {
             }
           }
 
-          setUserStatus({
-            dailyEnergyCount: data.dailyEnergyCount || 0,
-            walletBalance: data.walletBalance || 0,
-            eloRank: data.eloRank || 1000,
-            dailyEnergyResetAt: data.dailyEnergyResetAt,
-            energyLastUpdatedAt: data.energyLastUpdatedAt,
-            presetId,
+          setUserStatus(prev => {
+            // 從標準化的 payload 中取得欄位，並保留既有值避免 undefined 造成倒數重置
+            const dailyEnergyCount =
+              payload.dailyEnergyCount ?? payload.daily_energy_count ?? prev?.dailyEnergyCount ?? 0
+            const walletBalance =
+              payload.walletBalance ?? payload.user_wallet_balance ?? payload.coins ?? prev?.walletBalance ?? 0
+            const eloRank = payload.eloRank ?? payload.elo_rank ?? prev?.eloRank ?? 1000
+            const dailyEnergyResetAt =
+              payload.dailyEnergyResetAt ?? payload.daily_energy_reset_at ?? prev?.dailyEnergyResetAt
+            const energyLastUpdatedAt =
+              payload.energyLastUpdatedAt ?? payload.energy_last_updated_at ?? prev?.energyLastUpdatedAt
+
+            return {
+              dailyEnergyCount,
+              walletBalance,
+              eloRank,
+              dailyEnergyResetAt,
+              energyLastUpdatedAt,
+              presetId,
+            }
           })
         } else {
           // API 返回失敗，可能是認證問題
@@ -537,16 +552,22 @@ export function PlayProvider({ children }: { children: React.ReactNode }) {
       })
 
       const data = await response.json()
+      const payload = data?.data ?? data
 
-      if (data.success) {
-        const hasEnoughEnergy = (data.dailyEnergyCount || 0) > 0
+      if (data.success && payload) {
+        const currentEnergy = payload.dailyEnergyCount ?? payload.daily_energy_count ?? 0
+        const hasEnoughEnergy = currentEnergy > 0
         return {
           success: hasEnoughEnergy,
           message: hasEnoughEnergy ? undefined : '羽毛不足',
-          currentEnergy: data.dailyEnergyCount || 0,
+          currentEnergy,
         }
       } else {
-        return { success: false, message: '無法檢查羽毛' }
+        const errorMessage =
+          typeof data?.error === 'string'
+            ? data.error
+            : data?.error?.message || '無法檢查羽毛'
+        return { success: false, message: errorMessage }
       }
     } catch (error) {
       console.error('[PlayProvider] Failed to check energy:', error)
@@ -569,9 +590,17 @@ export function PlayProvider({ children }: { children: React.ReactNode }) {
       const data = await response.json()
 
       if (data.success) {
+        const payload = data?.data ?? data
+        const serverEnergy = payload?.dailyEnergyCount ?? payload?.daily_energy_count
+        const energyAfterConsume =
+          typeof serverEnergy === 'number' ? serverEnergy : undefined
+        const timestamp = payload?.energyLastUpdatedAt ?? payload?.energy_last_updated_at ?? new Date().toISOString()
+
         setUserStatus(prev => prev ? {
           ...prev,
-          dailyEnergyCount: Math.max(0, prev.dailyEnergyCount - 1),
+          dailyEnergyCount: energyAfterConsume ?? Math.max(0, prev.dailyEnergyCount - 1),
+          // 伺服器在消耗時會更新 energy_last_updated_at，前端同步為 now（或伺服器回傳的值）
+          energyLastUpdatedAt: timestamp,
         } : null)
         return { success: true }
       } else {

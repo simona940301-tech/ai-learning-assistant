@@ -3,73 +3,98 @@
 import { useLevelStatus } from '@/lib/hooks/useLevelStatus'
 
 /**
- * LevelBar - 極簡主義等級 + XP 連體元件
+ * LevelBar - 極簡 Candy 風格的等級 + XP 連體元件
  *
- * 等級圓形與 XP bar 視覺上連成一體：
- * - 等級圓形：右側無圓角，與 XP bar 緊貼
- * - XP bar：左側無圓角，形成連續的「膠囊」形狀
+ * - Level badge：淺棕漸層膠囊、柔和內陰影
+ * - XP bar：米白透明底、淺棕→深棕漸層填充，頂部 1px 高光，180ms ease-out
+ * - 視覺上成為單一膠囊，保持寬鬆間距與深棕前景色
  */
 export function LevelBar() {
   const { level, currentXp, xpToNextLevel, progressPercent, isLoading } = useLevelStatus()
+  const xpBarHeight = 19 // +20% height for a thicker bar
 
   if (isLoading) {
     return (
       <div className="flex items-center w-full">
-        <div className="h-[34px] w-[34px] rounded-l-full bg-[#E6D3BF] animate-pulse" style={{ opacity: 0.9 }} />
-        <div className="flex-1 h-[7px] bg-[#E6D3BF] animate-pulse" style={{ opacity: 0.9 }} />
+        <div
+          className="h-[34px] min-w-[54px] rounded-full bg-[#E6D3BF] animate-pulse"
+          style={{ opacity: 0.9 }}
+        />
+        <div
+          className="flex-1 h-[11px] ml-[-10px] bg-[#E6D3BF] animate-pulse"
+          style={{ opacity: 0.9, borderRadius: '999px' }}
+        />
       </div>
     )
   }
 
-  const totalXp = Math.max(currentXp + xpToNextLevel, 1)
   const clampedProgress = Math.min(Math.max(progressPercent ?? 0, 0), 100)
 
   return (
-    <div className="flex items-center min-w-0" aria-label="Level and experience" style={{ gap: '0', height: '34px' }}>
-      {/* Level circle - 右側無圓角，與 XP bar 銜接，直徑 32-36px */}
-      <div className="flex-shrink-0 relative z-10 flex items-center">
-        <div 
-          className="flex items-center justify-center border bg-[#F5E9D8] text-[#6A4A3C] shadow-none"
-          style={{ 
-            width: '34px', 
-            height: '34px',
-            borderRadius: '50% 0 0 50%', 
-            borderRight: 'none',
-            borderWidth: '1px',
-            borderColor: '#D9C0A6',
-            borderStyle: 'solid',
+    <div
+      className="flex items-center min-w-0 w-full"
+      aria-label="Level and experience"
+      style={{ gap: '0px', height: '44px' }}
+    >
+      {/* Level badge：柔和膠囊，與 XP bar 高度貼齊且緊貼相連 */}
+      <div className="relative z-10 flex-shrink-0">
+        <div
+          className="inline-flex items-center justify-center"
+          style={{
+            minHeight: `${xpBarHeight * 1.12}px`,
+            padding: '5px 13px',
+            borderRadius: '999px',
+            background: '#E9E0D5',
+            boxShadow: 'inset 0 0 0 0.6px rgba(107,74,54,0.18)',
           }}
         >
-          <span className="text-sm font-semibold tabular-nums">{level}</span>
+          <span
+            className="text-sm font-bold tabular-nums"
+            style={{
+              color: '#6B4A36',
+              textShadow: '0 0.3px 0 rgba(107,74,54,0.45)',
+            }}
+          >
+            {level}
+          </span>
         </div>
       </div>
 
-      {/* XP bar 容器 - 包含數字和 bar，緊湊設計 */}
-      <div className="relative flex-1 min-w-[100px] -ml-[1px] flex flex-col" style={{ height: '34px', justifyContent: 'center' }}>
-        {/* XP 數字顯示在上方 */}
-        <div className="absolute top-0 left-0 right-0 flex items-center justify-start px-1" style={{ height: '14px' }}>
-          <span className="text-[10px] font-medium text-[#6A4A3C] tabular-nums leading-tight">
-            {currentXp} / {xpToNextLevel}
-          </span>
-        </div>
-
-        {/* XP bar - 左側無圓角，與圓形銜接，高度 6-8px */}
-        <div className="relative flex items-center" style={{ height: '8px', marginTop: 'auto' }}>
-          {/* 背景 */}
-          <div 
-            className="absolute inset-0 bg-[#E6D3BF]" 
-            style={{ borderRadius: '0 999px 999px 0' }} 
-          />
-          
-          {/* 填充 */}
+      {/* XP bar：厚底條，文字置中疊在 bar 上 */}
+      <div className="relative flex-1 min-w-[200px]" style={{ width: '100%', maxWidth: '520px' }}>
+        <div
+          className="relative w-full ml-[-10px]"
+          style={{
+            height: `${xpBarHeight}px`,
+            borderRadius: `${xpBarHeight / 2}px`,
+            background: '#E9E0D5',
+            overflow: 'hidden',
+          }}
+        >
           <div
-            className="absolute inset-0 bg-[#C49A6C] transition-all duration-500 ease-out"
-            style={{ 
+            className="absolute inset-y-0 left-0 transition-[width] ease-out"
+            style={{
               width: `${clampedProgress}%`,
-              borderRadius: '0 999px 999px 0',
+              background: 'linear-gradient(90deg, #EADCC7 0%, #C9AA8A 100%)',
+              borderRadius: `${xpBarHeight / 2}px`,
               minWidth: clampedProgress > 0 ? '2px' : '0',
+              transitionDuration: '180ms',
             }}
           />
+
+          <div
+            className="absolute inset-0 flex items-center justify-center pointer-events-none"
+          >
+            <span
+              className="text-[11px] font-semibold tabular-nums"
+              style={{
+                color: '#6B4A36',
+                textShadow: '0 0.6px 0 rgba(255,255,255,0.6)',
+              }}
+            >
+              {currentXp} / {xpToNextLevel}
+            </span>
+          </div>
         </div>
       </div>
     </div>

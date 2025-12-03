@@ -49,6 +49,9 @@ CREATE TABLE IF NOT EXISTS profiles (
   
   -- Battle Stats
   daily_energy_count INTEGER DEFAULT 8 CHECK (daily_energy_count >= 0 AND daily_energy_count <= 8),
+  daily_energy_reset_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '1 day'),
+  energy_last_updated_at TIMESTAMPTZ DEFAULT NOW(),
+  elo_rank INTEGER DEFAULT 1000 CHECK (elo_rank >= 0 AND elo_rank <= 3000),
   examiner_contribution_score INTEGER DEFAULT 0 CHECK (examiner_contribution_score >= 0),
   user_wallet_balance DECIMAL(12, 2) DEFAULT 0 CHECK (user_wallet_balance >= 0),
   skill_mastery_json JSONB DEFAULT '{}'::jsonb,

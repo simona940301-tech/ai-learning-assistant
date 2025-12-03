@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { usePlay } from '@/lib/play-context'
 
 /**
- * 統一的能量狀態 Hook
+ * 統一的能量狀態 Hook（帶調試輸出）
  * 所有組件都應該透過這個 hook 取得能量資料，確保單一資料來源
  */
 export interface UseEnergyStatus {
@@ -29,12 +29,20 @@ function calculateNextEnergyAt(
   maxEnergy: number,
   energyLastUpdatedAt?: string | null
 ): Date | null {
+  console.log('🔍 [calculateNextEnergyAt] Input:', {
+    energy,
+    maxEnergy,
+    energyLastUpdatedAt,
+    energyLastUpdatedAtDate: energyLastUpdatedAt ? new Date(energyLastUpdatedAt).toISOString() : null,
+  })
+
   if (energy >= maxEnergy) {
+    console.log('✅ [calculateNextEnergyAt] Energy full, no recovery needed')
     return null // 已滿，不需要恢復
   }
 
   if (!energyLastUpdatedAt) {
-    // 沒有更新時間，假設從現在開始 30 分鐘後恢復
+    console.warn('⚠️  [calculateNextEnergyAt] No energyLastUpdatedAt, using NOW + 30min')
     return new Date(Date.now() + ENERGY_RECOVERY_INTERVAL_MS)
   }
 
@@ -42,10 +50,21 @@ function calculateNextEnergyAt(
   const now = Date.now()
   const timeSinceUpdate = now - lastUpdated
   const intervalsPassed = Math.floor(timeSinceUpdate / ENERGY_RECOVERY_INTERVAL_MS)
-  
+
   // 計算下一點能量恢復的時間
   const nextRecoveryTime = lastUpdated + (intervalsPassed + 1) * ENERGY_RECOVERY_INTERVAL_MS
-  
+
+  console.log('📊 [calculateNextEnergyAt] Calculation:', {
+    lastUpdated: new Date(lastUpdated).toISOString(),
+    now: new Date(now).toISOString(),
+    timeSinceUpdateMs: timeSinceUpdate,
+    timeSinceUpdateMinutes: (timeSinceUpdate / 60000).toFixed(2),
+    intervalsPassed,
+    nextRecoveryTime: new Date(nextRecoveryTime).toISOString(),
+    remainingMs: nextRecoveryTime - now,
+    remainingMinutes: ((nextRecoveryTime - now) / 60000).toFixed(2),
+  })
+
   return new Date(nextRecoveryTime)
 }
 
@@ -59,7 +78,7 @@ function formatTime(ms: number): string {
   return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
 }
 
-export function useEnergyStatus(): UseEnergyStatus {
+export function useEnergyStatusDebug(): UseEnergyStatus {
   const { userStatus, refreshStatus, isLoadingStatus } = usePlay()
 
   const [remainingMs, setRemainingMs] = useState<number | undefined>(undefined)
@@ -71,23 +90,23 @@ export function useEnergyStatus(): UseEnergyStatus {
   const isFull = energy >= maxEnergy
   const energyLastUpdatedAt = userStatus?.energyLastUpdatedAt
 
-  console.log('🔍 [useEnergyStatus] Current state:', {
+  console.log('🎯 [useEnergyStatus] UserStatus:', {
     energy,
+    maxEnergy,
+    isFull,
     energyLastUpdatedAt,
     userStatus,
   })
 
   // 計算下一點能量恢復的時間
-  // 🔧 FIX: 使用字符串值而不是對象引用作為依賴，避免不必要的重新計算
   const nextEnergyAt = useMemo(() => {
-    console.log('🔄 [useEnergyStatus] Recalculating nextEnergyAt with:', {
-      energy,
-      maxEnergy,
-      energyLastUpdatedAt,
-      isFull,
-    })
-    if (isFull) return undefined
-    return calculateNextEnergyAt(energy, maxEnergy, energyLastUpdatedAt) ?? undefined
+    if (isFull) {
+      console.log('✅ [useEnergyStatus] Energy full, nextEnergyAt = undefined')
+      return undefined
+    }
+    const result = calculateNextEnergyAt(energy, maxEnergy, energyLastUpdatedAt) ?? undefined
+    console.log('🎯 [useEnergyStatus] nextEnergyAt:', result?.toISOString())
+    return result
   }, [energy, maxEnergy, energyLastUpdatedAt, isFull])
 
   // 計算剩餘時間和進度
@@ -101,12 +120,20 @@ export function useEnergyStatus(): UseEnergyStatus {
       const now = Date.now()
       const next = nextEnergyAt.getTime()
       const remaining = Math.max(0, next - now)
-      
+
+      console.log('⏱️  [useEnergyStatus] Timer tick:', {
+        now: new Date(now).toISOString(),
+        next: new Date(next).toISOString(),
+        remainingMs: remaining,
+        remainingFormatted: formatTime(remaining),
+      })
+
       setRemainingMs(remaining)
       setCurrentTime(now)
 
       // 如果時間到了，觸發狀態刷新
       if (remaining <= 0) {
+        console.log('🔄 [useEnergyStatus] Time expired, refreshing status')
         refreshStatus().catch(console.error)
       }
     }
@@ -149,11 +176,3 @@ export function useEnergyStatus(): UseEnergyStatus {
     isLoading: isLoadingStatus,
   }
 }
-
-
-
-
-
-
-
-

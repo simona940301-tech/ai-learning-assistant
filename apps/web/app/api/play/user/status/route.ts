@@ -167,6 +167,27 @@ export async function GET(req: NextRequest) {
       )
     }
 
+    // 🔧 FIX: Auto-initialize energy_last_updated_at if it's NULL
+    // This happens for users created before the energy regeneration migration
+    if (!energyLastUpdatedAt) {
+      console.warn(`[Play User Status] User ${user.id} has NULL energy_last_updated_at, initializing...`)
+      const now = new Date().toISOString()
+      energyLastUpdatedAt = now
+
+      const updatePayload: Record<string, any> = {
+        energy_last_updated_at: now,
+      }
+
+      // Also ensure daily_energy_reset_at is set
+      if (!profile.daily_energy_reset_at) {
+        const nextResetTime = getNextResetTime()
+        updatePayload.daily_energy_reset_at = nextResetTime.toISOString()
+      }
+
+      await supabase.from('profiles').update(updatePayload).eq('id', user.id)
+      console.log(`[Play User Status] Initialized energy_last_updated_at for user ${user.id}`)
+    }
+
     // Compute current energy using regeneration logic with enterprise-grade error handling
     const { data: calcData, error: calcError } = await supabase.rpc('calculate_current_energy', {
       p_daily_energy: dailyEnergy,
@@ -195,17 +216,22 @@ export async function GET(req: NextRequest) {
 
     const regeneratedEnergy = calcData as number
 
-    // If regenerated value differs, persist it and update timestamp
+    // If regenerated value differs, persist it WITHOUT updating timestamp
+    // ⚠️ CRITICAL: energy_last_updated_at should ONLY be updated when consuming energy,
+    // NOT when regenerating. Otherwise, the countdown timer will reset on every page load.
     if (regeneratedEnergy !== dailyEnergy) {
-      const updatePayload: Record<string, any> = {
-        energy_last_updated_at: new Date().toISOString(),
-      }
+      const updatePayload: Record<string, any> = {}
+
+      // ❌ DO NOT update energy_last_updated_at here!
+      // It should remain as the time when energy was last CONSUMED
+
       if (hasDailyEnergy) {
         updatePayload.daily_energy = regeneratedEnergy
       }
       if (hasDailyEnergyCount) {
         updatePayload.daily_energy_count = regeneratedEnergy
       }
+
       await supabase.from('profiles').update(updatePayload).eq('id', user.id)
       dailyEnergy = regeneratedEnergy
     }
@@ -244,7 +270,7 @@ export async function GET(req: NextRequest) {
         walletBalance: profile.coins ?? profile.user_wallet_balance ?? 0,
         eloRank: profile.elo_rank || 1000,
         dailyEnergyResetAt,
-        energyLastUpdatedAt: profile.energy_last_updated_at || new Date().toISOString(),
+        energyLastUpdatedAt: energyLastUpdatedAt || new Date().toISOString(),  // 🔧 FIX: 使用更新後的變量，不是原始 profile
       },
       Api.withTimestamp()
     )

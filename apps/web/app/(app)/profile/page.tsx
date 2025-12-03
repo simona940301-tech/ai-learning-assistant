@@ -170,6 +170,7 @@ export default function ProfilePage() {
     <>
       <AppBar
         title="Profile"
+        showEnergy={false}
         rightAction={
           <Link href="/home">
             <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-primary">
