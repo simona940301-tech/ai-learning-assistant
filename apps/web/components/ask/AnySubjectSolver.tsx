@@ -87,7 +87,7 @@ export default function AnySubjectSolver() {
 
       if (attachedFiles && attachedFiles.length > 0) {
         const fileContexts: string[] = []
-        
+
         attachedFiles.forEach((file) => {
           if (file.content) {
             // 有內容的檔案：直接添加內容
@@ -223,6 +223,10 @@ export default function AnySubjectSolver() {
   const handleDockSubmit = useCallback(
     async (text: string) => {
       setOcrStatus(null)
+
+      // Clear input immediately for better UX
+      setInputValue('')
+
       if (activeFollowUp) {
         await handleFollowUpSubmit(text, activeFollowUp.turnId)
       } else {

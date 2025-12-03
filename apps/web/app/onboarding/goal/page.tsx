@@ -170,8 +170,8 @@ export default function OnboardingGoalPage() {
       anonymousData.goalData = goalData
       localStorage.setItem('onboarding_anonymous_data', JSON.stringify(anonymousData))
       
-      // 導向 challenge 頁面
-      router.push('/onboarding/challenge')
+      // 匿名模式：導向 avatar 頁面
+      router.push('/onboarding/avatar')
       return
     }
 
@@ -216,7 +216,8 @@ export default function OnboardingGoalPage() {
         })
         .eq('id', user.id)
 
-      router.push('/onboarding/challenge')
+      // 已登入模式：導向 avatar 頁面
+      router.push('/onboarding/avatar')
     } catch (error) {
       console.error('[OnboardingGoal] Failed to save:', error)
       setFormError('儲存失敗,請稍後再試')

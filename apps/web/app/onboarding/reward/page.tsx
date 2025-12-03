@@ -222,8 +222,8 @@ export default function OnboardingRewardPage() {
   }, [user?.id, authLoading, loading]) // 加入 loading 依賴確保只執行一次
 
   const handleRegister = () => {
-    // 導向註冊頁面，並帶上資料
-    router.push('/onboarding?from=reward')
+    // 導向登入/註冊頁面，並帶上來源參數
+    router.push('/auth/login?from=reward')
   }
 
   if (loading) {
@@ -415,28 +415,7 @@ export default function OnboardingRewardPage() {
             transition={{ delay: 1 }}
           >
             <Button
-              onClick={async () => {
-                // 檢查是否已設定頭像
-                try {
-                  const { data: profile } = await supabaseBrowserClient
-                    .from('profiles')
-                    .select('avatar_url')
-                    .eq('id', user.id)
-                    .single()
-                  
-                  if (profile?.avatar_url) {
-                    // 已有頭像，直接導向問卷
-                    router.push('/onboarding/habits')
-                  } else {
-                    // 無頭像，導向頭像設定
-                    router.push('/onboarding/avatar')
-                  }
-                } catch (error) {
-                  console.error('[Reward] Failed to check avatar:', error)
-                  // 錯誤時，預設導向頭像設定
-                  router.push('/onboarding/avatar')
-                }
-              }}
+              onClick={() => router.push('/onboarding/habits')}
               className="w-full h-16 bg-[#FED168] hover:bg-[#E6C058] text-[#5D4037] rounded-2xl text-lg font-bold shadow-lg"
             >
               繼續設定 →

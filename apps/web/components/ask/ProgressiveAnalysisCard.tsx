@@ -5,10 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Loader2, BookmarkPlus, Check, Sparkles, FileText } from 'lucide-react'
 import { experimental_useObject as useObject } from '@ai-sdk/react'
 import { FileAnalysis } from '@/lib/types'
-import { detectSubject, type SubjectTag } from '@/lib/utils/detect-subject'
+import { detectSubject } from '@/lib/utils/detect-subject'
 import { RAGMarkdownRenderer } from './RAGMarkdownRenderer'
 import { cn } from '@/lib/utils'
 import { GSATAnalysisSchema } from '@/lib/schemas/gsat-analysis-schema'
+import { SubjectSelectionDialog, type SubjectTag } from './SubjectSelectionDialog'
 
 interface ProgressiveAnalysisCardProps {
     documentId?: string
@@ -77,6 +78,7 @@ export default function ProgressiveAnalysisCard({
     const [isSaving, setIsSaving] = useState(false)
     const [saveSuccess, setSaveSuccess] = useState(false)
     const [documentNames, setDocumentNames] = useState<Record<string, string>>({})
+    const [showSubjectDialog, setShowSubjectDialog] = useState(false)
 
     const { object, error: streamError, isLoading, submit } = useObject({
         api: '/api/rag/analyze-object',
@@ -191,15 +193,20 @@ export default function ProgressiveAnalysisCard({
         setError(streamError.message || '分析失敗，請稍後再試')
     }, [streamError])
 
-    // Handle save to backpack
+    // Handle save to backpack - show subject selection dialog
     const handleSaveToNotebook = async () => {
+        if (!analysis) return
+        setShowSubjectDialog(true)
+    }
+
+    // Handle confirmed save with selected subject
+    const handleConfirmedSave = async (subject: SubjectTag) => {
         if (!analysis) return
 
         setIsSaving(true)
         setSaveSuccess(false)
 
         try {
-            const subjectTag = resolveSubjectTag()
             const note_md = analysis.structuredNotes || analysis.quickSummary || ''
 
             const response = await fetch('/api/backpack/save', {
@@ -208,8 +215,9 @@ export default function ProgressiveAnalysisCard({
                 body: JSON.stringify({
                     user_id: 'auto',
                     question: fileName || '文件分析',
-                    canonical_skill: subjectTag,
-                    note_md
+                    canonical_skill: subject,
+                    note_md,
+                    subject // Pass selected subject for better categorization
                 })
             })
 
@@ -221,6 +229,7 @@ export default function ProgressiveAnalysisCard({
 
             console.log('[ProgressiveAnalysisCard] Saved to backpack:', data)
             setSaveSuccess(true)
+            setShowSubjectDialog(false)
             setTimeout(() => setSaveSuccess(false), 3000)
 
         } catch (error) {
@@ -436,10 +445,10 @@ export default function ProgressiveAnalysisCard({
                                                                     {normalizeOptions(q.options, q.questionType === '多選').map((opt: string, oIdx: number) => {
                                                                         const label = String.fromCharCode(65 + oIdx)
                                                                         const optionText = normalizeOptionText(opt)
-                                                                    return (
-                                                                        <div
-                                                                            key={oIdx}
-                                                                            className="flex items-center gap-3 rounded-lg px-3 py-2 bg-[#F1E8DB]"
+                                                                        return (
+                                                                            <div
+                                                                                key={oIdx}
+                                                                                className="flex items-center gap-3 rounded-lg px-3 py-2 bg-[#F1E8DB]"
                                                                             >
                                                                                 <span className="font-bold text-[#8C6B4A]">{label}</span>
                                                                                 <span className="text-[15px] leading-[1.5] tracking-[0.2px] text-[#6C4A2D]">
@@ -523,6 +532,16 @@ export default function ProgressiveAnalysisCard({
                     </div>
                 </motion.div>
             )}
+
+            {/* Subject Selection Dialog */}
+            <SubjectSelectionDialog
+                open={showSubjectDialog}
+                onOpenChange={setShowSubjectDialog}
+                detectedSubject={analysis?.detectedSubject || subject}
+                confidence={0.8} // TODO: Get actual confidence from analysis
+                onConfirm={handleConfirmedSave}
+                isLoading={isSaving}
+            />
         </div>
     )
 }

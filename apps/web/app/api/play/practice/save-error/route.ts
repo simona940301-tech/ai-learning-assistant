@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getApiUser } from '@/lib/api/auth'
+import { generateEmbedding } from '@/lib/services/elite-rag-analyzer'
 
 export const dynamic = 'force-dynamic'
 
@@ -89,6 +90,20 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // 🧠 Generate Semantic Vector for Weakness Tracking
+        let userAnswerVector: number[] | null = null
+        try {
+            // Create context text combining question and user's wrong answer
+            const contextText = `題目: ${questionText}\n錯誤答案: ${userAnswer}\n正確答案: ${correctAnswer}`
+            
+            console.log('[SaveError] Generating embedding for weakness tracking...')
+            userAnswerVector = await generateEmbedding(contextText)
+            console.log('[SaveError] ✅ Embedding generated:', userAnswerVector.length, 'dimensions')
+        } catch (embeddingError) {
+            console.error('[SaveError] ⚠️ Embedding generation failed:', embeddingError)
+            // Continue without embedding - not critical for basic error book functionality
+        }
+
         // Upsert into error_book using the resolved ID
         const { data: existing } = await supabase
             .from('error_book')
@@ -98,26 +113,33 @@ export async function POST(req: NextRequest) {
             .maybeSingle()
 
         if (!existing) {
+            const insertData: any = {
+                user_id: user.id,
+                question_id: finalQuestionId,
+                status: 'active',
+                pack_id: null,
+                first_attempted_at: new Date().toISOString(),
+                last_attempted_at: new Date().toISOString(),
+                attempt_count: 1,
+                notes: {
+                    source: 'practice',
+                    room_id: roomId || null,
+                    question_preview: questionText,
+                    user_answer: userAnswer,
+                    correct_answer: correctAnswer,
+                    options,
+                    original_question_id: questionId // Keep track of original ID
+                },
+            }
+
+            // Add vector if successfully generated (for Semantic Weakness Sniper)
+            if (userAnswerVector) {
+                insertData.user_answer_vector = userAnswerVector
+            }
+
             const { error: insertError } = await supabase
                 .from('error_book')
-                .insert({
-                    user_id: user.id,
-                    question_id: finalQuestionId,
-                    status: 'active',
-                    pack_id: null,
-                    first_attempted_at: new Date().toISOString(),
-                    last_attempted_at: new Date().toISOString(),
-                    attempt_count: 1,
-                    notes: {
-                        source: 'practice',
-                        room_id: roomId || null,
-                        question_preview: questionText,
-                        user_answer: userAnswer,
-                        correct_answer: correctAnswer,
-                        options,
-                        original_question_id: questionId // Keep track of original ID
-                    },
-                })
+                .insert(insertData)
                 .single()
 
             if (insertError) {
@@ -125,13 +147,20 @@ export async function POST(req: NextRequest) {
                 return NextResponse.json({ error: 'FAILED_SAVE_ERROR_BOOK' }, { status: 500 })
             }
         } else {
+            const updateData: any = {
+                last_attempted_at: new Date().toISOString(),
+                attempt_count: (existing.attempt_count || 0) + 1,
+                status: 'active' // Reactivate if it was mastered
+            }
+
+            // Update vector if successfully generated (for Semantic Weakness Sniper)
+            if (userAnswerVector) {
+                updateData.user_answer_vector = userAnswerVector
+            }
+
             const { error: updateError } = await supabase
                 .from('error_book')
-                .update({
-                    last_attempted_at: new Date().toISOString(),
-                    attempt_count: (existing.attempt_count || 0) + 1,
-                    status: 'active' // Reactivate if it was mastered
-                })
+                .update(updateData)
                 .eq('id', existing.id)
 
             if (updateError) {

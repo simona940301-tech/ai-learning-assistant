@@ -10,40 +10,55 @@ import { PremiumLoader } from '@/components/ui/premium-loader'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Sparkles } from 'lucide-react'
 import { supabaseBrowserClient } from '@/lib/supabase'
-import { AvatarSelector } from '@/components/avatar/AvatarSelector'
 import { getAvatarPreset, AVATAR_PRESETS } from '@/lib/avatar/presets'
-import { HatchingCeremony } from '@/components/chick/HatchingCeremony'
 
 /**
- * STEP 4 — 選擇頭像 (Avatar Selection)
+ * STEP 2 — 選擇頭像 (Avatar Selection)
  *
- * Onboarding 流程的最後一步，讓用戶選擇頭像
- * 然後完成 onboarding 並跳轉到 play 頁面
+ * 在 goal 設定後，challenge 測驗前選擇頭像
+ * 支援匿名模式（使用 localStorage）
+ * 完成後導向 challenge 頁面
  */
 export default function OnboardingAvatarPage() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
 
-  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null)
+  // 預設選擇第一個頭像
+  const [selectedPresetId, setSelectedPresetId] = useState<string>(AVATAR_PRESETS[0].id)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
-  const [showHatching, setShowHatching] = useState(false)
+  const [isAnonymous, setIsAnonymous] = useState(false)
 
-  // Redirect if not logged in
+  // 不需要 redirect，支援匿名模式
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/onboarding')
+    if (!authLoading) {
+      setIsAnonymous(!user)
     }
-  }, [user, authLoading, router])
+  }, [user, authLoading])
 
-  // Load current avatar selection
+  // Load current avatar selection (支援匿名和已登入)
   useEffect(() => {
     async function init() {
-      if (!user) return
-
       try {
-        // Get current profile avatar
+        if (!user) {
+          // 匿名模式：從 localStorage 讀取
+          const stored = localStorage.getItem('onboarding_anonymous_data')
+          if (stored) {
+            try {
+              const data = JSON.parse(stored)
+              if (data.avatarId) {
+                setSelectedPresetId(data.avatarId)
+              }
+            } catch (e) {
+              console.error('[Avatar] Failed to parse stored data:', e)
+            }
+          }
+          setLoading(false)
+          return
+        }
+
+        // 已登入模式：從資料庫讀取
         const { data: profile } = await supabaseBrowserClient
           .from('profiles')
           .select('avatar_url')
@@ -52,9 +67,8 @@ export default function OnboardingAvatarPage() {
 
         if (profile?.avatar_url) {
           // Try to match with preset
-          const presets = Object.values(getAvatarPreset).filter(Boolean)
-          const matchingPreset = presets.find(preset =>
-            preset?.imageUrl === profile.avatar_url
+          const matchingPreset = AVATAR_PRESETS.find(preset =>
+            preset.imageUrl === profile.avatar_url
           )
           if (matchingPreset) {
             setSelectedPresetId(matchingPreset.id)
@@ -81,7 +95,7 @@ export default function OnboardingAvatarPage() {
       }
     }
 
-    if (user && !authLoading) {
+    if (!authLoading) {
       init()
     }
   }, [user, authLoading])
@@ -92,7 +106,7 @@ export default function OnboardingAvatarPage() {
   }
 
   const handleConfirm = async () => {
-    if (!user || !selectedPresetId || saving) return
+    if (!selectedPresetId || saving) return
 
     setSaving(true)
 
@@ -103,7 +117,29 @@ export default function OnboardingAvatarPage() {
         return
       }
 
-      // Update profile with selected avatar
+      if (!user) {
+        // 匿名模式：儲存到 localStorage
+        const stored = localStorage.getItem('onboarding_anonymous_data')
+        let anonymousData: any = {}
+        
+        if (stored) {
+          try {
+            anonymousData = JSON.parse(stored)
+          } catch (e) {
+            console.error('[Avatar] Failed to parse stored data:', e)
+          }
+        }
+        
+        anonymousData.avatarId = preset.id
+        anonymousData.avatarUrl = preset.imageUrl
+        localStorage.setItem('onboarding_anonymous_data', JSON.stringify(anonymousData))
+        
+        // 直接導向 challenge
+        router.push('/onboarding/challenge')
+        return
+      }
+
+      // 已登入模式：更新資料庫
       await supabaseBrowserClient
         .from('profiles')
         .update({
@@ -112,47 +148,31 @@ export default function OnboardingAvatarPage() {
         })
         .eq('id', user.id)
 
-      // Update session step (not completed yet - still need to complete habits survey)
+      // Update session step
       if (sessionId) {
         await supabaseBrowserClient
           .from('onboarding_sessions')
           .update({
-            current_step: 4, // Avatar selection completed
+            current_step: 2, // Avatar selection completed, next is challenge
           })
           .eq('id', sessionId)
       }
 
-      // Small delay for visual feedback, then show hatching ceremony
-      setTimeout(() => {
-        setSaving(false)
-        setShowHatching(true)
-      }, 300)
+      // 導向 challenge
+      router.push('/onboarding/challenge')
     } catch (error) {
       console.error('[Avatar] Failed to save:', error)
       setSaving(false)
     }
   }
 
-  const handleHatchingComplete = () => {
-    // 完成破殼儀式後，導向學習習慣問卷
-    router.push('/onboarding/habits')
-  }
-
   if (authLoading || loading) {
     return <PremiumLoader message="載入中..." />
   }
 
-  if (!user) {
-    return null
-  }
-
   return (
     <div className="min-h-screen bg-[#FAF6E9] px-6 py-8">
-      <AnimatePresence mode="wait">
-        {showHatching ? (
-          <HatchingCeremony key="hatching" onComplete={handleHatchingComplete} />
-        ) : (
-          <div className="max-w-2xl mx-auto">
+      <div className="max-w-2xl mx-auto">
             {/* Header */}
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -200,8 +220,8 @@ export default function OnboardingAvatarPage() {
               transition={{ delay: 0.3 }}
               className="bg-[#FFFDF5] rounded-3xl p-8 border-2 border-[#E0D0B8] shadow-lg"
             >
-              <div className="grid grid-cols-2 gap-6 max-w-md mx-auto">
-                {AVATAR_PRESETS.filter(avatar => avatar.category === 'student' && (avatar.id === 'student-01' || avatar.id === 'student-02')).map((avatar) => {
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 max-w-2xl mx-auto">
+                {AVATAR_PRESETS.map((avatar) => {
                   const isSelected = selectedPresetId === avatar.id
                   return (
                     <button
@@ -283,9 +303,7 @@ export default function OnboardingAvatarPage() {
                 </button>
               </motion.div>
             )}
-          </div>
-        )}
-      </AnimatePresence>
+      </div>
     </div>
   )
 }

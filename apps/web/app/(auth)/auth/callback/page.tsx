@@ -15,6 +15,25 @@ export default function AuthCallbackPage() {
   // 遷移匿名測驗資料到資料庫
   const migrateAnonymousData = async (userId: string): Promise<boolean> => {
     try {
+      // ========================================
+      // 🔒 CRITICAL: 雙重保護 - 確保不會污染老用戶
+      // ========================================
+      const { data: existingProfile } = await supabaseBrowserClient
+        .from('profiles')
+        .select('onboarding_completed')
+        .eq('id', userId)
+        .maybeSingle()
+
+      if (existingProfile?.onboarding_completed) {
+        console.log('[AuthCallback] 🛡️ 老用戶保護：跳過匿名資料遷移')
+        // 清除匿名資料
+        localStorage.removeItem('onboarding_anonymous_data')
+        sessionStorage.removeItem('onboarding_challenge_score')
+        sessionStorage.removeItem('onboarding_challenge_results')
+        sessionStorage.removeItem('onboarding_challenge_questions')
+        return false
+      }
+
       const stored = localStorage.getItem('onboarding_anonymous_data')
       if (!stored) {
         // 檢查 sessionStorage 是否有資料（從 reward 頁面來的）
@@ -54,12 +73,28 @@ export default function AuthCallbackPage() {
           sessionData.challenge_completed_at = new Date().toISOString()
         }
 
-        // 創建 onboarding session
-        await supabaseBrowserClient
+        // 創建或更新 onboarding session（避免重複）
+        const { data: existingSession } = await supabaseBrowserClient
           .from('onboarding_sessions')
-          .insert(sessionData)
-          .select()
-          .single()
+          .select('id')
+          .eq('user_id', userId)
+          .eq('status', 'in_progress')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (existingSession) {
+          await supabaseBrowserClient
+            .from('onboarding_sessions')
+            .update(sessionData)
+            .eq('id', existingSession.id)
+        } else {
+          await supabaseBrowserClient
+            .from('onboarding_sessions')
+            .insert(sessionData)
+            .select()
+            .single()
+        }
 
         // 清除 sessionStorage
         sessionStorage.removeItem('onboarding_challenge_score')
@@ -111,12 +146,33 @@ export default function AuthCallbackPage() {
         }
       }
 
-      // 創建 onboarding session
-      const { data: session } = await supabaseBrowserClient
+      // 創建或更新 onboarding session（避免重複創建）
+      // 先檢查是否已有 in_progress session
+      const { data: existingSession } = await supabaseBrowserClient
         .from('onboarding_sessions')
-        .insert(sessionData)
-        .select()
-        .single()
+        .select('id')
+        .eq('user_id', userId)
+        .eq('status', 'in_progress')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (existingSession) {
+        // 更新現有 session
+        console.log('[AuthCallback] 更新現有 session:', existingSession.id)
+        await supabaseBrowserClient
+          .from('onboarding_sessions')
+          .update(sessionData)
+          .eq('id', existingSession.id)
+      } else {
+        // 創建新 session
+        console.log('[AuthCallback] 創建新 session')
+        await supabaseBrowserClient
+          .from('onboarding_sessions')
+          .insert(sessionData)
+          .select()
+          .single()
+      }
 
       // 更新 profile（如果有目標設定資料）
       if (data.goalData) {
@@ -225,7 +281,9 @@ export default function AuthCallbackPage() {
 
       if (user) {
         try {
-          // Check if user has completed onboarding
+          // ========================================
+          // 🔒 CRITICAL: 優先檢查是否為老用戶
+          // ========================================
           const { data } = await supabaseBrowserClient
             .from('profiles')
             .select('onboarding_completed')
@@ -237,21 +295,36 @@ export default function AuthCallbackPage() {
           const redirectTo = urlParams.get('redirect') || '/home'
 
           if (data?.onboarding_completed) {
-            // Already completed onboarding, go to home page
+            // ✅ 老用戶：清除所有匿名資料，直接到首頁
+            console.log('[AuthCallback] 🎯 老用戶登入，清除匿名資料並導向 /home')
+            
+            // 清除匿名資料（避免污染老用戶資料）
+            localStorage.removeItem('onboarding_anonymous_data')
+            sessionStorage.removeItem('onboarding_challenge_score')
+            sessionStorage.removeItem('onboarding_challenge_results')
+            sessionStorage.removeItem('onboarding_challenge_questions')
+            
             router.push(redirectTo)
             return
           }
 
-          // Check if has anonymous data (completed challenge before login)
+          // ========================================
+          // 🆕 新用戶：遷移匿名資料
+          // ========================================
+          console.log('[AuthCallback] 🆕 新用戶登入，檢查匿名資料...')
+          
           const hasAnonymousData =
             sessionStorage.getItem('onboarding_challenge_score') ||
             sessionStorage.getItem('onboarding_challenge_results') ||
             localStorage.getItem('onboarding_anonymous_data')
 
-          // 如果有匿名資料，先遷移
+          // 只有新用戶才遷移匿名資料
           if (hasAnonymousData) {
-            console.log('[AuthCallback] Detected anonymous data, migrating...')
-            await migrateAnonymousData(user.id)
+            console.log('[AuthCallback] 發現匿名資料，開始遷移...')
+            const migrated = await migrateAnonymousData(user.id)
+            if (migrated) {
+              console.log('[AuthCallback] ✅ 匿名資料遷移成功')
+            }
           }
 
           // Get session to check progress (after migration)
@@ -272,26 +345,36 @@ export default function AuthCallbackPage() {
             .maybeSingle()
 
           // Smart routing based on progress
+          // 新流程：Goal(1) → Avatar(2) → Challenge(3) → Reward(4) → Habits(5) → Complete
           if (session?.scorecard_submitted_at) {
             // Completed habits survey, go to complete page
             router.push('/onboarding/complete')
           } else if (session?.challenge_completed_at) {
-            // Completed challenge, check if has avatar
-            if (profile?.avatar_url) {
-              // Has avatar, go to habits survey
-              router.push('/onboarding/habits')
-            } else {
-              // No avatar yet, go to avatar selection
-              router.push('/onboarding/avatar')
-            }
+            // Completed challenge, go to reward page
+            router.push('/onboarding/reward')
+          } else if (profile?.avatar_url) {
+            // Has avatar, go to challenge
+            router.push('/onboarding/challenge')
+          } else if (session?.id) {
+            // Has session (completed goal), go to avatar selection
+            router.push('/onboarding/avatar')
           } else {
             // New user or no progress, start from beginning
             router.push('/onboarding/goal')
           }
         } catch (error) {
           console.error('[AuthCallback] Error checking user status:', error)
-          // 發生錯誤時，導向 onboarding
-          router.push('/onboarding')
+          
+          // 🔒 錯誤處理：根據是否有 user 決定導向
+          if (user) {
+            // 已登入但查詢出錯，安全起見導向首頁（避免卡在 onboarding）
+            console.log('[AuthCallback] 已登入用戶遇到錯誤，導向 /home')
+            router.push('/home')
+          } else {
+            // 未登入，導向 onboarding 入口
+            console.log('[AuthCallback] 未登入用戶遇到錯誤，導向 /onboarding')
+            router.push('/onboarding')
+          }
         }
       } else {
         // If still not authenticated, redirect to onboarding

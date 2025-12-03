@@ -168,6 +168,100 @@ export async function GET(req: NextRequest) {
                 }
             }
 
+        } else if (room.source_type === 'WEAKNESS_SNIPER') {
+            isFullObjectMode = true
+            const userId = room.source_config?.user_id || user.id
+
+            // 1. Fetch recent wrong answers to build context
+            const { data: recentErrors } = await supabase
+                .from('error_book')
+                .select('question_text, user_answer, correct_answer')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false })
+                .limit(5)
+
+            if (!recentErrors || recentErrors.length === 0) {
+                // Fallback to random if no errors
+                const { data: seeds } = await supabase.from('seed_questions').select('*').limit(10)
+                if (seeds) allQuestions = seeds
+            } else {
+                // 2. Generate Weakness Vector
+                const contextText = recentErrors.map(e =>
+                    `題目: ${e.question_text}\n錯誤答案: ${e.user_answer}\n正確答案: ${e.correct_answer}`
+                ).join('\n\n')
+
+                try {
+                    // Dynamically import to avoid circular deps if any
+                    const { generateEmbedding, generateTargetedQuestions } = await import('@/lib/services/elite-rag-analyzer')
+
+                    const vector = await generateEmbedding(contextText)
+
+                    // 3. Vector Search
+                    const { data: similarQuestions, error: rpcError } = await supabase.rpc('match_questions', {
+                        query_embedding: vector,
+                        match_threshold: 0.6, // Slightly lower threshold for broader recall
+                        match_count: 10,
+                        exclude_ids: []
+                    })
+
+                    if (rpcError) throw rpcError
+
+                    let foundQuestions: any[] = []
+                    if (similarQuestions && similarQuestions.length > 0) {
+                        // Fetch full details for matched IDs
+                        const ids = similarQuestions.map((q: any) => q.id)
+                        const { data: details } = await supabase
+                            .from('seed_questions')
+                            .select('*')
+                            .in('id', ids)
+
+                        if (details) foundQuestions = details
+                    }
+
+                    // 4. RAG Generation (if insufficient results)
+                    if (foundQuestions.length < 5) {
+                        const generated = await generateTargetedQuestions(contextText, 5 - foundQuestions.length)
+
+                        // Save generated questions to DB (optional, but good for persistence)
+                        // For now, we just map them to response format
+                        const generatedFormatted = generated.map(g => ({
+                            id: 'gen_' + Math.random().toString(36).substr(2, 9), // Ephemeral ID
+                            question_text: g.questionText,
+                            options: g.options?.map(o => o.text) || [],
+                            correct_answer: g.correctAnswer,
+                            explanation: g.explanation,
+                            difficulty: g.difficulty,
+                            subject: 'generated',
+                            skill_tags: g.topicTags || [],
+                            is_generated: true
+                        }))
+
+                        // Combine matched and generated
+                        allQuestions = [...foundQuestions, ...generatedFormatted]
+                    } else {
+                        allQuestions = foundQuestions
+                    }
+
+                } catch (err) {
+                    console.error('Weakness Sniper Error:', err)
+                    // Fallback
+                    const { data: seeds } = await supabase.from('seed_questions').select('*').limit(10)
+                    if (seeds) allQuestions = seeds
+                }
+            }
+
+            // Map to standard format if needed (seed_questions format)
+            allQuestions = allQuestions.map((q: any) => ({
+                id: q.id,
+                question_text: q.question_text || q.stem,
+                options: q.options || (q.choices ? (Array.isArray(q.choices) ? q.choices : [q.choices.A, q.choices.B, q.choices.C, q.choices.D]) : []),
+                correct_answer: q.correct_answer || q.answer,
+                explanation: q.explanation,
+                difficulty: q.difficulty || q.difficulty_level || 3,
+                subject: q.subject,
+                skill_tags: q.skill_tags || q.knowledge_tags || []
+            }))
+
         } else {
             // Default Strategy: FILE_RAG, SUBJECT_TAG, MIXED
             let query = supabase.from('exam_question_bank').select('id')

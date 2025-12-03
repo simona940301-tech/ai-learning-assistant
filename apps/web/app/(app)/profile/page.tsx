@@ -58,8 +58,8 @@ export default function ProfilePage() {
 
   const resolvePresetId = useCallback((avatarUrl?: string | null) => {
     if (!avatarUrl) return null
-    const presets = Object.values(getAvatarPreset).filter(Boolean)
-    const matchingPreset = presets.find(preset => preset?.imageUrl === avatarUrl)
+    const { AVATAR_PRESETS } = require('@/lib/avatar/presets')
+    const matchingPreset = AVATAR_PRESETS.find((preset: any) => preset.imageUrl === avatarUrl)
     return matchingPreset?.id ?? null
   }, [])
 
@@ -232,32 +232,37 @@ export default function ProfilePage() {
                 className="mb-8"
               >
                 <Card className="border border-[#E8E1D7] bg-white p-6 rounded-lg">
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center justify-between mb-5">
                     <div>
                       <p className="text-sm font-medium text-[#666666] mb-2">目前等級</p>
-                      <h3 className="text-2xl font-bold text-[#4A3728]">
+                      <h3 className="text-3xl font-bold text-[#4A3728]">
                         LV.{currentLevel}
                       </h3>
                     </div>
-                    <div className="rounded-full bg-[#F5F5F4] p-2">
-                      <Crown className="h-5 w-5 text-[#4A3728]/60" />
+                    <div className="rounded-full bg-[#FED168]/20 p-3">
+                      <Crown className="h-6 w-6 text-[#FED168]" />
                     </div>
                   </div>
 
-                  {/* XP Progress */}
-                  <div className="space-y-3">
-                    <div className="flex justify-between text-sm font-medium text-[#666666]">
-                      <span>XP {xpInCurrentLevel.toLocaleString()}</span>
-                      <span>還差 {xpToNextLevel} XP</span>
+                  {/* XP Progress Bar - 全新設計 */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-baseline">
+                      <span className="text-xs font-medium text-[#666666]">經驗值</span>
+                      <span className="text-sm font-bold text-[#4A3728]">
+                        {xpInCurrentLevel.toLocaleString()} / {(xpInCurrentLevel + xpToNextLevel).toLocaleString()}
+                      </span>
                     </div>
-                    <div className="relative h-1 w-full rounded-full bg-[#F5F5F4]">
+                    <div className="relative h-3 w-full rounded-full bg-[#E8E1D7] overflow-hidden">
                       <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${levelProgress}%` }}
                         transition={{ duration: 1, ease: "easeOut" }}
-                        className="h-full rounded-full bg-[#4A3728]"
+                        className="h-full rounded-full bg-gradient-to-r from-[#FED168] to-[#FFAD00]"
                       />
                     </div>
+                    <p className="text-xs text-[#999999] text-right">
+                      還差 {xpToNextLevel} XP 升級
+                    </p>
                   </div>
                 </Card>
               </motion.div>

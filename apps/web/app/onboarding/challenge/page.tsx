@@ -88,6 +88,7 @@ export default function OnboardingChallengePage() {
   const [showReview, setShowReview] = useState(false)
   const [isAnonymous, setIsAnonymous] = useState(false)
   const [isNavigating, setIsNavigating] = useState(false)
+  const [playerAvatarId, setPlayerAvatarId] = useState<string | null>(null)
   const resultsRef = useRef<Result[]>([])
   const aiAnswerPromiseRef = useRef<Promise<void> | null>(null)
   const aiTimeoutsRef = useRef<number[]>([])
@@ -104,7 +105,7 @@ export default function OnboardingChallengePage() {
 
         // 檢查是否為匿名模式
         if (!user || authLoading) {
-          // 匿名模式：從 localStorage 讀取 goalData 和測驗資料
+          // 匿名模式：從 localStorage 讀取 goalData、avatar 和測驗資料
           const stored = localStorage.getItem(STORAGE_KEY)
           if (stored) {
             try {
@@ -114,6 +115,10 @@ export default function OnboardingChallengePage() {
                 userLevel = data.goalData.mock_exam_level
               } else {
                 userLevel = data.userLevel || 8
+              }
+              // 讀取 avatar ID
+              if (data.avatarId) {
+                setPlayerAvatarId(data.avatarId)
               }
               // 如果已有進行中的測驗，恢復狀態
               if (data.results.length > 0 && data.results.length < 7) {
@@ -139,7 +144,7 @@ export default function OnboardingChallengePage() {
           }
           setIsAnonymous(true)
         } else {
-          // 已登入模式
+          // 已登入模式：讀取 session 和 avatar
           const { data: sessionData } = await supabaseBrowserClient
             .from('onboarding_sessions')
             .select('id, mock_exam_level, current_grade')
@@ -151,6 +156,24 @@ export default function OnboardingChallengePage() {
 
           currentSessionId = sessionData?.id || null
           userLevel = sessionData?.mock_exam_level || 8
+
+          // 讀取用戶 avatar
+          const { data: profile } = await supabaseBrowserClient
+            .from('profiles')
+            .select('avatar_url')
+            .eq('id', user.id)
+            .single()
+
+          if (profile?.avatar_url) {
+            // 從 avatar_url 提取 preset ID
+            // avatar_url 格式: /avatars/presets/fairy/avatarlightblue.png
+            // 需要匹配對應的 preset ID
+            const { AVATAR_PRESETS } = await import('@/lib/avatar/presets')
+            const matchingPreset = AVATAR_PRESETS.find(p => p.imageUrl === profile.avatar_url)
+            if (matchingPreset) {
+              setPlayerAvatarId(matchingPreset.id)
+            }
+          }
 
           if (!currentSessionId) {
             const { data: newSession } = await supabaseBrowserClient
@@ -514,7 +537,7 @@ export default function OnboardingChallengePage() {
       
       try {
         const updateData = {
-          current_step: 3,
+          current_step: 4, // Goal(1) → Avatar(2) → Challenge(3) → Reward(4)
           challenge_completed_at: new Date().toISOString(),
           challenge_score: correctCount,
           challenge_question_ids: questions.map((q) => q.id),
@@ -709,6 +732,7 @@ export default function OnboardingChallengePage() {
           opponentName="AI 教練"
           opponentStatus={aiStatus}
           opponentAnswer={aiAnswer}
+          playerPresetId={playerAvatarId}
         />
       </div>
     </PlayMockProvider>

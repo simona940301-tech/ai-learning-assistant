@@ -38,6 +38,7 @@ const SaveLegacySchema = z.object({
   question: z.string().min(1),
   canonical_skill: z.string().min(1),
   note_md: z.string().min(1),
+  subject: z.string().optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -53,8 +54,8 @@ export async function POST(request: NextRequest) {
         errorType === 'invalid-jwt'
           ? '登入狀態失效，請重新登入或清除 Cookies 後再試。'
           : errorType === 'unauthenticated'
-          ? 'Authentication required'
-          : 'Authentication error occurred'
+            ? 'Authentication required'
+            : 'Authentication error occurred'
 
       trackError(`Backpack save unauthorized: ${errorType}`)
       return NextResponse.json(
@@ -117,9 +118,13 @@ export async function POST(request: NextRequest) {
     // Fallback to legacy format
     const legacyParse = SaveLegacySchema.safeParse(body)
     if (legacyParse.success) {
-      const { user_id, question, canonical_skill, note_md } = legacyParse.data
+      const { user_id, question, canonical_skill, note_md, subject } = legacyParse.data
       // SECURITY: Always use authenticated user ID, ignore client-provided user_id
       const finalUserId = user.id
+
+      // Use subject if provided, otherwise fallback to canonical_skill
+      // This ensures we use the user-confirmed subject from the dialog
+      const finalSubject = subject || canonical_skill
 
       // Save to notebook_entries (not backpack_notes)
       const supabase = getSupabaseClient(request)
@@ -130,7 +135,7 @@ export async function POST(request: NextRequest) {
           title: question,
           content_md: note_md,
           source_type: 'summary', // RAG analysis summary
-          tags: [canonical_skill],
+          tags: [finalSubject],
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })

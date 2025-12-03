@@ -152,7 +152,7 @@ ${contextText}`
         // Return AI stream response
         const response = result.toTextStreamResponse()
         console.log('[StreamAnalysis] 📤 Response headers:', Object.fromEntries(response.headers.entries()))
-        
+
         return response
 
     } catch (error) {
@@ -908,7 +908,7 @@ ${questionText}`
         ])
 
         const duration = Date.now() - startTime
-        console.log(`[Ultimate] ✅ All layers complete in ${duration}ms`)
+        console.log(`[Ultimate] ✅ All layers completed in ${duration}ms`)
 
         // Combine into full markdown
         const fullMarkdown = `# 📚 ${getSubjectLabel(subject)}
@@ -930,9 +930,79 @@ ${questions}`
             questions,
             fullMarkdown
         }
+
     } catch (error) {
-        console.error('[Ultimate] ❌ Error:', error)
+        console.error('[Ultimate] ❌ Failed:', error)
         throw error
+    }
+}
+
+// ============================================
+// Semantic Weakness Sniper (Phase 6)
+// ============================================
+
+/**
+ * Generate embedding vector for text using Gemini
+ */
+export async function generateEmbedding(text: string): Promise<number[]> {
+    try {
+        const model = genAI.getGenerativeModel({ model: "text-embedding-004" })
+        const result = await model.embedContent(text)
+        return result.embedding.values
+    } catch (error) {
+        console.error('[Embedding] ❌ Failed:', error)
+        throw error
+    }
+}
+
+/**
+ * Generate targeted questions based on weakness context
+ */
+export async function generateTargetedQuestions(
+    weaknessContext: string,
+    count: number = 3
+): Promise<ExamQuestion[]> {
+    console.log('[TargetedGen] 🚀 Generating targeted questions...')
+
+    try {
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })
+
+        const prompt = `你是頂尖的教育專家。學生在以下概念上有誤解或弱點：
+"${weaknessContext}"
+
+請生成 ${count} 道針對性的練習題，旨在糾正這些誤解並強化概念。
+題目難度應適中（Difficulty 3-4）。
+
+請以 JSON 格式回覆：
+{
+  "questions": [
+    {
+      "questionText": "題目內容",
+      "questionType": "multiple_choice",
+      "options": [
+        {"label": "A", "text": "選項A", "isCorrect": false},
+        {"label": "B", "text": "選項B", "isCorrect": true},
+        {"label": "C", "text": "選項C", "isCorrect": false},
+        {"label": "D", "text": "選項D", "isCorrect": false}
+      ],
+      "correctAnswer": "B",
+      "explanation": "詳細解析，特別指出為什麼學生原本的誤解是錯的。",
+      "difficulty": 3,
+      "topicTags": ["相關主題"],
+      "confidenceScore": 0.95
+    }
+  ]
+}`
+
+        const result = await model.generateContent(prompt)
+        const responseText = result.response.text()
+        const jsonText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+        const parsed = JSON.parse(jsonText)
+
+        return parsed.questions || []
+    } catch (error) {
+        console.error('[TargetedGen] ❌ Failed:', error)
+        return []
     }
 }
 
