@@ -89,7 +89,7 @@ function CommunityPageContent() {
 
   return (
     <>
-      <AppBar title="Community" user={{ name: 'User', avatar: '' }} />
+      <AppBar title="Community" showEnergy={false} />
 
       <main className="mx-auto max-w-lg">
         {/* Removed Tabs - only showing latest posts */}
