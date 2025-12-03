@@ -38,64 +38,30 @@ Goal → Avatar → Challenge → Reward（註冊 CTA）→ Habits → Complete
 
 ---
 
-## 🚨 當前問題：Next.js 渲染錯誤
+## ✅ 已修復：Next.js 渲染錯誤
 
-### 錯誤訊息
-```
-TypeError: Cannot read properties of undefined (reading 'clientModules')
-```
-
-### 根本原因
+### 問題診斷
 1. **Node 版本不匹配**
    - 專案需要：Node 20.x
-   - 當前版本：Node v22.19.0
+   - 原本版本：Node v22.19.0
 
-2. **可能的 node_modules 損壞**
+2. **語法錯誤在 context-cache-service.ts**
+   - 錯誤代碼：`const (genAI as any).cacheManager = genAI.(genAI as any).cacheManager;`
+   - 出現在多個函數中（5 處）
 
----
+### 修復步驟
+1. ✅ 切換到 Node 20.19.6 使用 nvm
+2. ✅ 修復所有語法錯誤在 [context-cache-service.ts](apps/web/lib/services/context-cache-service.ts)
+3. ✅ 清除 .next 快取
+4. ✅ 重新啟動開發伺服器
 
-## 🔧 修復步驟
-
-### 方案 1：使用正確的 Node 版本（推薦）
-
-#### Step 1: 安裝 nvm（如果還沒有）
-```bash
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-```
-
-#### Step 2: 安裝 Node 20
-```bash
-nvm install 20
-nvm use 20
-```
-
-#### Step 3: 重新安裝依賴並啟動
-```bash
-cd /Users/simonac/Desktop/moonshot-idea/apps/web
-rm -rf node_modules .next
-pnpm install
-pnpm dev
-```
-
-### 方案 2：強制清除並重建（如果方案 1 不可行）
-
-```bash
-cd /Users/simonac/Desktop/moonshot-idea
-
-# 停止所有進程
-lsof -ti:3000 | xargs kill -9 2>/dev/null || true
-
-# 清除所有快取
-rm -rf apps/web/.next
-rm -rf apps/web/node_modules
-rm -rf node_modules
-
-# 重新安裝
-pnpm install
-
-# 啟動
-cd apps/web && pnpm dev
-```
+### 修復結果
+- ✅ 開發伺服器成功啟動（http://127.0.0.1:3000）
+- ✅ 首頁正常渲染（200 OK）
+- ✅ 所有路由正常編譯
+- ✅ Middleware 正常運作
+- ✅ API 認證正常
+- ✅ 用戶認證流程正常
 
 ---
 
@@ -111,6 +77,7 @@ cd apps/web && pnpm dev
 | `apps/web/app/auth/login/page.tsx` | **新增**獨立登入/註冊頁 | ✅ |
 | `apps/web/app/(auth)/auth/callback/page.tsx` | 三層老用戶保護 + 錯誤處理 | ✅ |
 | `apps/web/app/(app)/profile/page.tsx` | 修復 avatar 顯示 + 改善 XP 進度條 | ✅ |
+| `apps/web/lib/services/context-cache-service.ts` | 修復 5 處語法錯誤 | ✅ |
 
 ---
 

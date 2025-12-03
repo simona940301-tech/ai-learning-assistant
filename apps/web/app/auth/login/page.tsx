@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { Button } from '@/components/ui/button'
@@ -12,13 +12,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Eye, EyeOff, Mail, Lock, Chrome, Sparkles, ArrowRight, Check } from 'lucide-react'
 
 /**
- * 登入/註冊頁面
- * 
- * 使用時機：
- * - 在 Reward 頁面點擊「立即註冊」
- * - 用戶想保存匿名模式的進度
+ * 登入/註冊頁面組件（內部實作）
  */
-export default function AuthLoginPage() {
+function AuthLoginPageContent() {
   const [isLogin, setIsLogin] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -437,6 +433,32 @@ export default function AuthLoginPage() {
         </motion.div>
       </div>
     </div>
+  )
+}
+
+/**
+ * 登入/註冊頁面（包裝 Suspense）
+ *
+ * 使用時機：
+ * - 在 Reward 頁面點擊「立即註冊」
+ * - 用戶想保存匿名模式的進度
+ */
+export default function AuthLoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-[#FAF6E9]">
+        <div className="flex items-center gap-3">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            className="w-8 h-8 border-4 border-[#FED168] border-t-transparent rounded-full"
+          />
+          <span className="text-[#5D4037] font-medium">載入中...</span>
+        </div>
+      </div>
+    }>
+      <AuthLoginPageContent />
+    </Suspense>
   )
 }
 
