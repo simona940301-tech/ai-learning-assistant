@@ -38,24 +38,78 @@ Goal → Avatar → Challenge → Reward（註冊 CTA）→ Habits → Complete
 
 ---
 
-## ✅ 已修復：Next.js 渲染錯誤
+## ✅ 已修復：Vercel 部署錯誤
 
-### 問題診斷
+### 問題 1：TypeScript 建置錯誤
+
+#### 診斷
+1. **語法錯誤在 context-cache-service.ts**（5 處）
+   - 錯誤代碼：`const (genAI as any).cacheManager = genAI.(genAI as any).cacheManager;`
+   - 影響函數：createContextCache, getContextCache, deleteContextCache, listContextCaches, generateWithCache, streamWithCache
+
+2. **Next.js 靜態渲染錯誤在 auth/login/page.tsx**
+   - 錯誤：`useSearchParams() should be wrapped in a suspense boundary`
+   - 原因：缺少 Suspense 包裝
+
+#### 修復
+1. ✅ 修復所有語法錯誤在 [context-cache-service.ts](apps/web/lib/services/context-cache-service.ts)
+   - 改為：`const cacheManager = (genAI as any).cacheManager;`
+2. ✅ 在 [auth/login/page.tsx](apps/web/app/auth/login/page.tsx) 添加 Suspense boundary
+   - 分離組件為 `AuthLoginPageContent` 和 `AuthLoginPage` wrapper
+   - 添加載入中的 fallback UI
+
+#### 結果
+- ✅ `pnpm build` 成功完成
+- ✅ 所有路由正常編譯
+- ✅ 無 TypeScript 語法錯誤
+
+---
+
+### 問題 2：pnpm 版本不匹配
+
+#### 診斷
+```
+ERR_PNPM_UNSUPPORTED_ENGINE: Unsupported environment
+Expected version: 8.15.0
+Got: 8.15.9
+```
+
+- [package.json](package.json) 中的 `engines.pnpm` 設定為精確版本 `8.15.0`
+- Vercel 使用 pnpm `8.15.9`
+- 導致所有部署在安裝階段就失敗（7-9 秒內）
+
+#### 修復
+✅ 更新 [package.json](package.json) 的 pnpm 版本約束：
+```json
+{
+  "engines": {
+    "node": "20.x",
+    "pnpm": ">=8.15.0 <9.0.0"  // 從 "8.15.0" 改為範圍
+  },
+  "packageManager": "pnpm@8.15.9"  // 從 8.15.0 更新
+}
+```
+
+#### 結果
+- ✅ Vercel 現在可以使用 pnpm 8.15.9
+- ✅ 部署不再在安裝階段失敗
+- ✅ 準備好進行完整建置
+
+---
+
+### 開發環境修復（本地）
+
+#### 問題診斷
 1. **Node 版本不匹配**
    - 專案需要：Node 20.x
    - 原本版本：Node v22.19.0
 
-2. **語法錯誤在 context-cache-service.ts**
-   - 錯誤代碼：`const (genAI as any).cacheManager = genAI.(genAI as any).cacheManager;`
-   - 出現在多個函數中（5 處）
-
-### 修復步驟
+#### 修復步驟
 1. ✅ 切換到 Node 20.19.6 使用 nvm
-2. ✅ 修復所有語法錯誤在 [context-cache-service.ts](apps/web/lib/services/context-cache-service.ts)
-3. ✅ 清除 .next 快取
-4. ✅ 重新啟動開發伺服器
+2. ✅ 清除 .next 快取
+3. ✅ 重新啟動開發伺服器
 
-### 修復結果
+#### 修復結果
 - ✅ 開發伺服器成功啟動（http://127.0.0.1:3000）
 - ✅ 首頁正常渲染（200 OK）
 - ✅ 所有路由正常編譯
