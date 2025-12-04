@@ -32,8 +32,8 @@ import { PremiumLoader } from '@/components/ui/premium-loader'
  */
 
 // AI 教練配置
-const AI_MIN_DELAY_MS = 5000
-const AI_RANDOM_DELAY_MS = 3000
+const AI_MIN_DELAY_MS = 12000
+const AI_RANDOM_DELAY_MS = 8000
 const AI_CORRECT_RATE = 0.6
 
 // localStorage keys
@@ -232,7 +232,7 @@ export default function OnboardingChallengePage() {
         if (data.success && data.questions && data.questions.length >= 7) {
           // ✅ 明確類型：API 返回的是 ApiQuestion[]
           const apiQuestions = data.questions as ApiQuestion[]
-          
+
           // 先對 API 返回的題目去重（以防萬一）
           const uniqueApiQuestions: ApiQuestion[] = Array.from(
             new Map(apiQuestions.map((q) => [q.id, q])).values()
@@ -253,27 +253,27 @@ export default function OnboardingChallengePage() {
             let available: ApiQuestion[] = (questionsByDifficulty[diff] || []).filter(
               (q) => !selectedQuestionIds.has(q.id)
             )
-            
+
             // 如果該難度的題目都用完了，從所有題目中選擇未選過的
             if (available.length === 0) {
               available = uniqueApiQuestions.filter(
                 (q) => !selectedQuestionIds.has(q.id)
               )
             }
-            
+
             // 如果還是沒有可用題目，使用 fallback（理論上不應該發生）
             if (available.length === 0) {
               console.warn(`[Challenge] No available questions for difficulty ${diff} at index ${index}`)
               available = uniqueApiQuestions
             }
-            
+
             // 隨機選擇一題
             const randomIndex = Math.floor(Math.random() * available.length)
             const selected = available[randomIndex]
-            
+
             // 記錄已選題目
             selectedQuestionIds.add(selected.id)
-            
+
             // ✅ 轉換 API 格式（snake_case）到前端格式（camelCase）
             return {
               id: selected.id,
@@ -281,7 +281,7 @@ export default function OnboardingChallengePage() {
               options: [selected.option_a, selected.option_b, selected.option_c, selected.option_d],
               correctAnswer: selected.correct_answer,
               difficulty: selected.difficulty_level,
-              timeLimit: 15,
+              timeLimit: 30,
               explanation: selected.explanation,
             }
           })
@@ -329,7 +329,7 @@ export default function OnboardingChallengePage() {
     if (loading || questions.length === 0 || currentIndex >= questions.length || showReview) return
 
     const question = questions[currentIndex]
-    
+
     playerAnsweredRef.current = false
     questionStartTimeRef.current = Date.now()
     setAiStatus('thinking')
@@ -340,10 +340,10 @@ export default function OnboardingChallengePage() {
 
     const promise = new Promise<void>((resolve) => {
       let aiAnswered = false
-      
+
       const thinkingTimer = window.setTimeout(() => {
         if (aiAnswered) return
-        
+
         aiAnswered = true
         const willAnswerCorrect = Math.random() < AI_CORRECT_RATE
         const wrongOptions: Array<'A' | 'B' | 'C' | 'D'> = ['A', 'B', 'C', 'D'].filter(
@@ -374,33 +374,33 @@ export default function OnboardingChallengePage() {
       }, aiAnswerDelay)
 
       aiTimeoutsRef.current.push(thinkingTimer)
-      
+
       const checkPlayerAnswer = setInterval(() => {
         if (playerAnsweredRef.current && !aiAnswered) {
           const elapsed = Date.now() - questionStartTimeRef.current
-          
+
           if (elapsed < AI_MIN_DELAY_MS) {
             clearInterval(checkPlayerAnswer)
             window.clearTimeout(thinkingTimer)
-            
-            const quickAnswerDelay = 500 + Math.random() * 1000
+
+            const quickAnswerDelay = 1500 + Math.random() * 2500
             const quickAnswerTimer = window.setTimeout(() => {
               if (aiAnswered) return
-              
+
               aiAnswered = true
               const willAnswerCorrect = Math.random() < AI_CORRECT_RATE
               const wrongOptions: Array<'A' | 'B' | 'C' | 'D'> = ['A', 'B', 'C', 'D'].filter(
                 (opt) => opt !== question.correctAnswer
               ) as Array<'A' | 'B' | 'C' | 'D'>
               const answer = willAnswerCorrect ? question.correctAnswer : wrongOptions[Math.floor(Math.random() * wrongOptions.length)]
-              
+
               setAiAnswer(answer)
               setAiStatus('locked')
-              
+
               const settleTimer = window.setTimeout(() => {
                 const isCorrect = answer === question.correctAnswer
                 setAiStatus(isCorrect ? 'hit' : 'miss')
-                
+
                 if (isCorrect) {
                   const estimated = calculateBaseScore(question.difficulty) * 1.6 + 100
                   const swing = 0.55 + Math.random() * 0.25
@@ -409,18 +409,18 @@ export default function OnboardingChallengePage() {
                 } else {
                   setAiStreak(0)
                 }
-                
+
                 resolve()
               }, 600)
-              
+
               aiTimeoutsRef.current.push(settleTimer)
             }, quickAnswerDelay)
-            
+
             aiTimeoutsRef.current.push(quickAnswerTimer)
           }
         }
       }, 100)
-      
+
       aiTimeoutsRef.current.push(checkPlayerAnswer as any)
     })
 
@@ -439,9 +439,9 @@ export default function OnboardingChallengePage() {
     timeRemaining: number
   ) => {
     if (questions.length === 0) return
-    
+
     playerAnsweredRef.current = true
-    
+
     const question = questions[currentIndex]
     const isCorrect = answer === question.correctAnswer
     const timeMs = (question.timeLimit - timeRemaining) * 1000
@@ -554,7 +554,7 @@ export default function OnboardingChallengePage() {
 
       // 已登入模式，更新資料庫（帶超時保護）
       console.log('[Challenge] Updating database for user session:', sessionId)
-      
+
       try {
         const updateData = {
           current_step: 4, // Goal(1) → Avatar(2) → Challenge(3) → Reward(4)
@@ -568,19 +568,19 @@ export default function OnboardingChallengePage() {
             answer_selected: r.answerSelected,
           })),
         }
-        
+
         console.log('[Challenge] Update data prepared:', updateData)
-        
+
         // 添加 5 秒超時保護
         const updatePromise = supabaseBrowserClient
           .from('onboarding_sessions')
           .update(updateData)
           .eq('id', sessionId)
-        
-        const timeoutPromise = new Promise((_, reject) => 
+
+        const timeoutPromise = new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Database update timeout')), 5000)
         )
-        
+
         // ✅ 修復：正確處理 Promise.race 的類型
         const result = await Promise.race([updatePromise, timeoutPromise]) as { error?: unknown } | null
         const updateError = result && typeof result === 'object' && 'error' in result ? result.error : null
@@ -675,13 +675,12 @@ export default function OnboardingChallengePage() {
                             return (
                               <div
                                 key={label}
-                                className={`px-4 py-3 rounded-xl border transition-colors ${
-                                  isCorrect
+                                className={`px-4 py-3 rounded-xl border transition-colors ${isCorrect
                                     ? 'bg-[#E8F5E9] border-[#528555]'
                                     : isUserAnswer
-                                    ? 'bg-[#FFEBEE] border-[#DC2626]'
-                                    : 'bg-[#F8F5E8] border-[#E0D0B8]'
-                                }`}
+                                      ? 'bg-[#FFEBEE] border-[#DC2626]'
+                                      : 'bg-[#F8F5E8] border-[#E0D0B8]'
+                                  }`}
                               >
                                 <div className="flex items-center justify-between">
                                   <span className={`text-[14px] ${isCorrect ? 'text-[#5D4037]' : 'text-[#8B6F47]'}`}>
@@ -723,10 +722,10 @@ export default function OnboardingChallengePage() {
             disabled={isNavigating}
             className="w-full h-14 bg-[#FED168] hover:bg-[#E6C058] disabled:bg-[#E0D0B8] disabled:cursor-not-allowed text-[#5D4037] disabled:text-[#8B6F47] rounded-2xl text-[16px] font-bold shadow-lg transition-colors"
           >
-            {isNavigating 
-              ? '正在跳轉...' 
-              : wrongQuestions.length === 0 
-                ? '查看獎勵 →' 
+            {isNavigating
+              ? '正在跳轉...'
+              : wrongQuestions.length === 0
+                ? '查看獎勵 →'
                 : '我理解了,繼續 →'
             }
           </Button>
@@ -767,7 +766,7 @@ function generateFallbackQuestions(): Question[] {
     options: ['選項 A', '選項 B', '選項 C', '選項 D'],
     correctAnswer: ['A', 'B', 'C', 'D'][i % 4] as 'A' | 'B' | 'C' | 'D',
     difficulty: Math.floor(i / 2) + 1,
-    timeLimit: 15,
+    timeLimit: 30,
     explanation: `這是第 ${i + 1} 題的解析。`,
   }))
 }

@@ -167,8 +167,8 @@ export function BattleQuestion({
               <div className="absolute inset-0 flex items-center justify-center">
                 <span className="font-mono text-sm font-bold text-white drop-shadow-lg">
                   {player2LifePoints}
-            </span>
-          </div>
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -184,13 +184,12 @@ export function BattleQuestion({
         {/* Time Progress Bar */}
         <div className="relative h-1 overflow-hidden rounded-full bg-muted">
           <motion.div
-            className={`h-full ${
-              timeRemaining <= 3
+            className={`h-full ${timeRemaining <= 3
                 ? 'bg-red-500'
                 : timeRemaining <= question.timeLimit * 0.5
-                ? 'bg-yellow-500'
-                : 'bg-green-500'
-            }`}
+                  ? 'bg-yellow-500'
+                  : 'bg-green-500'
+              }`}
             initial={{ width: '100%' }}
             animate={{ width: `${timePercentage}%` }}
             transition={{ duration: 1, ease: 'linear' }}
@@ -217,31 +216,29 @@ export function BattleQuestion({
                 key={index}
                 onClick={() => handleAnswerSelect(letter)}
                 disabled={isAnswered}
-                className={`w-full rounded-lg border-2 p-4 text-left transition-all relative ${
-                  isAnswered
+                className={`w-full rounded-lg border-2 p-4 text-left transition-all relative ${isAnswered
                     ? isCorrect
                       ? 'border-green-500 bg-green-500/10'
                       : isSelected && !isCorrect
-                      ? 'border-red-500 bg-red-500/10'
-                      : 'border-muted bg-muted/50 opacity-60'
+                        ? 'border-red-500 bg-red-500/10'
+                        : 'border-muted bg-muted/50 opacity-60'
                     : isSelected
-                    ? 'border-blue-500 bg-blue-500/10 shadow-md'
-                    : 'border-border bg-background hover:border-blue-300 hover:bg-accent'
-                }`}
+                      ? 'border-blue-500 bg-blue-500/10 shadow-md'
+                      : 'border-border bg-background hover:border-blue-300 hover:bg-accent'
+                  }`}
                 whileHover={!isAnswered ? { scale: 1.02 } : {}}
                 whileTap={!isAnswered ? { scale: 0.98 } : {}}
               >
                 <div className="flex items-center gap-3">
                   <div
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-bold ${
-                      isAnswered && isCorrect
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-bold ${isAnswered && isCorrect
                         ? 'bg-green-500 text-white'
                         : isAnswered && isSelected && !isCorrect
-                        ? 'bg-red-500 text-white'
-                        : isSelected
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-muted text-muted-foreground'
-                    }`}
+                          ? 'bg-red-500 text-white'
+                          : isSelected
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-muted text-muted-foreground'
+                      }`}
                   >
                     {letter}
                   </div>
@@ -249,8 +246,8 @@ export function BattleQuestion({
                   {isAnswered && isCorrect && (
                     <Trophy className="h-5 w-5 text-green-500" />
                   )}
-                  {/* 對手答案指示器 */}
-                  {isOpponentAnswer && !isAnswered && (
+                  {/* 對手答案指示器 - 已移除 */}
+                  {/* {isOpponentAnswer && !isAnswered && (
                     <motion.div
                       initial={{ opacity: 0, scale: 0 }}
                       animate={{ opacity: 1, scale: 1 }}
@@ -258,7 +255,7 @@ export function BattleQuestion({
                     >
                       對手
                     </motion.div>
-                  )}
+                  )} */}
                 </div>
               </motion.button>
             )

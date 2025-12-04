@@ -49,20 +49,20 @@ function OptionButton({
     ? isCorrect
       ? 'bg-green-500/25 border-green-400/60'
       : isSelected && !isCorrect
-      ? 'bg-red-500/25 border-red-400/60'
-      : 'bg-amber-50 border-amber-200/30 opacity-60'
+        ? 'bg-red-500/25 border-red-400/60'
+        : 'bg-amber-50 border-amber-200/30 opacity-60'
     : isSelected
-    ? 'bg-amber-500/25 border-amber-400/70'
-    : 'bg-white border-amber-200/30 hover:bg-amber-50 hover:border-amber-300/50'
+      ? 'bg-amber-500/25 border-amber-400/70'
+      : 'bg-white border-amber-200/30 hover:bg-amber-50 hover:border-amber-300/50'
 
   // 字母圓圈顏色 - 溫黃色系
   const letterBgColor = isAnswered && isCorrect
     ? 'bg-green-500'
     : isAnswered && isSelected && !isCorrect
-    ? 'bg-red-500'
-    : isSelected
-    ? 'bg-amber-500'
-    : 'bg-amber-200/40'
+      ? 'bg-red-500'
+      : isSelected
+        ? 'bg-amber-500'
+        : 'bg-amber-200/40'
 
   // 文字顏色 - 溫黃色系
   const textColor = isAnswered
@@ -85,9 +85,8 @@ function OptionButton({
     >
       {/* 字母圓圈 */}
       <div
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-colors ${letterBgColor} ${
-          isAnswered && isCorrect ? 'text-white' : isSelected ? 'text-white' : 'text-amber-800'
-        }`}
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-colors ${letterBgColor} ${isAnswered && isCorrect ? 'text-white' : isSelected ? 'text-white' : 'text-amber-800'
+          }`}
       >
         {letter}
       </div>
@@ -118,8 +117,8 @@ function OptionButton({
         </motion.span>
       )}
 
-      {/* 對手鎖定提示 */}
-      {isOpponentAnswer && !isAnswered && (
+      {/* 對手鎖定提示 - 已移除，不再顯示對手選擇 */}
+      {/* {isOpponentAnswer && !isAnswered && (
           <motion.div
             className="flex items-center gap-1 text-[10px] font-semibold text-amber-600"
             initial={{ opacity: 0, x: 5 }}
@@ -127,7 +126,7 @@ function OptionButton({
           >
             <Sparkles className="h-3 w-3 text-amber-600" />
           </motion.div>
-      )}
+      )} */}
     </motion.button>
   )
 }
@@ -146,11 +145,11 @@ export function OptionsList({
   onSelectAnswer,
 }: OptionsListProps) {
   const letters: OptionLetter[] = ['A', 'B', 'C', 'D']
-  
+
   // 確保顯示所有選項（最多4個）
   // 強制顯示4個選項按鈕，即使數據少於4個
   const displayOptions: Array<{ text: string; letter: OptionLetter; isEmpty: boolean }> = []
-  
+
   for (let i = 0; i < 4; i++) {
     const opt = options[i]
     const letter = letters[i]
@@ -161,7 +160,7 @@ export function OptionsList({
       displayOptions.push({ text: `選項 ${letter}`, letter, isEmpty: true })
     }
   }
-  
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-gradient-to-b from-amber-50 to-yellow-100 border-t border-amber-200/30 shadow-[0_-4px_20px_rgba(245,158,11,0.1)]">
       {/* 選項容器 - 內部可捲動，mobile-first padding */}
@@ -182,7 +181,7 @@ export function OptionsList({
                 </div>
               )
             }
-            
+
             return (
               <OptionButton
                 key={`${letter}-${index}`}

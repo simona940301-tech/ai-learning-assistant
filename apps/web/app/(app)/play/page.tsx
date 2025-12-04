@@ -12,6 +12,8 @@ import { CustomBattleModal } from '@/components/play/CustomBattleModal'
 import { UGCContractModal } from '@/components/play/UGCContractModal'
 import { BattleQuestionV3 } from '@/components/play/BattleQuestionV3'
 import { BattleTransitionOverlay } from '@/components/play/BattleTransitionOverlay'
+import { EditorGameModal } from '@/components/play/EditorGameModal'
+import { FileText } from 'lucide-react'
 import {
   calculateBaseScore,
   calculateSpeedCoefficient,
@@ -138,6 +140,7 @@ function PlayPageContent() {
   } = usePlay()
   const [isChestModalOpen, setChestModalOpen] = useState(false)
   const [isFocusModalOpen, setFocusModalOpen] = useState(false)
+  const [isEditorModalOpen, setEditorModalOpen] = useState(false)
 
   // 🎯 引導系統：自動檢測 T04 (Onboarding 完成後) 和 T01 (停留過久)
   const { recordOperation } = useGuidance({
@@ -539,6 +542,16 @@ function PlayPageContent() {
       estimatedTime: '8-12 分鐘',
     },
     {
+      id: 'editor',
+      label: '實習編輯',
+      description: '找錯、修稿、主旨判斷',
+      icon: FileText,
+      onClick: () => setEditorModalOpen(true),
+      accent: 'bg-gradient-to-br from-purple-400/60 to-indigo-500/60 text-white',
+      energyCost: 1,
+      estimatedTime: '5 分鐘',
+    },
+    {
       id: 'ugc',
       label: '內容貢獻',
       description: '創建題目、管理題目、發起挑戰',
@@ -754,6 +767,7 @@ function PlayPageContent() {
 
       <AnimatePresence>
         {isFocusModalOpen && <FocusModeModal onClose={() => setFocusModalOpen(false)} />}
+        {isEditorModalOpen && <EditorGameModal isOpen={isEditorModalOpen} onClose={() => setEditorModalOpen(false)} />}
       </AnimatePresence>
 
     </>

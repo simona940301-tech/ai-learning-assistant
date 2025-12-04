@@ -85,14 +85,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (provider: Provider | 'google' | 'facebook' | 'apple') => {
       // 🎯 修復：OAuth 永遠使用真實認證，即使在開發模式
       console.log('🚀 [AuthProvider] Starting real OAuth login with', provider)
+
+      let redirectTo = undefined
+      if (typeof window !== 'undefined') {
+        // 優先使用當前 origin
+        redirectTo = `${window.location.origin}/auth/callback`
+
+        // 如果有設定 NEXT_PUBLIC_SITE_URL 且不是 localhost，則優先使用（適用於生產環境覆蓋）
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
+        if (siteUrl && !siteUrl.includes('localhost') && !window.location.origin.includes('localhost')) {
+          redirectTo = `${siteUrl}/auth/callback`
+        }
+
+        console.log('🔗 [AuthProvider] OAuth Redirect URL:', redirectTo)
+      }
+
       const { error } = await supabaseBrowser.auth.signInWithOAuth({
         provider,
-        options:
-          typeof window !== 'undefined'
-            ? {
-              redirectTo: `${window.location.origin}/auth/callback`,
-            }
-            : undefined,
+        options: {
+          redirectTo,
+          queryParams: {
+            // 強制 Google 顯示選擇帳號畫面，避免自動登入錯誤的帳號
+            prompt: 'select_account',
+          }
+        }
       })
       if (error) {
         console.error('❌ [AuthProvider] OAuth error:', error)
