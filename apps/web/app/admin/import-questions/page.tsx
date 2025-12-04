@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 
-type SourceType = 'GSAT' | 'AST' | 'OTHER' | 'NATIONAL_MOCK' | 'NORTHERN_MOCK'
+type SourceType = 'GSAT' | 'AST' | 'OTHER' | 'NATIONAL_MOCK' | 'NORTHERN_MOCK' | 'SYSTEM'
 
 interface ImportResult {
   success: boolean
@@ -197,6 +197,7 @@ export default function ImportQuestionsPage() {
                   <SelectItem value="AST">指考</SelectItem>
                   <SelectItem value="NATIONAL_MOCK">全國模考</SelectItem>
                   <SelectItem value="NORTHERN_MOCK">北部模考</SelectItem>
+                  <SelectItem value="SYSTEM">系統自創</SelectItem>
                   <SelectItem value="OTHER">其他</SelectItem>
                 </SelectContent>
               </Select>

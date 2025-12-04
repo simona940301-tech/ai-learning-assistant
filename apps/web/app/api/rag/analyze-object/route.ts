@@ -60,15 +60,23 @@ export async function POST(req: NextRequest) {
                     .in('id', relatedDocIds)
 
                 if (!relatedError && relatedDocs && relatedDocs.length > 0) {
-                    // Append related documents as additional context
-                    const relatedContext = relatedDocs.map((doc, idx) =>
-                        `\n\n--- 相關文件 ${idx + 1}: ${doc.filename} ---\n${doc.original_text}`
-                    ).join('\n')
+                    // Format primary document
+                    let combinedContext = `<document index="1" filename="${primaryDoc.filename}" type="primary">\n${primaryDoc.original_text}\n</document>`
 
-                    analysisText = `--- 主要文件: ${primaryDoc.filename} ---\n${analysisText}${relatedContext}`
+                    // Append related documents with XML tags
+                    relatedDocs.forEach((doc, idx) => {
+                        combinedContext += `\n\n<document index="${idx + 2}" filename="${doc.filename}" type="related">\n${doc.original_text}\n</document>`
+                    })
 
+                    analysisText = combinedContext
                     console.log('[Analyze Object] ✅ Combined text length:', analysisText.length)
+                } else {
+                    // Fallback if no related docs found or error
+                    analysisText = `<document index="1" filename="${primaryDoc.filename}" type="primary">\n${primaryDoc.original_text}\n</document>`
                 }
+            } else {
+                // Single document case - still wrap for consistency
+                analysisText = `<document index="1" filename="${primaryDoc.filename}" type="primary">\n${primaryDoc.original_text}\n</document>`
             }
         }
 

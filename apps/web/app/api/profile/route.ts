@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getApiUser } from '@/lib/api/auth'
 import { Api } from '@/lib/api/response'
 import { ApiErrorCode } from '@/lib/types/api'
@@ -48,9 +48,11 @@ export async function GET(req: NextRequest) {
     const xpValue = profile?.xp ?? 0
     const levelInfo = levelForXp(xpValue)
 
-    return Api.success({
+    const profilePayload = {
       id: profile.id,
       username: profile.username,
+      display_name: profile.display_name,
+      full_name: profile.full_name,
       avatar_url: profile.avatar_url,
       bio: profile.bio,
       xp: xpValue,
@@ -61,6 +63,13 @@ export async function GET(req: NextRequest) {
       streak: profile.streak,
       created_at: profile.created_at,
       updated_at: profile.updated_at,
+    }
+
+    // Keep top-level "profile" for existing UI while also exposing "data" for consistency.
+    return NextResponse.json({
+      success: true,
+      profile: profilePayload,
+      data: profilePayload,
     })
   } catch (error) {
     console.error('[Profile API] Error:', error)

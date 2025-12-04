@@ -45,7 +45,7 @@ export function MarkdownExplain({ markdown }: MarkdownExplainProps) {
   }, [])
 
   return (
-    <div className="prose prose-invert prose-sm max-w-none">
+    <div className="prose prose-invert prose-sm max-w-none prose-h2:text-lg prose-h2:font-semibold prose-h2:mt-6 prose-h2:mb-4 prose-h3:text-base prose-h3:font-semibold prose-h3:mt-4 prose-h3:mb-3 prose-p:leading-relaxed prose-p:mb-4 prose-ul:my-4 prose-ul:leading-normal prose-li:my-1.5 prose-li:leading-normal prose-ol:my-4 prose-ol:leading-normal">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{

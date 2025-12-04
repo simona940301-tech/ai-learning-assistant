@@ -6,6 +6,7 @@ import { motion } from 'framer-motion'
 import { nanoid } from 'nanoid'
 import InputDock from '@/components/ask/InputDock'
 import ExplainCardV2, { type ExplainCardSnapshot } from '@/components/solve/ExplainCardV2'
+import ConversationItem from './ConversationItem'
 import ChatContainer from '@/components/ask/ChatContainer'
 import { useHighlightStore } from '@/src/store/highlightStore'
 import { Card } from '@/components/ui/card'
@@ -137,6 +138,11 @@ export default function AnySubjectSolver() {
 
   const handleCardLoading = useCallback((turnId: string, loading: boolean) => {
     setCardLoading((prev) => ({ ...prev, [turnId]: loading }))
+  }, [])
+
+  // 🎯 優化：使用 useCallback 包裝 onChange，避免每次輸入都建立新的 function reference
+  const handleInputChange = useCallback((newValue: string) => {
+    setInputValue(newValue)
   }, [])
 
   const handleFollowUpSubmit = useCallback(
@@ -339,58 +345,21 @@ export default function AnySubjectSolver() {
 
         {shouldRenderEmpty && renderEmpty}
 
-        {conversation.map((turn, index) => {
-          const onTurnLoadingChange = (loading: boolean) => {
-            handleCardLoading(turn.id, loading)
-          }
-
-          const onTurnExplainComplete = (snapshot: ExplainCardSnapshot) => {
-            handleSnapshot(turn.id, snapshot)
-          }
-
-          return (
-            <div key={turn.id} className="space-y-6 rounded-3xl border border-border/40 bg-card/50 px-4 py-5 shadow-sm sm:px-6">
-              <div className="flex flex-col space-y-4">
-                <UserMessage content={turn.questionText} />
-
-                <motion.div initial={{ opacity: 0.8, y: 6 }} animate={{ opacity: 1, y: 0 }}>
-                  <ExplainCardV2
-                    inputText={turn.questionText}
-                    questionId={turn.questionId || undefined}
-                    onLoadingChange={onTurnLoadingChange}
-                    onExplainComplete={onTurnExplainComplete}
-                  />
-                </motion.div>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-                <span>第 {index + 1} 題 · {new Date(turn.createdAt).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}</span>
-                <button
-                  type="button"
-                  className="rounded-full border border-border/60 px-3 py-1 text-foreground/80 transition hover:border-foreground hover:text-foreground disabled:opacity-60"
-                  onClick={() => activateFollowUp(turn, index)}
-                  disabled={!!cardLoading[turn.id] || !turn.snapshot}
-                >
-                  追問
-                </button>
-              </div>
-
-              {turn.followups.map((entry) => (
-                <div key={entry.id} className="ml-2 space-y-3 border-l-2 border-border/30 pl-4 sm:ml-4 sm:pl-6">
-                  <UserMessage content={entry.userText} />
-                  {entry.status === 'loading' && <AIMessage content="思考中，稍等我整理重點…" tone="neutral" />}
-                  {entry.status === 'ready' && entry.response && <AIMessage content={entry.response} tone="mentor" />}
-                  {entry.status === 'error' && (
-                    <AIMessage content={`⚠️ 追問失敗：${entry.error ?? '請稍後再試'}`} tone="neutral" />
-                  )}
-                </div>
-              ))}
-            </div>
-          )
-        })}
+        {conversation.map((turn, index) => (
+          <ConversationItem
+            key={turn.id}
+            turn={turn}
+            index={index}
+            isLoading={!!cardLoading[turn.id]}
+            onLoadingChange={handleCardLoading}
+            onExplainComplete={handleSnapshot}
+            onActivateFollowUp={activateFollowUp}
+          />
+        ))}
       </ChatContainer>
 
-      <div className="flex-shrink-0 border-t border-border/40 bg-background/95 backdrop-blur">
+      {/* 🎯 固定在底部的輸入區 (ChatGPT 風格) */}
+      <div className="fixed inset-x-0 z-10 border-t border-border/40 bg-background/95 backdrop-blur" style={{ bottom: 'var(--tab-bar-height, 64px)' }}>
         {activeFollowUp && (
           <div className="flex items-center justify-between px-4 py-2 text-xs text-muted-foreground">
             <div className="truncate">
@@ -412,7 +381,7 @@ export default function AnySubjectSolver() {
           value={inputValue}
           isBusy={isInputBusy}
           ocrStatus={ocrStatus}
-          onChange={setInputValue}
+          onChange={handleInputChange}
           onSubmit={handleDockSubmit}
           onOcrComplete={setOcrStatus}
           placeholder={followUpPlaceholder}

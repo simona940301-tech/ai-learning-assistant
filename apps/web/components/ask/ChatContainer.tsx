@@ -13,7 +13,7 @@ const ChatContainer = ({ children }: ChatContainerProps) => {
   }, [children])
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gradient-to-b from-muted/20 via-background to-background px-4 pb-36 pt-20 sm:px-6">
+    <div className="flex-1 overflow-y-auto bg-gradient-to-b from-muted/20 via-background to-background px-4 pb-36 pt-4 sm:px-6">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
         {children}
         <div ref={anchorRef} />

@@ -56,36 +56,22 @@ export function QuestionCard({
 
         {/* 內容區域 - mobile-first: 較小 padding，內容過多時可捲動 */}
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-4 pb-4 md:px-5 md:pt-5 md:pb-6">
-          {/* 頂部資訊行：FOCUS ZONE + 題號 + 時間 - shrink-0 */}
+          {/* 🎯 Phase C: 頂部資訊行 - 移除時間（改由 HUD 顯示） */}
           <div className="mb-3 shrink-0 flex items-center justify-between md:mb-4">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600/80">
               Focus Zone
             </span>
-            <div className="flex items-center gap-2 md:gap-3">
-              <span className="text-xs font-medium text-amber-700/60">
-                {currentQuestion} / {totalQuestions}
-              </span>
-              <div className="flex items-center gap-1.5">
-                <Clock
-                  className={`h-3.5 w-3.5 ${isTimeWarning ? 'text-orange-500' : 'text-amber-600/60'
-                    }`}
-                />
-                <span
-                  className={`text-sm font-medium tabular-nums ${isTimeWarning ? 'text-orange-500' : 'text-amber-700/80'
-                    }`}
-                >
-                  {timeRemaining}s
-                </span>
-              </div>
-            </div>
+            <span className="text-xs font-medium text-amber-700/60">
+              {currentQuestion} / {totalQuestions}
+            </span>
           </div>
 
-          {/* 題幹文字 - flex-1 自動佔滿空間 */}
-          <p className={`flex-1 leading-relaxed text-amber-900 transition-all duration-300 ${questionText.length < 50
-              ? 'text-2xl md:text-3xl font-medium'
+          {/* 🎯 Phase C: 題幹文字 - +1 級字體、semibold、拉開層級 */}
+          <p className={`flex-1 leading-relaxed text-amber-900 transition-all duration-300 mb-8 ${questionText.length < 50
+              ? 'text-3xl md:text-4xl font-semibold'
               : questionText.length < 100
-                ? 'text-xl md:text-2xl'
-                : 'text-lg md:text-xl'
+                ? 'text-2xl md:text-3xl font-semibold'
+                : 'text-xl md:text-2xl font-semibold'
             }`}>
             {questionText}
           </p>

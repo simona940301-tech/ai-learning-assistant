@@ -252,7 +252,7 @@ export default function AnySubjectSolver() {
   )
 
   return (
-    <div className="min-h-[70vh] bg-background text-foreground pb-40">
+    <div className="min-h-[70vh] bg-background text-foreground pb-52">
       {state.progress && (
         <ProgressToast current={state.progress.current} total={state.progress.total} message={state.progress.message} />
       )}

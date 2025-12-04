@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { useChat } from '@ai-sdk/react'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { useChat, Chat, DefaultChatTransport } from '@ai-sdk/react'
 import { Sparkles, Send, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { RAGMarkdownRenderer } from '@/components/ask/RAGMarkdownRenderer'
 
 interface RAGChatInterfaceProps {
@@ -14,27 +14,43 @@ interface RAGChatInterfaceProps {
     onChatReady?: () => void
 }
 
+const SUGGESTED_QUESTIONS = [
+    "這份文件的核心觀念是什麼？",
+    "請列出這份文件的時間軸",
+    "有哪些常考的重點？",
+    "請針對這份文件出三題練習題",
+    "解釋文中的專有名詞"
+]
+
 export default function RAGChatInterface({
     refreshKey,
     contextFileIds = [],
     onChatReady
 }: RAGChatInterfaceProps) {
-    // State
+    // Local input state (managed manually)
+    const [input, setInput] = useState('')
     const [validationError, setValidationError] = useState<string | null>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
-    // Scroll to bottom on new messages
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }
+    // Create Chat instance with custom transport
+    const chatInstance = useMemo(() => {
+        const transport = new DefaultChatTransport({
+            api: '/api/rag/chat',
+            body: {
+                contextFileIds: contextFileIds
+            }
+        })
 
-    // AI SDK Chat Hook
-    const { messages, input, handleInputChange, append, isLoading } = useChat({
-        api: '/api/rag/chat',
-        body: {
-            contextFileIds: contextFileIds
-        },
-        onError: (error) => {
+        return new Chat({
+            messages: [],
+            transport
+        })
+    }, [contextFileIds.join(',')])
+
+    // AI SDK Chat Hook (v2.0 API)
+    const chat = useChat({
+        chat: chatInstance,
+        onError: (error: Error) => {
             console.error('[RAGChatInterface] Chat error:', error)
             setValidationError('發生錯誤，請稍後再試')
         },
@@ -43,8 +59,13 @@ export default function RAGChatInterface({
         }
     })
 
-    // 🎯 Safety: Ensure input is never undefined
-    const safeInput = input || ''
+    const { messages, sendMessage, status } = chat
+    const isLoading = status === 'streaming'
+
+    // Scroll to bottom on new messages
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
 
     // Scroll on messages change
     useEffect(() => {
@@ -60,7 +81,7 @@ export default function RAGChatInterface({
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
 
-        if (!safeInput.trim() || isLoading) return
+        if (!input.trim() || isLoading) return
 
         if (contextFileIds.length === 0) {
             setValidationError('請先選擇至少一個文件')
@@ -69,27 +90,62 @@ export default function RAGChatInterface({
         }
 
         setValidationError(null)
-        setValidationError(null)
-        await append({
+
+        // Send message using new API
+        await sendMessage({
             role: 'user',
-            content: safeInput.trim()
-        }, {
-            body: {
-                contextFileIds: contextFileIds
-            }
+            content: input.trim()
+        })
+
+        // Clear input
+        setInput('')
+    }
+
+    const handleSuggestedClick = async (question: string) => {
+        if (isLoading) return
+
+        if (contextFileIds.length === 0) {
+            setValidationError('請先選擇至少一個文件')
+            setTimeout(() => setValidationError(null), 3000)
+            return
+        }
+
+        await sendMessage({
+            role: 'user',
+            content: question
         })
     }
 
     return (
-        <div className="relative flex flex-col min-h-[500px]">
+        <div className="relative flex flex-col min-h-[500px] bg-card/30">
             {/* Messages Area */}
-            <div className="flex-1 space-y-6 px-4 pb-32">
+            <div className="flex-1 space-y-6 px-4 py-6 pb-32">
                 {messages.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-64 text-center space-y-4 opacity-50">
-                        <Sparkles className="w-12 h-12 text-primary/20" />
-                        <p className="text-sm text-muted-foreground">
-                            選擇文件並開始提問，AI 將為您分析重點
-                        </p>
+                    <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-center space-y-8">
+                        <div className="space-y-4">
+                            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
+                                <Sparkles className="w-8 h-8 text-primary" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-semibold text-foreground">AI 學習助手</h3>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                    選擇文件並開始提問，AI 將為您分析重點
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Suggested Questions */}
+                        <div className="flex flex-wrap justify-center gap-2 max-w-lg">
+                            {SUGGESTED_QUESTIONS.map((q, idx) => (
+                                <button
+                                    key={idx}
+                                    onClick={() => handleSuggestedClick(q)}
+                                    className="px-4 py-2 rounded-full bg-secondary/50 hover:bg-secondary text-sm text-secondary-foreground transition-all duration-200 hover:scale-105"
+                                >
+                                    {q}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 ) : (
                     messages.map((m) => (
@@ -169,8 +225,8 @@ export default function RAGChatInterface({
                     <div className="absolute inset-0 bg-background/50 backdrop-blur-xl rounded-full -z-10" />
 
                     <input
-                        value={safeInput}
-                        onChange={handleInputChange}
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
                         placeholder={contextFileIds.length > 0 ? "輸入問題..." : "請先選擇文件..."}
                         disabled={contextFileIds.length === 0 || isLoading}
                         className={cn(
@@ -183,11 +239,11 @@ export default function RAGChatInterface({
 
                     <Button
                         type="submit"
-                        disabled={!safeInput.trim() || isLoading || contextFileIds.length === 0}
+                        disabled={!input.trim() || isLoading || contextFileIds.length === 0}
                         size="icon"
                         className={cn(
                             "absolute right-2 top-2 h-10 w-10 rounded-full transition-all duration-300",
-                            safeInput.trim()
+                            input.trim()
                                 ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-105 shadow-md"
                                 : "bg-secondary text-muted-foreground hover:bg-secondary/80"
                         )}

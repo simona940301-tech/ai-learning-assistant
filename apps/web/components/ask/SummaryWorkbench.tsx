@@ -1,7 +1,7 @@
 'use client'
 
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
-import { Sparkles, Loader2, AlertCircle } from 'lucide-react'
+import { Sparkles, Loader2, AlertCircle, MessageSquare } from 'lucide-react'
 import { FileUploader } from '@/components/ask/file-uploader'
 import { Button } from '@/components/ui/button'
 import { useAsk } from '@/lib/ask-context'
@@ -64,6 +64,7 @@ export function SummaryWorkbench() {
     const [selectedFileIds, setSelectedFileIds] = useState<string[]>([])
     const [pendingAnalysisIds, setPendingAnalysisIds] = useState<string[]>([])
     const [showConfirmToast, setShowConfirmToast] = useState(false)
+    const [showChat, setShowChat] = useState(false)
 
     // Update selectedFileIds when uploads change
     useEffect(() => {
@@ -94,7 +95,7 @@ export function SummaryWorkbench() {
     const handleStartAnalysis = async () => {
         // Validation
         if (attachedFiles.length === 0) {
-            setError('請先上傳 PDF 或 TXT 檔案', 'UPLOAD')
+            setError('請先上傳文件或圖片', 'UPLOAD')
             return
         }
 
@@ -340,6 +341,7 @@ export function SummaryWorkbench() {
     const handleReset = () => {
         reset()
         clearAll()
+        setShowChat(false)
     }
 
     // Derived state for UI
@@ -540,7 +542,7 @@ export function SummaryWorkbench() {
                             {/* Helper Text */}
                             {attachedFiles.length === 0 && !hasError && (
                                 <p className="text-sm text-muted-foreground/60">
-                                    支援 PDF、TXT 和圖片檔案，總大小不超過 50MB
+                                    支援 PDF、TXT、JPG、PNG、WEBP、HEIC 等格式，總大小不超過 50MB
                                 </p>
                             )}
                         </div>
@@ -568,17 +570,45 @@ export function SummaryWorkbench() {
                             </div>
                         </div>
 
-                        {/* Chat Interface - Temporarily disabled */}
-                        {/* TODO: Re-enable when Q&A feature is ready */}
-                        {/* {state.uploadedDocIds.length > 0 && (
-                            <div className="mt-12 pt-8 border-t border-border">
-                                <RAGChatInterface
-                                    refreshKey={state.uploadedDocIds[0]}
-                                    contextFileIds={selectedFileIds}
-                                    onChatReady={() => console.log('[SummaryWorkbench] Chat ready')}
-                                />
-                            </div>
-                        )} */}
+                        {/* Chat Interface - Temporarily Disabled (API Incompatibility) */}
+                        {/* TODO: Reimplement with compatible API or custom fetch implementation */}
+                        {
+                            /*
+                            {state.uploadedDocIds.length > 0 && (
+                                <div className="mt-8">
+                                    <div className="flex justify-center mb-6">
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => setShowChat(!showChat)}
+                                            className="rounded-full gap-2 shadow-sm hover:shadow-md transition-all"
+                                        >
+                                            <MessageSquare className="w-4 h-4" />
+                                            {showChat ? '隱藏 AI 助手' : '向 AI 提問'}
+                                        </Button>
+                                    </div>
+    
+                                    <AnimatePresence>
+                                        {showChat && (
+                                            <motion.div
+                                                initial={{ opacity: 0, height: 0 }}
+                                                animate={{ opacity: 1, height: 'auto' }}
+                                                exit={{ opacity: 0, height: 0 }}
+                                                className="overflow-hidden"
+                                            >
+                                                <div className="bg-card rounded-3xl border border-border shadow-sm p-1">
+                                                    <RAGChatInterface
+                                                        refreshKey={state.uploadedDocIds[0]}
+                                                        contextFileIds={selectedFileIds}
+                                                        onChatReady={() => console.log('[SummaryWorkbench] Chat ready')}
+                                                    />
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                            )}
+                            */
+                        }
 
                         {/* Reset Button */}
                         <div className="flex justify-center pt-6">

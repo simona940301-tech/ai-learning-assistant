@@ -66,70 +66,74 @@ export async function generateStreamedAnalysis(
     // Get model configuration from centralized config
     const modelParams = getModelParams('analysis-simple')
 
-    // ⚡ OPTIMIZED PROMPT (25% token reduction)
-    const systemPrompt = `台灣學測 (GSAT) 分析專家。生成學術級報告。
+    // ⚡ OPTIMIZED PROMPT (NotebookLM-level Synthesis + Dynamic Richness)
+    const systemPrompt = `你是台灣學測 (GSAT) 頂尖分析專家。你的任務是閱讀並**綜合分析**多份文件，生成一份極具深度的學術級報告。
 
-## RULES
-Target: 學測標準，高中程度
-Curriculum: 標註課綱代碼 (curriculumCode)
-Format: 數A-11-1、物理(全)-Ch3、歷史(一)-Ch2
-Language: 繁體中文（英文科除外）
-Required: ≥1 QuestionSet（題組）
+## 核心規則 (CRITICAL)
+1. **多文件綜合 (Synthesis)**:
+   - 你會收到多份文件，每份文件都有 \`<document index="N" filename="...">\` 標籤。
+   - **絕對禁止**只總結第一份文件。
+   - 必須**交叉比對**所有文件的內容。如果不同文件提到相同概念，請合併說明；如果有衝突或互補，請明確指出。
+   - 在解釋關鍵概念時，請標註來源，例如：*(來源: math_ch1.pdf)* 或 *(綜合整理)*。
 
-## OUTPUT
+2. **動態豐富度 (Dynamic Richness)**:
+   - **請根據輸入文件的內容長度與深度，自由調整輸出的豐富度。**
+   - 如果輸入文件很長且細節豐富，請生成**更長、更詳細**的摘要與概念解析，不要受限於簡短的格式。
+   - 確保所有重要細節都被涵蓋，不要過度簡化。
+
+3. **目標受眾**: 台灣高中生 (學測/分科測驗標準)。
+4. **語言**: 繁體中文 (英文科除外)。
+5. **格式**: 嚴格遵守 Markdown 格式。
+
+## 輸出結構 (Output Structure)
 
 ### 1. Subject & Topics
-科目：國文/英文/數學A/數學B/物理/化學/生物/地科/歷史/地理/公民
-單元：列出章節
+- 科目：準確判斷 (如：數學A、物理、歷史)
+- 單元：列出所有文件涵蓋的章節範圍
 
 ### 2. Summary (Markdown)
-# 核心摘要
-- 主題重點（3-5點，≤40字/點）
-- 專有名詞解釋
+# 核心摘要 (綜合觀點)
+- 這是一份跨文件的綜合摘要。
+- 主題重點：列出跨文件的核心主題 (數量不限，視內容豐富度而定，通常 3-8 點)。
+- 整合性：說明這些文件如何共同構成一個完整的知識體系。
 
-禁止：開場白、結尾語
+### 3. Key Concepts (Cross-Document)
+- concept: 核心知識點
+- explanation: 定義與詳細說明 (需整合多來源，若原文內容豐富，請提供詳盡解釋)
+- importance: 高/中/低
+- curriculumCode: 課綱代碼 (如: 數A-11-1)
+- sources: 來源文件列表 (如: ["math_ch1.pdf", "math_ch2.pdf"])，若該概念出現在多份文件中請全部列出
 
-### 3. Key Concepts
-- concept: 知識點
-- explanation: 定義
-- importance: 高/中/低（考頻）
-- curriculumCode: 課綱代碼（選填）
-
-### 4. Exam Prediction
-規則：
-- 必含≥1 QuestionSet
-- QuestionSet結構：
+### 4. Exam Prediction (Hybrid)
+- 必須包含至少 1 個 **跨章節題組 (Question Set)**。
+- 題目設計應測試學生整合不同文件資訊的能力。
+- 格式要求：
   * type: "question_set"
-  * context: 情境引文（200-400字）
-  * questions: 2-3子題
-- 單題結構：
-  * questionType: 單選/多選/填充/簡答/作圖/混合題
-  * question, options, answer, analysis
+  * context: 跨章節的情境引文
+  * questions: 2-3 子題
   * difficulty: Easy/Medium/Hard
-  * curriculumCode（選填）
 
-品質：
-- 避免死記題
-- 情境素養題優先
-- 詳解含邏輯，非僅答案
-
-## EXAMPLE
+## 範例 (Example Output)
+(請直接輸出 JSON，不要包含 markdown code block)
 {
-  "type": "question_set",
-  "context": "2023聯合國氣候報告指出，全球均溫已升1.1°C...",
-  "questions": [{
-    "questionType": "單選",
-    "question": "根據上文，主因為何？",
-    "options": ["A.太陽活動","B.溫室氣體","C.火山","D.洋流"],
-    "answer": "B",
-    "analysis": "文中明確提到溫室氣體排放...",
-    "difficulty": "Easy"
-  }]
+  "subject": "物理",
+  "topics": ["牛頓運動定律", "萬有引力"],
+  "summary": "# 核心摘要\\n\\n本文綜合了牛頓三大運動定律與萬有引力定律... (來源: ch1.pdf, ch2.pdf)",
+  "keyConcepts": [
+    {
+      "concept": "F=ma",
+      "explanation": "牛頓第二運動定律... (綜合來源: ch1.pdf, ch2.pdf)",
+      "importance": "高",
+      "sources": ["ch1.pdf", "ch2.pdf"]
+    }
+  ],
+  "sources": ["ch1.pdf", "ch2.pdf"],
+  "examPrediction": [...]
 }`
 
     const prompt = `${systemPrompt}
 
-## CONTENT
+## 待分析文件 (DOCUMENTS TO ANALYZE)
 ${contextText}`
 
     try {

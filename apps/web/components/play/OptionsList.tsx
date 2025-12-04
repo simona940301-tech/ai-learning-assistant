@@ -76,7 +76,7 @@ function OptionButton({
       type="button"
       onClick={() => !isAnswered && onSelect(letter)}
       disabled={isAnswered}
-      className={`relative flex h-[56px] items-center gap-3 rounded-xl border px-4 transition-all ${bgColor}`}
+      className={`relative flex h-16 w-full items-center gap-3 rounded-xl border px-3 transition-all ${bgColor}`}
       whileHover={!isAnswered ? { scale: 1.01 } : {}}
       whileTap={!isAnswered ? { scale: 0.98 } : {}}
       initial={{ opacity: 0, y: 10 }}
@@ -173,7 +173,7 @@ export function OptionsList({
               return (
                 <div
                   key={`${letter}-${index}`}
-                  className="relative flex h-[56px] items-center gap-3 rounded-xl border border-amber-200/30 bg-amber-50/50 px-4 opacity-40"
+                  className="relative flex h-16 w-full items-center gap-3 rounded-xl border border-amber-200/30 bg-amber-50/50 px-3 opacity-40"
                 >
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-200/40 text-sm font-bold text-amber-600/50">
                     {letter}

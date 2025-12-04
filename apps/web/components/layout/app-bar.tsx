@@ -3,9 +3,8 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Home } from 'lucide-react'
+import { Home, HelpCircle, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { EnergyBar } from '@/components/status/EnergyBar'
 import { LevelBar } from '@/components/status/LevelBar'
 import { EnergyPill } from '@/components/status/EnergyPill'
 
@@ -16,32 +15,36 @@ interface AppBarProps {
     avatar?: string
   }
   rightAction?: React.ReactNode
-  showEnergy?: boolean
   maxWidthClass?: string
+  /**
+   * 🎯 Phase A: 統一 CTA 設計
+   * 'help' | 'settings' | 'custom' | null
+   */
+  rightCTA?: 'help' | 'settings' | 'custom' | null
 }
 
 export function AppBar({
   title,
   user,
   rightAction,
-  showEnergy = true,
   maxWidthClass = 'max-w-lg',
+  rightCTA = null,
 }: AppBarProps) {
   const pathname = usePathname()
-  const isProfilePage = pathname === '/profile'
+  const isHomePage = pathname === '/home'
   const isPlayPage = pathname === '/play'
 
-  // 極簡模式：play 頁面專用
+  // 🎯 Phase A: Play 頁面 - 極簡 HUD（Level + Energy）
   if (isPlayPage) {
     return (
-      <header className="sticky top-0 z-40 border-b border-[#E2D4C7] bg-[#F7F2EC]">
-        <div className={`mx-auto flex items-center justify-between px-4 ${maxWidthClass}`} style={{ paddingTop: '12px', paddingBottom: '14px' }}>
-          {/* 左：等級組（Level Unit）- 給予足夠寬度讓 XP bar 顯示 */}
+      <header className="sticky top-0 z-40 border-b border-border/30 bg-[#F7F2EC]">
+        <div className={`mx-auto flex h-14 items-center justify-between px-4 ${maxWidthClass}`}>
+          {/* 左：Level Bar */}
           <div className="flex-1 min-w-0 max-w-[320px]">
             <LevelBar />
           </div>
 
-          {/* 右：Candy Crush 風格能量膠囊 */}
+          {/* 右：Energy Pill */}
           <div className="flex items-center flex-shrink-0 justify-end min-w-[200px]">
             <EnergyPill />
           </div>
@@ -50,10 +53,47 @@ export function AppBar({
     )
   }
 
-  // 一般模式：其他頁面
+  // 🎯 Phase A: 其他頁面 - 左標題 / 中空 / 右單一 CTA
+  const renderRightCTA = () => {
+    if (rightAction) return rightAction
+
+    if (rightCTA === 'help') {
+      return (
+        <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-primary">
+          <HelpCircle className="h-5 w-5" />
+        </Button>
+      )
+    }
+
+    if (rightCTA === 'settings') {
+      return (
+        <Link href="/profile/settings">
+          <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-primary">
+            <Settings className="h-5 w-5" />
+          </Button>
+        </Link>
+      )
+    }
+
+    // Default: User avatar (if exists)
+    if (user) {
+      return (
+        <Link href="/home">
+          <Avatar className="h-9 w-9">
+            <AvatarImage src={user.avatar} alt={user.name} />
+            <AvatarFallback>{user.name[0]}</AvatarFallback>
+          </Avatar>
+        </Link>
+      )
+    }
+
+    return null
+  }
+
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 border-b border-border/30 bg-[#F7F2EC]/95 backdrop-blur-xl">
       <div className={`mx-auto flex h-14 items-center justify-between px-4 ${maxWidthClass}`}>
+        {/* 左：Home Button + Title */}
         <div className="flex items-center gap-2">
           <Link href="/home">
             <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-primary">
@@ -63,19 +103,9 @@ export function AppBar({
           <h1 className="text-lg font-semibold">{title}</h1>
         </div>
 
-        <div className="flex items-center gap-2">
-          {showEnergy && <EnergyBar />}
-
-          {rightAction ? (
-            rightAction
-          ) : user ? (
-            <Link href={isProfilePage ? '/home' : '/profile'}>
-              <Avatar className="h-9 w-9">
-                <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback>{user.name[0]}</AvatarFallback>
-              </Avatar>
-            </Link>
-          ) : null}
+        {/* 右：單一 CTA（簡化設計） */}
+        <div className="flex items-center">
+          {renderRightCTA()}
         </div>
       </div>
     </header>

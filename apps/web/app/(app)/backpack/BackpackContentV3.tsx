@@ -688,7 +688,13 @@ export function BackpackContentV3() {
       {/* Note Viewer Modal */}
       <NoteViewerModal
         isOpen={!!viewingNote}
-        onClose={() => setViewingNote(null)}
+        onClose={() => {
+          setViewingNote(null)
+          // 清除 URL 中的 noteId 參數，防止重新打開
+          if (targetNoteId) {
+            router.replace(`/backpack?type=${contentType}${selectedSubject ? `&subject=${selectedSubject}` : ''}`)
+          }
+        }}
         file={viewingNote}
       />
 

@@ -141,12 +141,15 @@ function detectVocabularyQuestion(text: string, options: string[]): boolean {
   return areOptionsShort && hasBlank && !optionsHaveVerbForms && !hasComplexGrammar
 }
 
+import { GoogleGenerativeAI } from '@google/generative-ai'
+
 /**
  * Universal Explainer - ChatGPT-like: Takes any input, generates explanation
  * No format parsing, no type detection, just pure AI reasoning
  */
 export async function universalExplainer(
-  inputText: string
+  inputText: string,
+  imageUrl?: string // ✅ Support image input
 ): Promise<UniversalExplainResult> {
   const start = Date.now()
   const mode = process.env.EXPLAINER_MODE || 'llm-only'
@@ -161,6 +164,7 @@ export async function universalExplainer(
   safeTrack('explain.generate.start' as any, {
     chars: truncatedInput.length,
     originalChars: inputText.length,
+    hasImage: !!imageUrl,
     mode,
     isEnglish,
   })
@@ -168,17 +172,45 @@ export async function universalExplainer(
   try {
     // ✅ 簡化：直接生成 markdown，像 ChatGPT 一樣
     const prompt = buildSimpleMarkdownPrompt(truncatedInput, isEnglish)
+    let markdown = ''
 
-    // 直接獲取 markdown 文本（不需要 JSON 格式）
-    const result = await chatCompletion(
-      [{ role: 'user', content: prompt }],
-      {
-        model: 'gemini-2.0-flash-exp',
-        temperature: 0.3, // ✅ 適中溫度：平衡創造力和準確性
-      }
-    )
+    if (imageUrl) {
+      // ✅ Multimodal Request (Image + Text)
+      const apiKey = process.env.GEMINI_API_KEY
+      if (!apiKey) throw new Error('GEMINI_API_KEY not configured')
 
-    const markdown = result.trim()
+      const genAI = new GoogleGenerativeAI(apiKey)
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })
+
+      // Extract base64 data
+      // Data URL format: data:image/png;base64,iVBORw0KGgo...
+      const base64Data = imageUrl.split(',')[1]
+      const mimeType = imageUrl.split(';')[0].split(':')[1] || 'image/png'
+
+      // Modify prompt for image context to ensure all questions are solved
+      const imagePrompt = `${prompt}\n\n【圖片題目特別注意事項】\n1. 請仔細識別圖片中的**所有題目**，包括用「(1)」、「(2)」、「1.」、「2.」等任何格式標記的題號\n2. 如果圖片包含多個題目，請**分別為每一題**提供完整解析（題意說明、正確答案、錯誤選項解析、Reminder）\n3. 不要遺漏任何題目，即使題目之間沒有明顯分隔\n4. 對於每一題，請在標題中明確標示題號（例如：## 題目 (1)、## 題目 (2)）\n5. 題幹部分如果包含共用閱讀文章，請在最前面先完整顯示原文，然後再逐題解析`
+
+      const result = await model.generateContent([
+        imagePrompt,
+        {
+          inlineData: {
+            data: base64Data,
+            mimeType
+          }
+        }
+      ])
+      markdown = result.response.text().trim()
+    } else {
+      // ✅ Text-only Request
+      const result = await chatCompletion(
+        [{ role: 'user', content: prompt }],
+        {
+          model: 'gemini-2.0-flash-exp',
+          temperature: 0.3, // ✅ 適中溫度：平衡創造力和準確性
+        }
+      )
+      markdown = result.trim()
+    }
 
     // ✅ 簡單驗證：只要有內容就返回
     if (markdown && markdown.length > 10) {

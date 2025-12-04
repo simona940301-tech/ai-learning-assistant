@@ -2,15 +2,15 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Play, MessageCircleQuestion, Backpack, User } from 'lucide-react'
+import { Home, Play, MessageCircleQuestion, Backpack, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const tabs = [
-  { name: 'Community', href: '/community', icon: Home },
+  { name: 'Community', href: '/community', icon: Users },
   { name: 'Play', href: '/play', icon: Play },
   { name: 'Ask', href: '/ask', icon: MessageCircleQuestion },
   { name: 'Backpack', href: '/backpack', icon: Backpack },
-  { name: 'Profile', href: '/profile', icon: User },
+  { name: 'Home', href: '/home', icon: Home },
 ]
 
 export function TabBar() {

@@ -200,14 +200,14 @@ export default function OnboardingAvatarPage() {
               className="relative mb-8"
             >
               <div className="relative mx-auto max-w-md">
-                {/* Speech Bubble */}
-                <div className="relative rounded-2xl bg-[#FFFDF5] border-2 border-[#FED168] p-4 shadow-lg">
+                {/* Speech Bubble - 透明背景 */}
+                <div className="relative rounded-2xl bg-[#FFFDF5]/90 backdrop-blur-sm border border-[#FED168]/50 p-4 shadow-md">
                   <div className="text-center text-[#5D4037] text-sm leading-relaxed">
                     點擊選擇一個你喜歡的頭像
                   </div>
                   {/* Bubble Tail */}
-                  <div className="absolute -bottom-3 left-1/2 -translate-x-1/2">
-                    <div className="h-6 w-6 rotate-45 border-r-2 border-b-2 border-[#FED168] bg-[#FFFDF5]"></div>
+                  <div className="absolute -bottom-2 left-1/2 -translate-x-1/2">
+                    <div className="h-4 w-4 rotate-45 border-r border-b border-[#FED168]/50 bg-[#FFFDF5]/90"></div>
                   </div>
                 </div>
               </div>

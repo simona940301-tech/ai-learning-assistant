@@ -12,6 +12,45 @@ interface RAGMarkdownRendererProps {
 }
 
 /**
+ * Helper to parse source citations and render them as minimalist chips
+ * Pattern: (來源: filename.pdf) or (Source: filename.pdf)
+ */
+function renderWithSourceChips(text: string | React.ReactNode): React.ReactNode {
+    if (typeof text !== 'string') return text
+
+    // Regex to capture the full citation group: (來源: ...)
+    // Supports: 來源, Source, source, from
+    const regex = /(\((?:來源|Source|source|from):\s*[^)]+\))/g
+
+    const parts = text.split(regex)
+
+    if (parts.length === 1) return text
+
+    return parts.map((part, index) => {
+        const match = part.match(/\((?:來源|Source|source|from):\s*([^)]+)\)/)
+        if (match) {
+            const fullSource = match[1].trim()
+            // Minimalist truncation: "math_ch1.pdf" -> "math_ch1..."
+            // Keep it very short as requested
+            const truncated = fullSource.length > 12
+                ? fullSource.substring(0, 8) + '...'
+                : fullSource
+
+            return (
+                <span
+                    key={index}
+                    className="inline-flex items-center px-1.5 py-0.5 mx-1 rounded-md text-[10px] font-medium bg-stone-100 text-stone-600 border border-stone-200 dark:bg-stone-800 dark:text-stone-400 dark:border-stone-700 align-baseline select-none cursor-help transition-colors hover:bg-stone-200 dark:hover:bg-stone-700"
+                    title={fullSource}
+                >
+                    {truncated}
+                </span>
+            )
+        }
+        return part
+    })
+}
+
+/**
  * Unified Markdown renderer for RAG analysis results
  * Based on ExplainCardV2/MarkdownExplain design patterns
  */
@@ -65,7 +104,7 @@ export function RAGMarkdownRenderer({ content, markdown, subject, className }: R
 
                     li: ({ children }) => (
                         <li className="text-foreground/90 leading-relaxed">
-                            {children}
+                            {renderWithSourceChips(children)}
                         </li>
                     ),
 
@@ -91,7 +130,7 @@ export function RAGMarkdownRenderer({ content, markdown, subject, className }: R
                     // Paragraphs: Comfortable spacing
                     p: ({ children }) => (
                         <p className="text-foreground/90 leading-relaxed my-3">
-                            {children}
+                            {renderWithSourceChips(children)}
                         </p>
                     ),
 

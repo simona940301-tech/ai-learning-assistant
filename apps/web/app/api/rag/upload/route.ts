@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getApiUser } from '@/lib/api/auth'
-import { extractTextFromPDF, extractTextFromTXT, cleanText } from '@/lib/utils/text-extraction'
+import { cleanText } from '@/lib/utils/text-extraction'
+import { extractTextSmart } from '@/lib/services/smart-text-extractor'
 import { generateSummary, extractKeywords } from '@/lib/services/rag-summary'
 import { createContextCache } from '@/lib/services/context-cache-service'
 import { createClient } from '@supabase/supabase-js'
@@ -95,46 +96,57 @@ export async function POST(req: NextRequest) {
         const isValidType =
             fileType === 'application/pdf' ||
             fileType === 'text/plain' ||
+            fileType.startsWith('image/') ||
             fileName.endsWith('.pdf') ||
-            fileName.endsWith('.txt')
+            fileName.endsWith('.txt') ||
+            fileName.match(/\.(jpg|jpeg|png|gif|webp|heic|heif)$/i)
 
         if (!isValidType) {
             return NextResponse.json(
-                { error: 'INVALID_FILE_TYPE', message: '僅支援 PDF 和 TXT 文件' },
+                { error: 'INVALID_FILE_TYPE', message: '僅支援 PDF、TXT 和圖片文件 (JPG, PNG, WEBP, HEIC 等)' },
                 { status: 400 }
             )
         }
 
-        // 4. 讀取文件內容
+        // 4. 讀取文件內容 - 使用智能文字提取器
         const buffer = Buffer.from(await file.arrayBuffer())
 
         let extractedText: string
         let numPages: number | undefined
+        let extractionMethod: string
 
-        if (fileName.endsWith('.pdf')) {
-            try {
-                const pdfData = await extractTextFromPDF(buffer)
-                extractedText = pdfData.text
-                numPages = pdfData.numPages
-            } catch (pdfError) {
-                console.error('[RAG Upload] PDF extraction failed:', pdfError)
-                const errorMsg = pdfError instanceof Error ? pdfError.message : String(pdfError)
-                return NextResponse.json(
-                    {
-                        error: 'PDF_PARSE_ERROR',
-                        message: `PDF 解析失敗: ${errorMsg}`,
-                        debug: {
-                            fileName,
-                            fileSize,
-                            bufferSize: buffer.length,
-                            suggestion: '請確認檔案是有效的 PDF 格式，而非損壞或加密的文件'
-                        }
-                    },
-                    { status: 400 }
-                )
-            }
-        } else {
-            extractedText = extractTextFromTXT(buffer)
+        try {
+            console.log(`[RAG Upload] Starting smart text extraction for ${fileName} (${fileType})`)
+            const extractionResult = await extractTextSmart(buffer, fileName, fileType)
+            extractedText = extractionResult.text
+            numPages = extractionResult.numPages
+            extractionMethod = extractionResult.method
+
+            console.log(`[RAG Upload] Extraction complete: ${extractionMethod} (${extractionResult.durationMs}ms, ${extractedText.length} chars)`)
+        } catch (extractError) {
+            console.error('[RAG Upload] Text extraction failed:', extractError)
+            const errorMsg = extractError instanceof Error ? extractError.message : String(extractError)
+
+            // Provide specific error messages based on file type
+            const fileTypeLabel = fileName.endsWith('.pdf') ? 'PDF' :
+                fileType.startsWith('image/') ? '圖片' : '文件'
+
+            return NextResponse.json(
+                {
+                    error: 'EXTRACTION_ERROR',
+                    message: `${fileTypeLabel}處理失敗: ${errorMsg}`,
+                    debug: {
+                        fileName,
+                        fileSize,
+                        fileType,
+                        bufferSize: buffer.length,
+                        suggestion: fileType.startsWith('image/')
+                            ? '請確認圖片清晰且包含可辨識的文字內容'
+                            : '請確認檔案格式正確且未損壞'
+                    }
+                },
+                { status: 400 }
+            )
         }
 
         // 5. 清理文本
@@ -170,13 +182,24 @@ export async function POST(req: NextRequest) {
 
         // 6. 創建資料庫記錄（狀態：processing）
         console.log('[RAG Upload] 準備插入數據，user_id:', finalUser.id)
+
+        // Determine file type for database
+        let dbFileType: string
+        if (fileName.endsWith('.pdf')) {
+            dbFileType = 'pdf'
+        } else if (fileType.startsWith('image/') || fileName.match(/\.(jpg|jpeg|png|gif|webp|heic|heif)$/i)) {
+            dbFileType = 'image'
+        } else {
+            dbFileType = 'txt'
+        }
+
         const { data: docRecord, error: insertError } = await supabase
             .from('rag_documents')
             .insert({
                 user_id: finalUser.id,
                 filename: fileName,
                 file_size: fileSize,
-                file_type: fileName.endsWith('.pdf') ? 'pdf' : 'txt',
+                file_type: dbFileType,
                 original_text: cleanedText,
                 status: 'processing',
             })

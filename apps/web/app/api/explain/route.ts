@@ -261,7 +261,17 @@ ${minimal.reason !== '-' ? minimal.reason : '無法生成詳細解析，請檢�
     // Layer 1: Universal Explainer
     if (UNIVERSAL_EXPLAINER_ENABLED) {
       try {
-        const universal = await universalExplainer(text)
+        // ✅ Detect if text is actually a base64 image
+        let processingText = text
+        let processingImage = input.imageUrl
+
+        if (text.startsWith('data:image/')) {
+          console.log('[api/explain] Detected base64 image in text field')
+          processingImage = text
+          processingText = '請解析這張圖片中的題目，並提供詳細解答。'
+        }
+
+        const universal = await universalExplainer(processingText, processingImage)
         // 只要有 markdown 就返回（即使有警告也返回）
         if (universal.markdown) {
           console.log('[api/explain] ✅ Universal layer success', {

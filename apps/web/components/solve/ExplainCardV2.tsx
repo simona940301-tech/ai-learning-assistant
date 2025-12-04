@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { nanoid } from 'nanoid'
 import type { ExplainViewModel } from '@/lib/types'
@@ -141,8 +141,12 @@ export default function ExplainCardV2({
         questionBlocksRef.current = []
         passageRef.current = ''
 
+        // 🎯 檢測是否為圖片輸入
+        const isImageInput = inputText.startsWith('data:image/')
+
         // 1. Detect question set（前端兜底，支援多題拆解）
-        if (inputText.length >= 120) {
+        // ⚠️ 圖片輸入直接跳過 question set 分析，讓後端處理
+        if (!isImageInput && inputText.length >= 120) {
           try {
             const analysis = await analyseQuestionSet(inputText)
             if (analysis.questionCount > 1) {
@@ -229,7 +233,14 @@ export default function ExplainCardV2({
             if (index === 0) viewModelRef.current = data.viewModel
             const vm = data.viewModel
             md += `# 題目 ${index + 1}\n\n`
-            if (stemText) md += `## 題幹\n\n${stemText}\n\n`
+            if (stemText) {
+              const isImage = stemText.trim().startsWith('data:image/')
+              if (isImage) {
+                md += `## 題幹\n\n![題目](${stemText})\n\n`
+              } else {
+                md += `## 題幹\n\n${stemText}\n\n`
+              }
+            }
             if (optionsInline) md += `## 選項\n\n${optionsInline}\n\n`
             const correctOption = vm.options?.find((opt: any) => opt.correct)
             const correctText = correctOption
@@ -272,7 +283,14 @@ export default function ExplainCardV2({
             const inferredAnswer = answerLabel || (answerIndex != null ? String.fromCharCode(65 + answerIndex) : data.answer)
 
             md += `# 題目 ${index + 1}\n\n`
-            if (stemText) md += `## 題幹\n\n${stemText}\n\n`
+            if (stemText) {
+              const isImage = stemText.trim().startsWith('data:image/')
+              if (isImage) {
+                md += `## 題幹\n\n![題目](${stemText})\n\n`
+              } else {
+                md += `## 題幹\n\n${stemText}\n\n`
+              }
+            }
             if (inlineOptions) md += `## 選項\n\n${inlineOptions}\n\n`
             if (inferredAnswer) md += `## ✅ 正確答案\n\n- **${inferredAnswer}**\n\n`
             const detail =
@@ -379,10 +397,9 @@ export default function ExplainCardV2({
   const handleSave = async () => {
     if (!markdownContent || isSaving) return
 
-    try {
-      setIsSaving(true)
-      setSaveStatus('idle')
+    setIsSaving(true)
 
+    try {
       // Detect subject from question text
       const { detectSubject } = await import('@/lib/utils/detect-subject')
       const subjectTag = detectSubject(inputText)
@@ -395,23 +412,45 @@ export default function ExplainCardV2({
       const passageSection = passageRef.current ? `## 原文\n\n${passageRef.current}` : ''
       const contentForSave = [passageSection, stemPrefix, markdownContent].filter(Boolean).join('\n\n')
 
+      // 🎯 處理圖片上傳的情況：如果 inputText 是 base64 圖片，使用更友善的標題
+      const isBase64Image = inputText.startsWith('data:image/')
+      const title = isBase64Image
+        ? `圖片題目解析 - ${new Date().toLocaleDateString('zh-TW')}`
+        : inputText.slice(0, 50) + (inputText.length > 50 ? '...' : '')
+
+      // 🔍 Debug: 檢查儲存的內容
+      console.log('[ExplainCardV2] Saving to notebook:', {
+        title,
+        isBase64Image,
+        contentLength: contentForSave.length,
+        tags: [subjectTag, 'AI解析'],
+        source_type: 'qa'
+      })
+
       const response = await fetch('/api/notebook/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: inputText.slice(0, 50) + (inputText.length > 50 ? '...' : ''),
+          title,
           content_md: contentForSave,
           tags: [subjectTag, 'AI解析'],
           source_type: 'qa'
         }),
       })
 
-      if (!response.ok) throw new Error('儲存失敗')
+      // 🔍 獲取詳細的錯誤訊息
+      const responseData = await response.json()
+      console.log('[ExplainCardV2] Save response:', { status: response.status, data: responseData })
+
+      if (!response.ok) {
+        const errorMessage = responseData?.message || responseData?.error || '儲存失敗'
+        throw new Error(errorMessage)
+      }
 
       setSaveStatus('success')
       setTimeout(() => setSaveStatus('idle'), 3000)
     } catch (err) {
-      console.error('Save failed:', err)
+      console.error('[ExplainCardV2] Save failed:', err)
       setSaveStatus('error')
     } finally {
       setIsSaving(false)

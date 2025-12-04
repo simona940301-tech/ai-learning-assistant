@@ -5,6 +5,7 @@ import {
   DragEvent,
   FormEvent,
   KeyboardEvent,
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -42,6 +43,13 @@ type UploadState = {
   fileName?: string
 }
 
+type ImagePreview = {
+  file: File
+  url: string
+  ocrText?: string
+  isProcessing: boolean
+}
+
 const DEFAULT_UPLOAD_STATE: UploadState = { status: 'idle', progress: 0 }
 
 const processImageToText = async (
@@ -49,18 +57,72 @@ const processImageToText = async (
   onProgress?: (progress: number) => void,
   signal?: AbortSignal
 ): Promise<string> => {
-  const steps = [20, 45, 70, 100]
-  for (const step of steps) {
+  // Convert image to base64 data URL
+  const toBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  }
+
+  try {
+    // Step 1: Convert to base64 (20%)
+    onProgress?.(20)
     if (signal?.aborted) {
       throw new DOMException('Upload cancelled', 'AbortError')
     }
-    await new Promise((resolve) => setTimeout(resolve, 220))
-    onProgress?.(step)
+
+    const base64Image = await toBase64(file)
+
+    // Step 2: Call OCR API (45%)
+    onProgress?.(45)
+    if (signal?.aborted) {
+      throw new DOMException('Upload cancelled', 'AbortError')
+    }
+
+    const response = await fetch('/api/ai/ocr', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        image: base64Image,
+      }),
+      signal,
+    })
+
+    // Step 3: Process response (70%)
+    onProgress?.(70)
+    if (signal?.aborted) {
+      throw new DOMException('Upload cancelled', 'AbortError')
+    }
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'OCR failed' }))
+      throw new Error(error.message || `OCR failed with status ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    // Step 4: Complete (100%)
+    onProgress?.(100)
+
+    if (!data.text) {
+      throw new Error('OCR returned empty text')
+    }
+
+    return data.text
+  } catch (error) {
+    if ((error as DOMException).name === 'AbortError') {
+      throw error
+    }
+    console.error('[InputDock] OCR processing failed:', error)
+    throw new Error(
+      error instanceof Error ? error.message : 'IMAGE_PROCESS_FAILED'
+    )
   }
-  if (signal?.aborted) {
-    throw new DOMException('Upload cancelled', 'AbortError')
-  }
-  return `【圖片擷取】${file.name}\nThe book, ___ I bought yesterday, is fascinating.\n(A) who\n(B) which\n(C) whom\n(D) whose`
 }
 
 const getFileExtension = (name: string) => name.split('.').pop()?.toLowerCase() ?? ''
@@ -139,12 +201,12 @@ interface InputDockProps {
   placeholder?: string
 }
 
-const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrComplete, placeholder }: InputDockProps) => {
+const InputDockComponent = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrComplete, placeholder }: InputDockProps) => {
   const { t } = useTranslation()
-  const [menuOpen, setMenuOpen] = useState(false)
   const [uploadState, setUploadState] = useState<UploadState>(DEFAULT_UPLOAD_STATE)
   const [isDragActive, setIsDragActive] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
+  const [imagePreview, setImagePreview] = useState<ImagePreview | null>(null)
   const [keyboardOffset, setKeyboardOffset] = useState(0)
   const [spacerHeight, setSpacerHeight] = useState<number>(() => {
     if (typeof document === 'undefined') return 56
@@ -201,6 +263,20 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
       viewport.removeEventListener('scroll', handleViewport)
     }
   }, [])
+
+  // 🎯 自動調整 textarea 高度 (ChatGPT 風格)
+  useEffect(() => {
+    const textarea = textAreaRef.current
+    if (!textarea) return
+
+    const adjustHeight = () => {
+      textarea.style.height = 'auto'
+      const newHeight = Math.min(textarea.scrollHeight, 72) // 最多 3 行 (72px)
+      textarea.style.height = `${newHeight}px`
+    }
+
+    adjustHeight()
+  }, [value])
 
   useEffect(() => {
     const node = dockRef.current
@@ -302,69 +378,48 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
       }
 
       emitUploadEvent('start', { file_name: file.name, file_size: file.size, source })
-      onOcrComplete(null)
 
-      const controller = new AbortController()
-      uploadAbortRef.current = controller
+      // Create image preview and convert to base64 for AI
+      const previewUrl = URL.createObjectURL(file)
 
-      setUploadState({
-        status: 'uploading',
-        progress: 10,
-        message: t('ask.input.status.uploading'),
-        source,
-        fileName: file.name,
-      })
+      // Convert to base64 for sending to AI
+      const toBase64 = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result as string)
+          reader.onerror = reject
+          reader.readAsDataURL(file)
+        })
+      }
 
       try {
-        const normalized = await normalizeImageFile(file, controller.signal)
-        const text = await processImageToText(
-          normalized,
-          (progress) => {
-            setUploadState((prev) => ({
-              ...prev,
-              status: 'uploading',
-              progress: Math.max(prev.progress, progress),
-            }))
-          },
-          controller.signal
-        )
+        const base64Image = await toBase64(file)
 
-        handleNormalizedText(text)
-        emitUploadEvent('success', {
-          file_name: normalized.name,
-          file_size: normalized.size,
+        setImagePreview({
+          file,
+          url: previewUrl,
+          ocrText: base64Image, // Store base64 for later submission
+          isProcessing: false,
+        })
+
+        setUploadState({ status: 'success', progress: 100, message: '圖片已準備好' })
+        onOcrComplete({ type: 'success', message: '圖片已上傳，點擊送出進行解題' })
+        emitUploadEvent('success', { file_name: file.name, file_size: file.size, source })
+      } catch (error) {
+        console.error('[InputDock] Image processing failed:', error)
+        setImagePreview(null)
+        const message = '圖片處理失敗'
+        setUploadState({ status: 'error', progress: 0, message })
+        onOcrComplete({ type: 'error', message })
+        emitUploadEvent('fail', {
+          error_code: 'image_process_failed',
+          file_name: file.name,
+          file_size: file.size,
           source,
         })
-      } catch (error) {
-        if ((error as DOMException).name === 'AbortError') {
-          setUploadState({
-            status: 'idle',
-            progress: 0,
-            message: t('ask.input.status.uploadCanceled'),
-          })
-          onOcrComplete({ type: 'error', message: t('ask.input.status.uploadCanceled') })
-          emitUploadEvent('cancel', { file_name: file.name })
-        } else {
-          console.error('[InputDock] OCR upload failed', error)
-          const message = (error as Error)?.message === 'IMAGE_PROCESS_FAILED'
-            ? t('ask.input.error.heicFallback')
-            : t('ask.input.error.unknown')
-          setUploadState({ status: 'error', progress: 0, message })
-          onOcrComplete({ type: 'error', message })
-          emitUploadEvent('fail', {
-            error_code: (error as Error)?.message || 'unknown',
-            file_name: file.name,
-            file_size: file.size,
-            source,
-          })
-        }
-      } finally {
-        if (uploadAbortRef.current === controller) {
-          uploadAbortRef.current = null
-        }
       }
     },
-    [handleNormalizedText, onOcrComplete, t]
+    [onOcrComplete]
   )
 
   const handleSubmit = useCallback(
@@ -372,8 +427,11 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
       event?.preventDefault()
       if (pendingSend || isBusy || uploadState.status === 'uploading') return
 
+      // Check if we have an image with base64 data
+      const hasImage = imagePreview && imagePreview.ocrText
       const trimmed = value.trim()
-      if (!trimmed) return
+
+      if (!trimmed && !hasImage) return
 
       const now = Date.now()
       if (now - lastSubmitRef.current < SEND_THROTTLE_MS) return
@@ -387,11 +445,21 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
       setPendingSend(true)
 
       try {
-        await onSubmit(trimmed)
+        // If we have an image, send it directly to AI (no OCR step!)
+        if (hasImage && imagePreview.ocrText) {
+          await onSubmit(imagePreview.ocrText) // Send base64 image
+          // Clean up image preview after submission
+          URL.revokeObjectURL(imagePreview.url)
+          setImagePreview(null)
+        } else {
+          await onSubmit(trimmed)
+        }
+
         onChange('')
         track('ask.input.send', {
           status: 'success',
-          length: trimmed.length,
+          length: hasImage ? 'image' : trimmed.length,
+          hasImage,
           network_state: getNetworkState(),
         })
       } catch (error) {
@@ -399,14 +467,15 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
         track('ask.input.send', {
           status: 'error',
           error: (error as Error)?.message ?? 'unknown',
-          length: trimmed.length,
+          length: hasImage ? 'image' : trimmed.length,
+          hasImage,
           network_state: getNetworkState(),
         })
       } finally {
         setPendingSend(false)
       }
     },
-    [isBusy, isOnline, onChange, onOcrComplete, onSubmit, pendingSend, t, uploadState.status, value]
+    [isBusy, isOnline, onChange, onOcrComplete, onSubmit, pendingSend, t, uploadState.status, value, imagePreview]
   )
 
   const handleKeyDown = useCallback(
@@ -507,151 +576,182 @@ const InputDock = ({ mode, value, isBusy, ocrStatus, onChange, onSubmit, onOcrCo
     [handleImageFile, onOcrComplete, t]
   )
 
-  const handleMenuFilePick = (file: File | null, source: UploadSource) => {
-    setMenuOpen(false)
-    if (file) {
-      handleImageFile(file, source)
+  const handleRemoveImage = useCallback(() => {
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview.url)
+      setImagePreview(null)
+      onChange('')
     }
-  }
+  }, [imagePreview, onChange])
+
+  // Cleanup preview URL on unmount
+  useEffect(() => {
+    return () => {
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview.url)
+      }
+    }
+  }, [imagePreview])
 
   return (
-    <>
-      <div className="input-dock-spacer" aria-hidden style={{ height: spacerHeight + keyboardOffset }} />
-      <div className="input-dock-shell" style={{ bottom: `calc(var(--tab-bar-height, 64px) + 8px + ${keyboardOffset}px)` }}>
-        <motion.form
-          ref={dockRef}
-          role="toolbar"
-          aria-label={t('ask.input.toolbarLabel')}
-          onSubmit={handleSubmit}
-          className={cn('input-dock-surface', {
-            'is-focused': isFocused,
-            'input-dock-dragging': isDragActive,
-          })}
-          initial={{ y: 24, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          onDragOver={handleDragOver}
-          onDragEnter={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-        >
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setMenuOpen((prev) => !prev)}
-              className={cn(
-                'flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-primary transition-all hover:bg-secondary/80 active:scale-95 active:bg-secondary/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-                menuOpen && 'shadow-lg'
-              )}
-              aria-expanded={menuOpen}
-              aria-label={t('ask.input.action.openMenu')}
-            >
-              <Plus className="h-4 w-4" />
-            </button>
-            <AnimatePresence>
-              {menuOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  transition={{ duration: 0.18 }}
-                  className="absolute left-0 top-11 w-44 rounded-xl border border-border bg-popover p-2 text-sm text-popover-foreground shadow-lg"
-                >
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm text-popover-foreground transition-all hover:bg-accent active:bg-accent/80 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  >
-                    <Paperclip className="h-4 w-4 text-primary" />
-                    {t('ask.input.action.uploadFile')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => photoInputRef.current?.click()}
-                    className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm text-popover-foreground transition-all hover:bg-accent active:bg-accent/80 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  >
-                    <Image className="h-4 w-4 text-primary" />
-                    {t('ask.input.action.uploadPhoto')}
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={Array.from(ACCEPTED_EXT).map((ext) => `.${ext}`).join(',')}
-            className="hidden"
-            multiple={false}
-            onChange={(event) => {
-              const file = event.target.files?.[0]
-              if (file) {
-                handleMenuFilePick(file, 'file')
-              }
-              // Reset input to allow re-uploading same file
-              event.target.value = ''
-            }}
-            aria-label={t('ask.input.action.uploadFile', { default: '選擇檔案上傳' })}
-          />
-          <input
-            ref={photoInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            multiple={false}
-            onChange={(event) => {
-              const file = event.target.files?.[0]
-              if (file) {
-                handleMenuFilePick(file, 'camera')
-              }
-              // Reset input to allow re-uploading same file
-              event.target.value = ''
-            }}
-            aria-label={t('ask.input.action.uploadPhoto', { default: '拍照上傳' })}
-          />
-
-          <div className="flex flex-1 items-center rounded-xl bg-secondary px-3 py-2">
-            <textarea
-              ref={textAreaRef}
-              value={value}
-              placeholder={dockPlaceholder}
-              onCompositionStart={() => {
-                compositionRef.current = true
-              }}
-              onCompositionUpdate={() => {
-                compositionRef.current = true
-              }}
-              onCompositionEnd={() => {
-                compositionRef.current = false
-              }}
-              onKeyDown={handleKeyDown}
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setIsFocused(false)}
-              onChange={(event) => onChange(event.target.value)}
-              onPaste={handlePaste}
-              className="w-full min-h-[24px] max-h-[60px] resize-none border-0 bg-transparent px-0 py-0 text-base leading-6 text-foreground placeholder:text-muted-foreground focus:outline-none"
-              aria-label={dockPlaceholder}
-              aria-multiline="true"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={isBusy || pendingSend || uploadState.status === 'uploading'}
-            className={cn(
-              'flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-all hover:bg-primary/90 active:scale-95 active:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-              (isBusy || pendingSend || uploadState.status === 'uploading') && 'opacity-60'
-            )}
-            aria-label={t('ask.input.sendLabel')}
-            aria-busy={pendingSend || isBusy}
+    <div className="px-4 py-3">
+      {/* 🎯 圖片預覽 - 小縮圖無邊框 */}
+      <AnimatePresence>
+        {imagePreview && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="mb-2 inline-block"
           >
-            {isBusy || pendingSend ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          </button>
-        </motion.form>
-      </div>
-    </>
+            <div className="relative inline-block">
+              <img
+                src={imagePreview.url}
+                alt="Preview"
+                className="h-12 w-12 rounded-lg object-cover shadow-sm"
+              />
+              <button
+                type="button"
+                onClick={handleRemoveImage}
+                className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-md transition-transform hover:scale-110"
+                aria-label="移除圖片"
+              >
+                <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <motion.form
+        ref={dockRef}
+        role="toolbar"
+        aria-label={t('ask.input.toolbarLabel')}
+        onSubmit={handleSubmit}
+        className={cn(
+          'flex items-end gap-2 rounded-2xl border border-secondary/20 bg-card/95 px-3 py-2 shadow-lg backdrop-blur transition-all',
+          {
+            'ring-2 ring-primary/40': isFocused,
+            'ring-2 ring-primary/60': isDragActive,
+          }
+        )}
+        initial={{ y: 24, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        onDragOver={handleDragOver}
+        onDragEnter={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {/* Direct file picker button (no menu) */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            console.log('[InputDock] Plus button clicked, triggering file input')
+            fileInputRef.current?.click()
+          }}
+          className={cn(
+            'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-secondary text-primary transition-all hover:bg-secondary/80 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+          )}
+          aria-label={t('ask.input.action.uploadFile')}
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,.jpg,.jpeg,.png,.webp,.gif,.heic,.heif"
+          className="hidden"
+          multiple={false}
+          onChange={(event) => {
+            console.log('[InputDock] File input changed:', event.target.files?.[0]?.name)
+            const file = event.target.files?.[0]
+            if (file) {
+              handleImageFile(file, 'file')
+            }
+            event.target.value = ''
+          }}
+          aria-label={t('ask.input.action.uploadFile', { default: '選擇檔案上傳' })}
+        />
+        <input
+          ref={photoInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          multiple={false}
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+            if (file) {
+              handleImageFile(file, 'camera')
+            }
+            event.target.value = ''
+          }}
+          aria-label={t('ask.input.action.uploadPhoto', { default: '拍照上傳' })}
+        />
+
+        {/* 🎯 ChatGPT 風格 Textarea: 1行起，最多3行，可滾動 */}
+        <textarea
+          ref={textAreaRef}
+          value={value}
+          placeholder={dockPlaceholder}
+          onCompositionStart={() => {
+            compositionRef.current = true
+          }}
+          onCompositionUpdate={() => {
+            compositionRef.current = true
+          }}
+          onCompositionEnd={() => {
+            compositionRef.current = false
+          }}
+          onKeyDown={handleKeyDown}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          onChange={(event) => onChange(event.target.value)}
+          onPaste={handlePaste}
+          rows={1}
+          className="flex-1 resize-none overflow-y-auto border-0 bg-transparent py-1 text-base leading-6 text-foreground placeholder:text-muted-foreground focus:outline-none"
+          style={{ 
+            minHeight: '24px',
+            maxHeight: '72px' // 3 lines × 24px
+          }}
+          aria-label={dockPlaceholder}
+          aria-multiline="true"
+        />
+
+        <button
+          type="submit"
+          disabled={isBusy || pendingSend || uploadState.status === 'uploading'}
+          className={cn(
+            'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md transition-all hover:bg-primary/90 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+            (isBusy || pendingSend || uploadState.status === 'uploading') && 'opacity-60'
+          )}
+          aria-label={t('ask.input.sendLabel')}
+          aria-busy={pendingSend || isBusy}
+        >
+          {isBusy || pendingSend ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        </button>
+      </motion.form>
+    </div>
   )
 }
+
+// 🎯 使用 memo 包裝，避免不必要的重新渲染
+const InputDock = memo(InputDockComponent, (prevProps, nextProps) => {
+  // 只有這些 props 改變時才重新渲染
+  return (
+    prevProps.value === nextProps.value &&
+    prevProps.isBusy === nextProps.isBusy &&
+    prevProps.ocrStatus === nextProps.ocrStatus &&
+    prevProps.placeholder === nextProps.placeholder &&
+    prevProps.mode === nextProps.mode
+  )
+})
+
+InputDock.displayName = 'InputDock'
 
 export default InputDock

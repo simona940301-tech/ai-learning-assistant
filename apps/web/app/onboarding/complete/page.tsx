@@ -198,6 +198,8 @@ export default function OnboardingCompletePage() {
     router.push('/home')
   }
 
+  // Note: 已整合到 /home 頁面
+
   if (authLoading || loading) {
     return <PremiumLoader message="完成註冊中..." />
   }

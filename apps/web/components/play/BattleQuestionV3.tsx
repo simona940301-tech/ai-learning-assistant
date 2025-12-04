@@ -21,6 +21,8 @@ import { BattleHeader } from './BattleHeader'
 import { QuestionCard } from './QuestionCard'
 import { OptionsList, type OptionLetter } from './OptionsList'
 import type { OpponentStatus } from './AnimatedAvatar'
+import { BattleEffects, type BattleEffectType } from './BattleEffects'
+import { getRandomOpponentFairy } from '@/lib/avatar/presets'
 
 // 重新導出 OpponentStatus 以保持向後兼容
 export type { OpponentStatus }
@@ -150,6 +152,9 @@ export function BattleQuestionV3({
   // Determine if it's PVE (System Battle)
   const isPVE = systemMode === 'PVE_TRAINING' || systemMode === 'WEAKNESS_BATTLE'
 
+  // 🎮 對手隨機選擇fairy（在對戰開始時選擇一次）
+  const [opponentPresetId] = useState(() => getRandomOpponentFairy().id)
+
   // UI State
   const [selectedAnswer, setSelectedAnswer] = useState<OptionLetter | null>(null)
   const [timeRemaining, setTimeRemaining] = useState(() => {
@@ -162,6 +167,10 @@ export function BattleQuestionV3({
   const [isAnswered, setIsAnswered] = useState(false)
   const [showLeaveDialog, setShowLeaveDialog] = useState(false)
   const [showComboAlert, setShowComboAlert] = useState(false)
+
+  // 🎮 特效狀態
+  const [playerEffect, setPlayerEffect] = useState<BattleEffectType>(null)
+  const [opponentEffect, setOpponentEffect] = useState<BattleEffectType>(null)
 
   // 判斷玩家狀態
   const playerStatus: OpponentStatus = isAnswered
@@ -212,6 +221,8 @@ export function BattleQuestionV3({
     })
     setSelectedAnswer(null)
     setIsAnswered(false)
+    setPlayerEffect(null)
+    setOpponentEffect(null)
     const expiresAt = battleState?.roundExpiresAt
     if (expiresAt) {
       setTimeRemaining(Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000)))
@@ -219,6 +230,17 @@ export function BattleQuestionV3({
       setTimeRemaining(question.timeLimit)
     }
   }, [battleState?.roundExpiresAt, questionIndex, question.id, question.timeLimit])
+
+  // 🎮 對手答題特效
+  useEffect(() => {
+    if (opponentAnswer && opponentStatus === 'hit') {
+      setOpponentEffect('hit')
+      setTimeout(() => setOpponentEffect(null), 1200)
+    } else if (opponentAnswer && opponentStatus === 'miss') {
+      setOpponentEffect('miss')
+      setTimeout(() => setOpponentEffect(null), 1000)
+    }
+  }, [opponentAnswer, opponentStatus])
 
   // 倒計時：以 server timestamp 為主，缺少時退回本地時間
   const roundStartTimeRef = useRef<number | null>(null)
@@ -280,6 +302,15 @@ export function BattleQuestionV3({
 
       setSelectedAnswer(answer)
       setIsAnswered(true)
+
+      // 🎮 觸發特效
+      if (isCorrect) {
+        setPlayerEffect('hit')
+        setTimeout(() => setPlayerEffect(null), 1200)
+      } else {
+        setPlayerEffect('miss')
+        setTimeout(() => setPlayerEffect(null), 1000)
+      }
 
       // 觸覺反饋
       GameHaptics.buttonPress() // Selection haptic
@@ -368,13 +399,21 @@ export function BattleQuestionV3({
 
   return (
     <div className="relative flex h-full min-h-screen flex-col overflow-hidden bg-gradient-to-br from-yellow-50 to-amber-100">
-      {/* Dynamic Background - Pulse Red when time < 5s */}
+      {/* 🎮 對戰特效系統 */}
+      <BattleEffects
+        playerEffect={playerEffect}
+        opponentEffect={opponentEffect}
+        playerCombo={player1Streak}
+        opponentCombo={player2Streak}
+      />
+
+      {/* 🎯 Phase C: 柔和色提示 - 移除紅色脈衝 */}
       <motion.div
         className="absolute inset-0 pointer-events-none z-0"
         animate={{
-          backgroundColor: timeRemaining <= 5 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(0, 0, 0, 0)',
+          backgroundColor: timeRemaining <= 5 ? 'rgba(251, 146, 60, 0.08)' : 'rgba(0, 0, 0, 0)',
         }}
-        transition={{ duration: 0.5 }}
+        transition={{ duration: 0.8, ease: 'easeInOut' }}
       />
 
       {/* 退出按鈕 */}
@@ -437,7 +476,7 @@ export function BattleQuestionV3({
         )}
       </AnimatePresence>
 
-      {/* 頂部 Header - shrink-0 固定高度，不要捲動 */}
+      {/* 🎯 Phase C: 頂部 HUD 一條搞定 - 傳遞時間資訊 */}
       <div className="shrink-0">
         <BattleHeader
           playerLabel="你"
@@ -448,9 +487,12 @@ export function BattleQuestionV3({
           opponentLabel={opponentName}
           opponentScore={player2Score}
           opponentStatus={opponentStatus}
+          opponentPresetId={opponentPresetId}
           opponentStreak={player2Streak}
           currentRound={questionIndex + 1}
           totalRounds={totalQuestions}
+          timeRemaining={timeRemaining}
+          timeLimit={question.timeLimit}
         />
       </div>
 

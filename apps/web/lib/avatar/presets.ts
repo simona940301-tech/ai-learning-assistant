@@ -99,6 +99,15 @@ export function getRandomAvatar(): AvatarPreset {
 }
 
 /**
+ * Get random fairy avatar for opponent (system AI)
+ * 用於對戰時隨機選擇對手的精靈頭像
+ */
+export function getRandomOpponentFairy(): AvatarPreset {
+  const fairyAvatars = AVATAR_PRESETS.filter(preset => preset.category === 'fairy')
+  return fairyAvatars[Math.floor(Math.random() * fairyAvatars.length)]
+}
+
+/**
  * Get default avatar for new users
  */
 export function getDefaultAvatar(): AvatarPreset {

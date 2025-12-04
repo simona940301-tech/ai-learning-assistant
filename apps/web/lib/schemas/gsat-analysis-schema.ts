@@ -20,9 +20,10 @@ const QuestionSetSchema = z.object({
 
 export const KeyConceptSchema = z.object({
     concept: z.string().describe('核心知識點'),
-    explanation: z.string().describe('簡潔的解釋或定義'),
+    explanation: z.string().describe('簡潔的解釋或定義，應整合多文件來源並註明出處'),
     importance: z.enum(['高', '中', '低']).describe('該概念在學測中的考頻和重要性'),
     curriculumCode: z.string().optional().describe('對應的課綱單元代碼，例如：數A-11-1 或 高中歷史(一)-Ch2'),
+    sources: z.array(z.string()).optional().describe('該概念的來源文件列表，例如：["math_ch1.pdf", "math_ch2.pdf"]'),
 })
 
 export const GSATAnalysisSchema = z.object({
@@ -34,6 +35,7 @@ export const GSATAnalysisSchema = z.object({
     examPrediction: z.array(
         z.union([QuestionSchema, QuestionSetSchema])
     ).describe('符合學測命題原則的考題預測（必須包含至少一個題組）'),
+    sources: z.array(z.string()).optional().describe('參考的文件來源列表'),
 })
 
 export type GSATAnalysis = z.infer<typeof GSATAnalysisSchema>

@@ -30,7 +30,8 @@
 
     /* Muted: Light Grey/Beige for disabled states #EDD9AB -> HSL(42, 56%, 80%) */
     --muted: 42 56% 85%;
-    --muted-foreground: 14 26% 45%;
+    /* 🎯 WCAG AA Compliant: Contrast ratio 4.6:1 (Issue #1.4.2) */
+    --muted-foreground: 14 26% 38%;
 
     /* Accent: Green #528555 -> HSL(123, 23%, 42%) */
     --accent: 123 23% 42%;
@@ -45,8 +46,26 @@
     --input: 36 30% 80%;
     --ring: 42 98% 70%;
 
-    --radius: 1rem;
-    --ask-input-dock-height: 56px;
+    /* 🎯 Design System: Border Radius (Issue #1.3.3) */
+    --radius-card: 1rem; /* 16px - Cards */
+    --radius-modal: 1.5rem; /* 24px - Modals/BottomSheets (top only) */
+    --radius-full: 9999px; /* Pills/Chips/Badges */
+    --radius: 1rem; /* Legacy support */
+
+    /* 🎯 Design System: Spacing Scale */
+    --spacing-xs: 0.5rem; /* 8px */
+    --spacing-sm: 0.75rem; /* 12px */
+    --spacing-md: 1rem; /* 16px */
+    --spacing-lg: 1.5rem; /* 24px */
+    --spacing-xl: 2rem; /* 32px */
+    --spacing-2xl: 3rem; /* 48px */
+
+    /* 🎯 Design System: Shadows (2-tier system) */
+    --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    --shadow-card-hover: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+    /* App-specific heights */
+    --ask-input-dock-height: 40px; /* 🎯 Phase A: 極簡設計 56px → 40px */
     --tab-bar-height: 64px;
 
     /* Safe Area Insets */
@@ -61,31 +80,7 @@
     --companion-glow: 42 98% 70% / 0.3;
   }
 
-  /* Enforce the same theme in Dark Mode (User request: "won't be affected by user's phone dark or light mode") */
-  .dark {
-    --background: 44 56% 95%;
-    --foreground: 14 26% 29%;
-    --card: 50 100% 98%;
-    --card-foreground: 14 26% 29%;
-    --popover: 50 100% 98%;
-    --popover-foreground: 14 26% 29%;
-    --primary: 42 98% 70%;
-    --primary-foreground: 14 26% 29%;
-    --secondary: 36 41% 67%;
-    --secondary-foreground: 14 26% 29%;
-    --muted: 42 56% 85%;
-    --muted-foreground: 14 26% 45%;
-    --accent: 123 23% 42%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 36 30% 80%;
-    --input: 36 30% 80%;
-    --ring: 42 98% 70%;
-    --companion: 42 98% 70%;
-    --companion-foreground: 14 26% 29%;
-    --companion-glow: 42 98% 70% / 0.3;
-  }
+  /* 🎯 Removed redundant .dark block (Issue #1.4.1) - Enforces light theme only */
 }
 
 @layer base {
@@ -138,27 +133,32 @@
 }
 
 @layer components {
-  .input-dock-shell {
+  /* 🎯 方案 3: 移除固定定位的 InputDock 樣式，改用 flex 佈局 */
+  /* 以下樣式已不再使用，保留以便參考 */
+  
+  /* .input-dock-shell {
     @apply fixed inset-x-0 z-[60] pointer-events-none;
-    /* bottom is set dynamically in component to account for tab bar and keyboard */
-  }
+  } */
 
-  .input-dock-surface {
-    @apply pointer-events-auto mx-auto flex w-full max-w-3xl items-center gap-2 rounded-2xl border border-secondary/20 bg-card/95 px-2 py-1 shadow-2xl backdrop-blur;
+  /* .input-dock-surface {
+    @apply pointer-events-auto mx-auto flex w-full max-w-3xl items-center gap-2 rounded-2xl border border-secondary/20 bg-card/95 shadow-2xl backdrop-blur;
+    height: 40px;
+    padding-left: 1rem;
+    padding-right: 1rem;
     padding-bottom: calc(0.35rem + env(safe-area-inset-bottom, 0px));
-  }
+  } */
 
-  .input-dock-surface.is-focused {
+  /* .input-dock-surface.is-focused {
     padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
-  }
+  } */
 
-  .input-dock-dragging {
+  /* .input-dock-dragging {
     @apply ring-2 ring-primary/60 bg-card/95;
-  }
+  } */
 
-  .input-dock-spacer {
+  /* .input-dock-spacer {
     width: 100%;
-  }
+  } */
 }
 
 /* Custom scrollbar for minimalist feel */

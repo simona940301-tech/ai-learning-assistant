@@ -92,8 +92,15 @@ export async function extractTextSmart(
 }
 
 /**
- * PDF 智能提取 - 自動檢測文字型 vs 掃描型
- * 優化：更智能的檢測邏輯、超時處理、性能追蹤
+ * PDF 智能提取 - 混合策略（頂尖實作）
+ * 
+ * 策略：
+ * 1. 先用 pdf-parse 提取文字層（快速）
+ * 2. 如果文字充足 (>100 chars/page)：直接使用
+ * 3. 如果文字不足但有部分文字：混合模式
+ *    - 保留原有文字層
+ *    - 用 Gemini OCR 補充圖片內容
+ * 4. 如果完全沒文字：純 OCR 模式
  */
 async function extractPDFSmart(
     fileBuffer: Buffer,
@@ -103,25 +110,27 @@ async function extractPDFSmart(
     console.log(`[SmartExtractor] 📑 PDF smart extraction: ${fileName} (${(fileBuffer.length / 1024).toFixed(1)} KB)`)
 
     try {
-        // Step 1: 嘗試快速文字提取 (pdf-parse) with timeout
+        // ========================================
+        // Step 1: 快速文字提取 (pdf-parse)
+        // ========================================
         const fastStart = Date.now()
         const PDF_PARSE_TIMEOUT = 5000 // 5 秒超時
-        
+
         let pdfData: any
         try {
             // Dynamic import to handle ESM/CommonJS compatibility
             const pdfParseModule = await import('pdf-parse')
             const pdfParseFunc = (pdfParseModule as any).default || pdfParseModule
-            
+
             // 使用 Promise.race 實現超時
             pdfData = await Promise.race([
                 pdfParseFunc(fileBuffer),
-                new Promise((_, reject) => 
+                new Promise((_, reject) =>
                     setTimeout(() => reject(new Error('pdf-parse timeout')), PDF_PARSE_TIMEOUT)
                 )
             ]) as any
         } catch (timeoutError) {
-            console.warn(`[SmartExtractor] pdf-parse timeout or error, using Gemini OCR:`, timeoutError)
+            console.warn(`[SmartExtractor] pdf-parse timeout, using Gemini OCR:`, timeoutError)
             const { text, numPages } = await extractTextFromPDFWithGemini(fileBuffer)
             return {
                 text,
@@ -132,39 +141,80 @@ async function extractPDFSmart(
         }
 
         const fastDuration = Date.now() - fastStart
-        console.log(`[SmartExtractor] pdf-parse: ${pdfData.text.length} chars, ${pdfData.numpages} pages in ${fastDuration}ms`)
+        const extractedText = pdfData.text.trim()
+        const numPages = pdfData.numpages
+        const avgCharsPerPage = numPages > 0 ? extractedText.length / numPages : 0
 
-        // 改進的判斷邏輯：考慮更多因素
-        const avgCharsPerPage = pdfData.numpages > 0 ? pdfData.text.length / pdfData.numpages : 0
-        const hasSubstantialText = pdfData.text.trim().length > 50
-        const hasReasonableDensity = avgCharsPerPage > 50 // 降低閾值以捕獲更多文字型 PDF
-        
-        // 額外檢查：如果文字長度相對於文件大小合理，更可能是文字型
-        const textRatio = pdfData.text.length / fileBuffer.length
-        const isLikelyTextPDF = hasSubstantialText && (avgCharsPerPage > 50 || textRatio > 0.01)
+        console.log(`[SmartExtractor] pdf-parse: ${extractedText.length} chars, ${numPages} pages in ${fastDuration}ms`)
+        console.log(`[SmartExtractor] Average: ${avgCharsPerPage.toFixed(0)} chars/page`)
 
-        if (isLikelyTextPDF) {
-            // 文字型 PDF - 使用 pdf-parse 結果!
-            console.log(`[SmartExtractor] ✅ Text-based PDF detected (${avgCharsPerPage.toFixed(0)} chars/page, ratio: ${(textRatio * 100).toFixed(2)}%)`)
+        // ========================================
+        // Step 2: 智能判斷處理策略
+        // ========================================
+
+        // 策略 A: 文字層充足 (>100 chars/page) → 直接使用
+        if (avgCharsPerPage >= 100) {
+            console.log(`[SmartExtractor] ✅ Rich text layer detected, using pdf-parse only`)
             return {
-                text: pdfData.text,
-                numPages: pdfData.numpages,
+                text: extractedText,
+                numPages,
                 method: 'pdf-parse',
                 durationMs: Date.now() - startTime
             }
-        } else {
-            // 掃描型 PDF - 降級到 Gemini OCR
-            console.log(`[SmartExtractor] 🔍 Scanned PDF detected (${avgCharsPerPage.toFixed(0)} chars/page), using Gemini OCR`)
-            const { text, numPages } = await extractTextFromPDFWithGemini(fileBuffer)
+        }
+
+        // 策略 B: 有部分文字 (10-100 chars/page) → 混合模式
+        else if (avgCharsPerPage >= 10 && extractedText.length > 0) {
+            console.log(`[SmartExtractor] 🔀 Hybrid mode: partial text (${avgCharsPerPage.toFixed(0)} chars/page) + OCR for images`)
+
+            try {
+                // 用 Gemini OCR 提取完整內容（包含圖片中的文字）
+                const { text: ocrText } = await extractTextFromPDFWithGemini(fileBuffer)
+
+                // 智能合併：如果 OCR 結果明顯更豐富，使用 OCR；否則保留原文字層
+                if (ocrText.length > extractedText.length * 1.5) {
+                    console.log(`[SmartExtractor] ✅ OCR provided richer content (${ocrText.length} vs ${extractedText.length} chars), using OCR`)
+                    return {
+                        text: ocrText,
+                        numPages,
+                        method: 'gemini-ocr',
+                        durationMs: Date.now() - startTime
+                    }
+                } else {
+                    console.log(`[SmartExtractor] ✅ Text layer sufficient, keeping original`)
+                    return {
+                        text: extractedText,
+                        numPages,
+                        method: 'pdf-parse',
+                        durationMs: Date.now() - startTime
+                    }
+                }
+            } catch (ocrError) {
+                // OCR 失敗，退回使用原文字層
+                console.warn(`[SmartExtractor] ⚠️ OCR failed in hybrid mode, using text layer:`, ocrError)
+                return {
+                    text: extractedText,
+                    numPages,
+                    method: 'pdf-parse',
+                    durationMs: Date.now() - startTime
+                }
+            }
+        }
+
+        // 策略 C: 幾乎沒文字 (<10 chars/page) → 純 OCR
+        else {
+            console.log(`[SmartExtractor] 🔍 Scanned PDF detected (${avgCharsPerPage.toFixed(0)} chars/page), using pure OCR`)
+            const { text, numPages: ocrPages } = await extractTextFromPDFWithGemini(fileBuffer)
             return {
                 text,
-                numPages,
+                numPages: ocrPages || numPages,
                 method: 'gemini-ocr',
                 durationMs: Date.now() - startTime
             }
         }
+
     } catch (error) {
-        // pdf-parse 失敗 - 降級到 Gemini OCR
+        // pdf-parse 完全失敗 - 降級到 Gemini OCR
         console.warn(`[SmartExtractor] pdf-parse failed, falling back to Gemini OCR:`, error)
         try {
             const { text, numPages } = await extractTextFromPDFWithGemini(fileBuffer)
@@ -241,9 +291,9 @@ export async function extractMultipleFilesSmart(
 
     const avgSize = files.reduce((sum, f) => sum + f.buffer.length, 0) / files.length
     const MAX_PARALLEL = getMaxParallel(files.length, avgSize)
-    
+
     console.log(`[SmartExtractor] Config: ${files.length} files, avg size: ${(avgSize / 1024).toFixed(1)} KB, max parallel: ${MAX_PARALLEL}`)
-    
+
     const results: ExtractionResult[] = []
     const errors: Array<{ file: string; error: string }> = []
 
@@ -252,10 +302,10 @@ export async function extractMultipleFilesSmart(
         const batchNum = Math.floor(i / MAX_PARALLEL) + 1
         const totalBatches = Math.ceil(files.length / MAX_PARALLEL)
         console.log(`[SmartExtractor] 📦 Processing batch ${batchNum}/${totalBatches} (${batch.length} files): ${batch.map(f => f.name).join(', ')}`)
-        
+
         const batchStart = Date.now()
         let batchResults: PromiseSettledResult<ExtractionResult>[]
-        
+
         try {
             batchResults = await Promise.allSettled(
                 batch.map((file, idx) => {
@@ -271,7 +321,7 @@ export async function extractMultipleFilesSmart(
                 reason: batchError instanceof Error ? batchError : new Error(String(batchError))
             }))
         }
-        
+
         const batchTime = Date.now() - batchStart
         console.log(`[SmartExtractor] Batch ${batchNum} completed in ${batchTime}ms`)
 
@@ -279,7 +329,7 @@ export async function extractMultipleFilesSmart(
         for (let j = 0; j < batchResults.length; j++) {
             const result = batchResults[j]
             const fileName = batch[j].name
-            
+
             if (result.status === 'fulfilled') {
                 results.push(result.value)
                 console.log(`[SmartExtractor] ✅ ${fileName}: ${result.value.method} (${result.value.durationMs}ms, ${result.value.text.length} chars)`)
@@ -291,7 +341,7 @@ export async function extractMultipleFilesSmart(
                 if (errorStack) {
                     console.error(`[SmartExtractor] Error stack:`, errorStack)
                 }
-                
+
                 // 添加錯誤結果（允許部分失敗）
                 results.push({
                     text: '',
@@ -336,14 +386,14 @@ async function cacheText(fileHash: string, result: ExtractionResult): Promise<vo
         // 快取 24 小時，添加超時保護（500ms）
         await Promise.race([
             redis.setEx(cacheKey, 86400, cacheData),
-            new Promise<void>((resolve) => 
+            new Promise<void>((resolve) =>
                 setTimeout(() => {
                     console.warn('[SmartExtractor] Cache write timeout, continuing')
                     resolve()
                 }, 500)
             )
         ])
-        
+
         console.log(`[SmartExtractor] 💾 Cached text extraction for ${fileHash}`)
     } catch (error) {
         console.warn('[SmartExtractor] Failed to cache text (non-critical):', error)
@@ -364,11 +414,11 @@ async function getCachedText(fileHash: string): Promise<Omit<ExtractionResult, '
         }
 
         const cacheKey = `text:${fileHash}`
-        
+
         // 添加超時保護（1秒）
         const cached = await Promise.race([
             redis.get(cacheKey),
-            new Promise<null>((resolve) => 
+            new Promise<null>((resolve) =>
                 setTimeout(() => {
                     console.warn('[SmartExtractor] Cache lookup timeout, continuing without cache')
                     resolve(null)

@@ -247,11 +247,41 @@ export function parseExplanationFile(text: string): ParsedQuestion[] {
         continue
       }
     }
+    
+    // 檢測單獨一行的選項：(A) text（支援全形和半形括號）
+    if (currentQuestion.questionText) {
+      const singleOptionMatch = 
+        line.match(/^\(([A-D])\)\s*(.+)$/i) ||      // (A) text 半形
+        line.match(/^（([A-D])）\s*(.+)$/i)         // （A） text 全形
+      
+      if (singleOptionMatch) {
+        const letter = singleOptionMatch[1].toUpperCase()
+        const text = singleOptionMatch[2].trim()
+        
+        if (letter === 'A' && !currentQuestion.optionA) {
+          currentQuestion.optionA = text
+          console.log('[parseExplanationFile] Found single option A:', text)
+        } else if (letter === 'B' && !currentQuestion.optionB) {
+          currentQuestion.optionB = text
+          console.log('[parseExplanationFile] Found single option B:', text)
+        } else if (letter === 'C' && !currentQuestion.optionC) {
+          currentQuestion.optionC = text
+          console.log('[parseExplanationFile] Found single option C:', text)
+        } else if (letter === 'D' && !currentQuestion.optionD) {
+          currentQuestion.optionD = text
+          console.log('[parseExplanationFile] Found single option D:', text)
+        }
+        continue
+      }
+    }
 
     // 檢測答案、難度、標籤在同一行
     // 格式：答案：C 難度：3 標籤： 英文-詞彙題, 英文-自然/季節
-    // 注意：標籤前面可能有空格，使用更寬鬆的匹配，支援全形字符
-    const metaLineMatch = line.match(/答案[：:：]\s*([A-DＡ-Ｄ])\s+難度[：:：]\s*(\d+)\s+標籤[：:：]\s*(.+)$/i)
+    // 或：答案： (A)難度： 2標籤： 英文-詞彙題
+    // 注意：標籤前面可能有空格，使用更寬鬆的匹配，支援全形字符和括號
+    const metaLineMatch = 
+      line.match(/答案[：:：]\s*\(?([A-DＡ-Ｄ])\)?\s*難度[：:：]\s*(\d+)\s*標籤[：:：]\s*(.+)$/i) ||
+      line.match(/答案[：:：]\s*（?([A-DＡ-Ｄ])）?\s*難度[：:：]\s*(\d+)\s*標籤[：:：]\s*(.+)$/i)
     
     if (metaLineMatch) {
       // 將全形字符轉換為半形
@@ -276,8 +306,10 @@ export function parseExplanationFile(text: string): ParsedQuestion[] {
     }
 
     // 分別檢測答案、難度、標籤（如果不在同一行）
-    // 支援全形和半形字符：答案：C 或 答案：Ｂ
-    const answerMatch = line.match(/^答案[：:：]\s*([A-DＡ-Ｄ])/i)
+    // 支援全形和半形字符：答案：C 或 答案：Ｂ 或 答案： (A)
+    const answerMatch = 
+      line.match(/^答案[：:：]\s*\(?([A-DＡ-Ｄ])\)?/i) ||
+      line.match(/^答案[：:：]\s*（?([A-DＡ-Ｄ])）?/i)
     if (answerMatch && !currentQuestion.correctAnswer) {
       // 將全形字符轉換為半形
       let answer = answerMatch[1]
@@ -309,52 +341,86 @@ export function parseExplanationFile(text: string): ParsedQuestion[] {
     }
 
     // 檢測「選項分析」區塊並提取選項（在詳解區塊內或外都可以）
-    if (line.match(/^選項分析[：:：]?$/i)) {
+    // 也檢測「選項分析：」（帶冒號）的情況
+    if (line.match(/^選項分析[：:：]?/i)) {
+      console.log('[parseExplanationFile] Found 選項分析 section at line:', i)
       // 開始收集選項
       let optionLineIndex = i + 1
       let foundOptions = 0
+      
+      // 檢查選項是否在同一行（選項分析：後面直接跟著空行或內容）
+      const sameLineMatch = line.match(/^選項分析[：:：]\s*(.+)$/i)
+      if (sameLineMatch && sameLineMatch[1].trim()) {
+        // 選項可能在同一行，跳過這種情況，從下一行開始
+        console.log('[parseExplanationFile] 選項分析 has content on same line, starting from next line')
+      }
+      
       while (optionLineIndex < lines.length) {
         const optionLine = lines[optionLineIndex]
+        console.log('[parseExplanationFile] Checking option line:', optionLineIndex, optionLine.substring(0, 60))
+        
         // 如果遇到下一個區塊標題或題目，停止
         if (optionLine.match(/^(核心考點|題幹翻譯|判斷詞義|結論|🧠|📝|題目\s*\d+)/i)) {
+          console.log('[parseExplanationFile] Reached next section, stopping option extraction')
           break
         }
-        // 匹配格式：* (A) text 或 (A) text
-        const optionMatch = optionLine.match(/^[*•]\s*\(([A-D])\)\s*(.+)$/i) || optionLine.match(/^\(([A-D])\)\s*(.+)$/i)
+        
+        // 匹配格式：* (A) text 或 (A) text，支援全形和半形括號
+        const optionMatch = 
+          optionLine.match(/^[*•]\s*\(([A-D])\)\s*(.+)$/i) ||      // * (A) 半形
+          optionLine.match(/^[*•]\s*（([A-D])）\s*(.+)$/i) ||     // * （A） 全形
+          optionLine.match(/^\(([A-D])\)\s*(.+)$/i) ||            // (A) 半形
+          optionLine.match(/^（([A-D])）\s*(.+)$/i)              // （A） 全形
         if (optionMatch) {
           const letter = optionMatch[1].toUpperCase()
-          // 提取選項文字（移除可能的詞性標註，如 (n.)、(adj.) 等）
+          // 提取選項文字
           let optionText = optionMatch[2].trim()
-          // 移除詞性標註，如 (n.)、(adj.)、(v.) 等，但保留選項文字
-          // 格式通常是：word (n.) 中文解釋，我們要提取 word
-          const wordMatch = optionText.match(/^([a-zA-Z]+(?:\s+[a-zA-Z]+)*)/)
-          if (wordMatch) {
-            optionText = wordMatch[1].trim()
+          
+          console.log('[parseExplanationFile] Raw option text:', letter, '=', optionText.substring(0, 50))
+          
+          // 提取第一個英文單字（在第一個空格或括號之前）
+          // 格式：word (N.) 中文解釋 -> 只取 word
+          // 格式：word （N.） 中文解釋 -> 只取 word
+          const firstWordMatch = optionText.match(/^([a-zA-Z]+)/)
+          if (firstWordMatch) {
+            optionText = firstWordMatch[1].trim()
+            console.log('[parseExplanationFile] Extracted first word:', optionText)
           } else {
-            // 如果沒有匹配到英文單字，移除括號內容後取第一個詞
-            optionText = optionText.replace(/\s*\([^)]+\)\s*/g, ' ').trim().split(/\s+/)[0]
+            // 如果沒有匹配到英文字母開頭，嘗試去除括號（全形和半形）後取第一個詞
+            const cleanText = optionText
+              .replace(/\s*\([^)]+\)\s*/g, ' ')    // 移除半形括號
+              .replace(/\s*（[^）]+）\s*/g, ' ')   // 移除全形括號
+              .trim()
+            optionText = cleanText.split(/\s+/)[0]
+            console.log('[parseExplanationFile] Extracted word using fallback:', optionText)
           }
           
           if (letter === 'A' && !currentQuestion.optionA) {
             currentQuestion.optionA = optionText
             foundOptions++
+            console.log('[parseExplanationFile] Set optionA =', optionText)
           } else if (letter === 'B' && !currentQuestion.optionB) {
             currentQuestion.optionB = optionText
             foundOptions++
+            console.log('[parseExplanationFile] Set optionB =', optionText)
           } else if (letter === 'C' && !currentQuestion.optionC) {
             currentQuestion.optionC = optionText
             foundOptions++
+            console.log('[parseExplanationFile] Set optionC =', optionText)
           } else if (letter === 'D' && !currentQuestion.optionD) {
             currentQuestion.optionD = optionText
             foundOptions++
+            console.log('[parseExplanationFile] Set optionD =', optionText)
           }
-          
-          console.log('[parseExplanationFile] Found option from 選項分析:', letter, optionText)
         }
         optionLineIndex++
         // 如果已經找到4個選項，可以提前停止
-        if (foundOptions >= 4) break
+        if (foundOptions >= 4) {
+          console.log('[parseExplanationFile] Found all 4 options, stopping')
+          break
+        }
       }
+      console.log('[parseExplanationFile] Finished extracting options, found:', foundOptions)
       // 跳過已處理的選項行
       i = optionLineIndex - 1
       continue
@@ -368,8 +434,8 @@ export function parseExplanationFile(text: string): ParsedQuestion[] {
       continue
     }
 
-    // 收集詳解內容
-    if (inExplanation || (currentQuestion.questionText && currentQuestion.optionA && currentQuestion.correctAnswer)) {
+    // 收集詳解內容（移除 optionA 的檢查，允許在沒有選項時也收集詳解）
+    if (inExplanation || (currentQuestion.questionText && currentQuestion.correctAnswer)) {
       // 如果遇到下一個題目的標記，停止收集
       if (line.match(/^📝\s*題目\s*\d+/i) || line.match(/^題目\s*\d+/i)) {
         i-- // 回退一行，讓外層循環處理

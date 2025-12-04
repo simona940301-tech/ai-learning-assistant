@@ -111,7 +111,7 @@ export default function PlayPage() {
           />
         ) : (
           <>
-        {/* Stats */}
+            {/* Stats */}
         <div className="mb-6 grid grid-cols-3 gap-4">
           <Card className="p-4 text-center">
             <div className="text-2xl font-bold">7</div>
@@ -143,8 +143,8 @@ export default function PlayPage() {
           })}
         </div>
 
-        {/* Tasks */}
-        <div className="space-y-3">
+            {/* Tasks */}
+            <div className="space-y-3">
           {tasks.map((task, idx) => {
             const subject = subjects.find(s => s.id === task.subject)
             const Icon = subject?.icon || BookOpen
@@ -183,10 +183,10 @@ export default function PlayPage() {
               </motion.div>
             )
           })}
-        </div>
+            </div>
 
-        {/* Task Modal */}
-        <AnimatePresence>
+            {/* Task Modal */}
+            <AnimatePresence>
           {selectedTask && (
             <motion.div
               initial={{ opacity: 0 }}
@@ -231,7 +231,8 @@ export default function PlayPage() {
               </motion.div>
             </motion.div>
           )}
-        </AnimatePresence>
+            </AnimatePresence>
+          </>
         )}
       </main>
     </>

@@ -334,7 +334,7 @@ export const universities: University[] = [
 export function searchUniversities(query: string): University[] {
   if (!query.trim()) return universities
   const lowerQuery = query.toLowerCase()
-  return universities.filter(uni => 
+  return universities.filter(uni =>
     uni.name.toLowerCase().includes(lowerQuery)
   )
 }
@@ -361,3 +361,43 @@ export function getDepartmentById(universityId: string, departmentId: string): D
   return university?.departments.find(d => d.id === departmentId)
 }
 
+
+// --- New Exports for Dream School Calculator V3.5 ---
+
+export interface EnglishRequirement {
+  requiredGradeLevel: number // T_grade
+  passScore: number // P_score (e.g. 60)
+  excellentScore: number // E_score (e.g. 90)
+}
+
+export interface SkillWeights {
+  vocabulary: number
+  cloze?: number
+  reading?: number
+  grammar?: number
+  [key: string]: number | undefined
+}
+
+export const DEFAULT_ENGLISH_REQUIREMENT: EnglishRequirement = {
+  requiredGradeLevel: 13, // T_grade
+  passScore: 60,          // P_score
+  excellentScore: 90      // E_score
+}
+
+export const GRADE_CONVERSION_MAP = [
+  { grade: 15, accuracy: 0.92 },
+  { grade: 14, accuracy: 0.88 },
+  { grade: 13, accuracy: 0.84 },
+  { grade: 12, accuracy: 0.80 },
+  { grade: 11, accuracy: 0.76 },
+  { grade: 10, accuracy: 0.72 },
+  { grade: 9, accuracy: 0.68 },
+  { grade: 8, accuracy: 0.64 },
+  { grade: 7, accuracy: 0.60 },
+  { grade: 6, accuracy: 0.55 },
+  { grade: 5, accuracy: 0.50 },
+  { grade: 4, accuracy: 0.45 },
+  { grade: 3, accuracy: 0.40 },
+  { grade: 2, accuracy: 0.30 },
+  { grade: 1, accuracy: 0.00 },
+]

@@ -33,7 +33,7 @@ export function NoteViewerModal({ isOpen, onClose, file }: NoteViewerModalProps)
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 gap-0 overflow-hidden bg-background/95 backdrop-blur-xl border-none shadow-2xl">
+            <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 gap-0 overflow-hidden bg-background/95 backdrop-blur-xl border-none shadow-2xl [&>button]:hidden">
                 <DialogTitle className="sr-only">筆記內容檢視</DialogTitle>
                 <DialogDescription className="sr-only">
                     檢視筆記 {file.title || file.file_name || '未命名'}，科目 {file.subject}
@@ -56,8 +56,13 @@ export function NoteViewerModal({ isOpen, onClose, file }: NoteViewerModalProps)
                             <span className="capitalize">{file.subject}</span>
                         </div>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0 h-6 w-6 rounded-full hover:bg-muted">
-                        <X className="w-3 h-3" />
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={onClose} 
+                        className="shrink-0 h-8 w-8 rounded-full hover:bg-muted z-50"
+                    >
+                        <X className="w-4 h-4" />
                     </Button>
                 </div>
 

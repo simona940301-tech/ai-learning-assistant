@@ -33,6 +33,8 @@ export interface BattleHeaderProps {
   totalRounds: number
   playerStreak?: number
   opponentStreak?: number
+  timeRemaining?: number
+  timeLimit?: number
 }
 
 // ============================================
@@ -190,18 +192,113 @@ export function BattleHeader({
   totalRounds,
   playerStreak = 0,
   opponentStreak = 0,
-}: BattleHeaderProps) {
-  // Mobile-first: 固定高度 header，shrink-0，不捲動（放大以適應更大的頭像）
+  timeRemaining = 0,
+  timeLimit = 30,
+  opponentPresetId,
+}: BattleHeaderProps & { opponentPresetId?: string | null }) {
+  // 🎯 Phase C: HUD 一條搞定 - 極簡 Sticky Bar + Avatar
+  // 左邊：玩家Avatar + 分數，中間：時間，右邊：對手Avatar + 分數
+  const isTimeWarning = timeRemaining <= 5
+  const timePercentage = (timeRemaining / timeLimit) * 100
+
   return (
-    <div className="flex shrink-0 items-center justify-between gap-2 px-3 py-2 md:px-4 md:py-2.5" style={{ height: '80px', minHeight: '80px', maxHeight: '96px' }}>
-      {/* Left Player - 玩家自己 */}
-      <PlayerPill side="left" label={playerLabel} score={playerScore} status={playerStatus} presetId={playerPresetId} streak={playerStreak} isPlayer={true} />
+    <div className="sticky top-0 z-40 flex shrink-0 items-center justify-between border-b border-amber-200/30 bg-gradient-to-r from-amber-50 to-yellow-50/95 backdrop-blur-sm px-3 py-2.5 md:px-4">
+      {/* 左邊：玩家 Avatar + 分數/連擊 */}
+      <div className="flex items-center gap-2">
+        {/* 玩家 Avatar */}
+        <div className="relative">
+          <AnimatedAvatar status={playerStatus} size="sm" presetId={playerPresetId} isPlayer={true} />
+          {/* Streak Glow */}
+          {playerStreak > 1 && (
+            <motion.div
+              className="absolute inset-0 rounded-full bg-amber-400/30 blur-md -z-10"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0.3, 0.6, 0.3] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+            />
+          )}
+        </div>
+        
+        {/* 分數/連擊 */}
+        <div className="flex items-center gap-1.5 rounded-full bg-white/60 border border-amber-200 px-2.5 py-1">
+          <span className="text-sm font-bold text-amber-900 tabular-nums">{playerScore}</span>
+          {playerStreak > 1 && (
+            <motion.span
+              className="text-xs font-bold text-amber-600"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+            >
+              {playerStreak}x
+            </motion.span>
+          )}
+        </div>
+      </div>
 
-      {/* Center Progress */}
-      <RoundProgressBar currentRound={currentRound} totalRounds={totalRounds} />
+      {/* 中間：倒數時間 */}
+      <div className="flex items-center gap-2">
+        <motion.div
+          className={`relative flex items-center gap-1.5 rounded-full border px-3 py-1.5 ${
+            isTimeWarning
+              ? 'bg-orange-100/80 border-orange-300'
+              : 'bg-white/60 border-amber-200'
+          }`}
+          animate={{
+            scale: isTimeWarning ? [1, 1.05, 1] : 1,
+          }}
+          transition={{
+            duration: 0.8,
+            repeat: isTimeWarning ? Infinity : 0,
+          }}
+        >
+          <motion.span
+            className={`text-sm font-bold tabular-nums ${
+              isTimeWarning ? 'text-orange-600' : 'text-amber-900'
+            }`}
+          >
+            {timeRemaining}s
+          </motion.span>
+          {/* 小進度條 */}
+          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-200/30 overflow-hidden">
+            <motion.div
+              className={isTimeWarning ? 'bg-orange-500' : 'bg-amber-400'}
+              initial={{ width: '100%' }}
+              animate={{ width: `${timePercentage}%` }}
+              transition={{ duration: 1, ease: 'linear' }}
+            />
+          </div>
+        </motion.div>
+      </div>
 
-      {/* Right Opponent - 對手（狐狸） */}
-      <PlayerPill side="right" label={opponentLabel} score={opponentScore} status={opponentStatus} streak={opponentStreak} isPlayer={false} />
+      {/* 右邊：對手 Avatar + 分數/連擊 */}
+      <div className="flex items-center gap-2 flex-row-reverse">
+        {/* 對手 Avatar */}
+        <div className="relative">
+          <AnimatedAvatar status={opponentStatus} size="sm" presetId={opponentPresetId} isPlayer={false} />
+          {/* Streak Glow */}
+          {opponentStreak > 1 && (
+            <motion.div
+              className="absolute inset-0 rounded-full bg-purple-400/30 blur-md -z-10"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0.3, 0.6, 0.3] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+            />
+          )}
+        </div>
+        
+        {/* 分數/連擊 */}
+        <div className="flex items-center gap-1.5 rounded-full bg-white/60 border border-purple-200 px-2.5 py-1">
+          <span className="text-sm font-bold text-purple-900 tabular-nums">{opponentScore}</span>
+          {opponentStreak > 1 && (
+            <motion.span
+              className="text-xs font-bold text-purple-600"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+            >
+              {opponentStreak}x
+            </motion.span>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
