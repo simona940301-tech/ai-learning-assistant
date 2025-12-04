@@ -14,11 +14,10 @@ interface NoteViewerModalProps {
 }
 
 export function NoteViewerModal({ isOpen, onClose, file }: NoteViewerModalProps) {
-    if (!file) return null
-
     // 預處理 markdown：將「正確答案」標題和答案段落合併為一行
+    // ✅ 修復：將 useMemo 移到條件 return 之前，符合 React Hooks 規則
     const processedContent = useMemo(() => {
-        if (!file.content) return file.content
+        if (!file?.content) return ''
 
         // 匹配模式：## 正確答案 或 ## ✔ 正確答案 後面跟著 正確答案 : (C) germs
         const pattern = /(##\s*(?:✔|✅)?\s*正確答案\s*\n+)(正確答案[：:]\s*\(?[A-D]\)?\s*[^\n]+)/g
@@ -29,7 +28,9 @@ export function NoteViewerModal({ isOpen, onClose, file }: NoteViewerModalProps)
             // 合併為一行：## ✅ 正確答案: (C) germs
             return `## ✅ 正確答案: ${answerText}`
         })
-    }, [file.content])
+    }, [file?.content])
+
+    if (!file) return null
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
