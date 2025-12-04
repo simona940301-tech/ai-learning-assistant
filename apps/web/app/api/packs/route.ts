@@ -4,6 +4,23 @@ import type { PackListResponse, PackWithStatus } from '@plms/shared/types';
 import { getConfidenceBadge } from '@plms/shared/types';
 
 /**
+ * ✅ 簡化的字段映射：snake_case → camelCase
+ * 遵循專案架構，直接在 route 中處理
+ */
+function snakeToCamelCase<T extends Record<string, any>>(obj: T): any {
+  if (!obj || typeof obj !== 'object') return obj;
+  
+  const result: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+    result[camelKey] = value && typeof value === 'object' && !Array.isArray(value)
+      ? snakeToCamelCase(value)
+      : value;
+  }
+  return result;
+}
+
+/**
  * GET /api/packs
  *
  * Browse and search packs with filters
@@ -103,6 +120,9 @@ export async function GET(req: NextRequest) {
 
     // Transform to PackWithStatus (V2: Optimized with automatic field mapping)
     const packsWithStatus: PackWithStatus[] = (packs || []).map(pack => {
+      // ✅ 使用內聯工具自動轉換 snake_case → camelCase
+      const autoConverted = snakeToCamelCase(pack);
+      
       return {
         ...autoConverted, // 自動處理: item_count→itemCount, has_explanation→hasExplanation 等
         // 只需手動處理業務邏輯和預設值

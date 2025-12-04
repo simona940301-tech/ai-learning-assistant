@@ -14,6 +14,8 @@ export interface Profile {
   energy_last_updated_at: string
   created_at: string
   updated_at: string
+  // ✅ 新增：預設頭像 ID
+  preset_avatar_id?: string | null
 }
 
 /**

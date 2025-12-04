@@ -56,6 +56,9 @@ type StoreState = {
 
   // Derived
   isHatched: boolean
+
+  // ✅ 新增：Bottom Sheet 狀態（暫時禁用但保留類型）
+  bottomSheetOpen: boolean
 }
 
 type StoreActions = {
@@ -80,6 +83,10 @@ type StoreActions = {
   // Hatching Actions
   hatchChick: (chickName: string, userNickname: string) => Promise<void>
   updateLastSeen: () => Promise<void>
+
+  // ✅ 新增：Bottom Sheet Actions（暫時禁用但保留類型）
+  openBottomSheet: () => void
+  closeBottomSheet: () => void
 }
 
 type ChickStatusResponse = {
@@ -157,6 +164,13 @@ export const useChickStore = create<StoreState & StoreActions>((set, get) => ({
   daysSinceLastSeen: 0,
   reunionState: null,
   isHatched: false,
+
+  // ✅ 新增：Bottom Sheet 初始狀態
+  bottomSheetOpen: false,
+
+  // ✅ 新增：Bottom Sheet Actions
+  openBottomSheet: () => set({ bottomSheetOpen: true }),
+  closeBottomSheet: () => set({ bottomSheetOpen: false }),
 
   async fetchStatus() {
     const { statusLoading } = get()

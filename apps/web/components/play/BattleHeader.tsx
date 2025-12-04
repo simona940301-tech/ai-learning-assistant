@@ -12,7 +12,7 @@ export interface PlayerPillProps {
   label: string
   score: number
   status: OpponentStatus
-  presetId?: string | null
+  presetId?: string  // ✅ 移除 null，只接受 string | undefined
   streak?: number
 }
 
@@ -25,7 +25,7 @@ export interface BattleHeaderProps {
   playerLabel: string
   playerScore: number
   playerStatus: OpponentStatus
-  playerPresetId?: string | null
+  playerPresetId?: string
   opponentLabel: string
   opponentScore: number
   opponentStatus: OpponentStatus
@@ -195,7 +195,7 @@ export function BattleHeader({
   timeRemaining = 0,
   timeLimit = 30,
   opponentPresetId,
-}: BattleHeaderProps & { opponentPresetId?: string | null }) {
+}: BattleHeaderProps & { opponentPresetId?: string }) {
   // 🎯 Phase C: HUD 一條搞定 - 極簡 Sticky Bar + Avatar
   // 左邊：玩家Avatar + 分數，中間：時間，右邊：對手Avatar + 分數
   const isTimeWarning = timeRemaining <= 5
@@ -207,7 +207,7 @@ export function BattleHeader({
       <div className="flex items-center gap-2">
         {/* 玩家 Avatar */}
         <div className="relative">
-          <AnimatedAvatar status={playerStatus} size="sm" presetId={playerPresetId} isPlayer={true} />
+          <AnimatedAvatar status={playerStatus} size="sm" presetId={playerPresetId ?? undefined} isPlayer={true} />
           {/* Streak Glow */}
           {playerStreak > 1 && (
             <motion.div
@@ -273,7 +273,7 @@ export function BattleHeader({
       <div className="flex items-center gap-2 flex-row-reverse">
         {/* 對手 Avatar */}
         <div className="relative">
-          <AnimatedAvatar status={opponentStatus} size="sm" presetId={opponentPresetId} isPlayer={false} />
+          <AnimatedAvatar status={opponentStatus} size="sm" presetId={opponentPresetId ?? undefined} isPlayer={false} />
           {/* Streak Glow */}
           {opponentStreak > 1 && (
             <motion.div

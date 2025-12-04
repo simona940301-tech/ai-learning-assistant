@@ -8,7 +8,7 @@ import { useAsk } from '@/lib/ask-context'
 import { cn } from '@/lib/utils'
 import ProgressiveAnalysisCard from '@/components/ask/ProgressiveAnalysisCard'
 import { motion, AnimatePresence } from 'framer-motion'
-// import RAGChatInterface from '@/components/ask/RAGChatInterface' // Temporarily disabled
+import RAGChatInterface from '@/components/ask/RAGChatInterface'
 import { useSummaryWorkbench, DocumentGroup } from '@/hooks/useSummaryWorkbench'
 import { useState, useEffect } from 'react'
 import { FileSelectionChips } from '@/components/ask/FileSelectionChips'
@@ -570,45 +570,40 @@ export function SummaryWorkbench() {
                             </div>
                         </div>
 
-                        {/* Chat Interface - Temporarily Disabled (API Incompatibility) */}
-                        {/* TODO: Reimplement with compatible API or custom fetch implementation */}
-                        {
-                            /*
-                            {state.uploadedDocIds.length > 0 && (
-                                <div className="mt-8">
-                                    <div className="flex justify-center mb-6">
-                                        <Button
-                                            variant="outline"
-                                            onClick={() => setShowChat(!showChat)}
-                                            className="rounded-full gap-2 shadow-sm hover:shadow-md transition-all"
-                                        >
-                                            <MessageSquare className="w-4 h-4" />
-                                            {showChat ? '隱藏 AI 助手' : '向 AI 提問'}
-                                        </Button>
-                                    </div>
-    
-                                    <AnimatePresence>
-                                        {showChat && (
-                                            <motion.div
-                                                initial={{ opacity: 0, height: 0 }}
-                                                animate={{ opacity: 1, height: 'auto' }}
-                                                exit={{ opacity: 0, height: 0 }}
-                                                className="overflow-hidden"
-                                            >
-                                                <div className="bg-card rounded-3xl border border-border shadow-sm p-1">
-                                                    <RAGChatInterface
-                                                        refreshKey={state.uploadedDocIds[0]}
-                                                        contextFileIds={selectedFileIds}
-                                                        onChatReady={() => console.log('[SummaryWorkbench] Chat ready')}
-                                                    />
-                                                </div>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
+                        {/* Chat Interface - Re-enabled! */}
+                        {state.uploadedDocIds.length > 0 && (
+                            <div className="mt-8">
+                                <div className="flex justify-center mb-6">
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setShowChat(!showChat)}
+                                        className="rounded-full gap-2 shadow-sm hover:shadow-md transition-all"
+                                    >
+                                        <MessageSquare className="w-4 h-4" />
+                                        {showChat ? '隱藏 AI 助手' : '向 AI 提問'}
+                                    </Button>
                                 </div>
-                            )}
-                            */
-                        }
+
+                                <AnimatePresence>
+                                    {showChat && (
+                                        <motion.div
+                                            initial={{ opacity: 0, height: 0 }}
+                                            animate={{ opacity: 1, height: 'auto' }}
+                                            exit={{ opacity: 0, height: 0 }}
+                                            className="overflow-hidden"
+                                        >
+                                            <div className="bg-card rounded-3xl border border-border shadow-sm p-1">
+                                                <RAGChatInterface
+                                                    refreshKey={state.uploadedDocIds[0]}
+                                                    contextFileIds={selectedFileIds}
+                                                    onChatReady={() => console.log('[SummaryWorkbench] Chat ready')}
+                                                />
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        )}
 
                         {/* Reset Button */}
                         <div className="flex justify-center pt-6">

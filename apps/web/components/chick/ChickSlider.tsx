@@ -34,8 +34,9 @@ const ChickSlider = React.forwardRef<
                 style={{ 
                     borderColor: '#FED168',
                     backgroundColor: theme.card,
-                    ringColor: '#FED168',
-                }}
+                    // ✅ 修復：使用 CSS 變數替代無效的 ringColor 屬性
+                    '--tw-ring-color': '#FED168',
+                } as React.CSSProperties}
             />
         </SliderPrimitive.Root>
     )

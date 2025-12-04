@@ -125,7 +125,7 @@ export interface BattleQuestionV3Props {
   opponentStatus?: OpponentStatus
   opponentAnswer?: 'A' | 'B' | 'C' | 'D' | null
   hideExitControls?: boolean
-  playerPresetId?: string | null
+  playerPresetId?: string  // ✅ 移除 null，統一使用 undefined
 }
 
 // ============================================
@@ -482,7 +482,7 @@ export function BattleQuestionV3({
           playerLabel="你"
           playerScore={player1Score}
           playerStatus="idle"
-          playerPresetId={playerPresetId}
+          playerPresetId={playerPresetId ?? undefined}
           playerStreak={player1Streak}
           opponentLabel={opponentName}
           opponentScore={player2Score}

@@ -23,7 +23,8 @@ export async function pruneChickMessages(userId: string, client?: SupabaseClient
     throw new Error(`Failed to fetch messages for pruning: ${error.message}`)
   }
 
-  const idsToDelete = (data ?? []).map(row => row.id).filter(Boolean)
+  // ✅ 修復：添加明確的類型注解
+  const idsToDelete = (data ?? []).map((row: { id?: string }) => row.id).filter(Boolean)
   if (idsToDelete.length === 0) {
     return { deleted: 0 }
   }

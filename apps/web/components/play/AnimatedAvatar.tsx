@@ -69,7 +69,10 @@ export function AnimatedAvatar({ name, status, size = 'md', showBadge = true, pr
   const preset = effectivePresetId ? getAvatarPreset(effectivePresetId) : null
 
   // 🎯 根據 isPlayer 選擇不同的表情映射
-  const expression = isPlayer ? playerExpressionMap[status] : foxExpressionMap[status]
+  // ✅ 修復：使用明確的類型標註以避免聯合類型推斷問題
+  const foxExpression = foxExpressionMap[status]
+  const playerExpression = playerExpressionMap[status]
+  const expression = isPlayer ? playerExpression : foxExpression
 
   // 答對/答錯時生成粒子
   useEffect(() => {
@@ -157,7 +160,7 @@ export function AnimatedAvatar({ name, status, size = 'md', showBadge = true, pr
               {preset.emoji}
             </div>
           </motion.div>
-        ) : !isPlayer && expression.imageUrl ? (
+        ) : !isPlayer && foxExpression.imageUrl ? (
           // 🎯 對手使用 fox 系列 PNG 圖片 - 放大容器顯示頭部
           <motion.div
             className="relative flex items-center justify-center overflow-hidden"
@@ -173,7 +176,7 @@ export function AnimatedAvatar({ name, status, size = 'md', showBadge = true, pr
             transition={{ duration: 0.2 }}
           >
             <img
-              src={expression.imageUrl}
+              src={foxExpression.imageUrl}
               alt="Fox Opponent"
               className="h-full w-full rounded-xl"
               style={{

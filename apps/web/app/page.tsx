@@ -73,15 +73,20 @@ export default function Home() {
         if (error) {
           // 檢查是否為認證錯誤（401/403/406）
           // 406 (Not Acceptable) 通常表示請求格式問題，但也可能是認證問題
+          // ✅ 修復：安全訪問 error 屬性，避免 TypeScript 錯誤
+          const errorCode = error.code as string | undefined
+          const errorMessage = error.message as string | undefined
+          const errorStatus = (error as { status?: number }).status
+          
           const isAuthError = 
-            error.code === 'PGRST301' || 
-            error.status === 401 || 
-            error.status === 403 ||
-            error.status === 406 || // Not Acceptable - 可能是認證問題
-            error.message?.includes('JWT') || 
-            error.message?.includes('authentication') ||
-            error.message?.includes('Unauthorized') ||
-            error.message?.includes('Not Acceptable')
+            errorCode === 'PGRST301' || 
+            errorStatus === 401 || 
+            errorStatus === 403 ||
+            errorStatus === 406 || // Not Acceptable - 可能是認證問題
+            errorMessage?.includes('JWT') || 
+            errorMessage?.includes('authentication') ||
+            errorMessage?.includes('Unauthorized') ||
+            errorMessage?.includes('Not Acceptable')
           
           if (isAuthError) {
             console.warn('[Home] Authentication error, redirecting to login:', error)

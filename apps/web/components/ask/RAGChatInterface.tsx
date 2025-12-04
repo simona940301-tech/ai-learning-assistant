@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
-import { useChat, Chat, DefaultChatTransport } from '@ai-sdk/react'
+import { useState, useEffect, useRef } from 'react'
 import { Sparkles, Send, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { RAGMarkdownRenderer } from '@/components/ask/RAGMarkdownRenderer'
+import { useRAGChat } from '@/lib/hooks/useRAGChat'
 
 interface RAGChatInterfaceProps {
     refreshKey?: string
@@ -27,40 +27,29 @@ export default function RAGChatInterface({
     contextFileIds = [],
     onChatReady
 }: RAGChatInterfaceProps) {
-    // Local input state (managed manually)
-    const [input, setInput] = useState('')
     const [validationError, setValidationError] = useState<string | null>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
-    // Create Chat instance with custom transport
-    const chatInstance = useMemo(() => {
-        const transport = new DefaultChatTransport({
-            api: '/api/rag/chat',
-            body: {
-                contextFileIds: contextFileIds
-            }
-        })
-
-        return new Chat({
-            messages: [],
-            transport
-        })
-    }, [contextFileIds.join(',')])
-
-    // AI SDK Chat Hook (v2.0 API)
-    const chat = useChat({
-        chat: chatInstance,
+    // Use our custom RAG Chat Hook
+    const {
+        messages,
+        input,
+        handleInputChange,
+        handleSubmit: submitMessage,
+        append,
+        isLoading
+    } = useRAGChat({
+        api: '/api/rag/chat',
+        contextFileIds,
+        onFinish: () => {
+            scrollToBottom()
+        },
         onError: (error: Error) => {
             console.error('[RAGChatInterface] Chat error:', error)
             setValidationError('發生錯誤，請稍後再試')
-        },
-        onFinish: () => {
-            scrollToBottom()
+            setTimeout(() => setValidationError(null), 3000)
         }
     })
-
-    const { messages, sendMessage, status } = chat
-    const isLoading = status === 'streaming'
 
     // Scroll to bottom on new messages
     const scrollToBottom = () => {
@@ -75,9 +64,9 @@ export default function RAGChatInterface({
     // Notify ready (only on mount)
     useEffect(() => {
         onChatReady?.()
-    }, [])
+    }, [onChatReady])
 
-    // Handle Submit
+    // Handle Submit with validation
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
 
@@ -90,15 +79,7 @@ export default function RAGChatInterface({
         }
 
         setValidationError(null)
-
-        // Send message using new API
-        await sendMessage({
-            role: 'user',
-            content: input.trim()
-        })
-
-        // Clear input
-        setInput('')
+        await submitMessage(e)
     }
 
     const handleSuggestedClick = async (question: string) => {
@@ -110,7 +91,7 @@ export default function RAGChatInterface({
             return
         }
 
-        await sendMessage({
+        append({
             role: 'user',
             content: question
         })
@@ -226,7 +207,7 @@ export default function RAGChatInterface({
 
                     <input
                         value={input}
-                        onChange={(e) => setInput(e.target.value)}
+                        onChange={handleInputChange}
                         placeholder={contextFileIds.length > 0 ? "輸入問題..." : "請先選擇文件..."}
                         disabled={contextFileIds.length === 0 || isLoading}
                         className={cn(

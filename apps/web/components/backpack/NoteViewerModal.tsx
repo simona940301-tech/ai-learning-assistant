@@ -37,7 +37,8 @@ export function NoteViewerModal({ isOpen, onClose, file }: NoteViewerModalProps)
             <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 gap-0 overflow-hidden bg-background/95 backdrop-blur-xl border-none shadow-2xl [&>button]:hidden">
                 <DialogTitle className="sr-only">筆記內容檢視</DialogTitle>
                 <DialogDescription className="sr-only">
-                    檢視筆記 {file.title || file.file_name || '未命名'}，科目 {file.subject}
+                    {/* ✅ 修復：使用正確的屬性名 title */}
+                    檢視筆記 {file.title || '未命名'}，科目 {file.subject}
                 </DialogDescription>
                 {/* Header - Simplified: Only Date and Subject */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-border/40 bg-muted/20">
@@ -114,7 +115,8 @@ export function NoteViewerModal({ isOpen, onClose, file }: NoteViewerModalProps)
                                         // 如果這個段落是「正確答案:」格式，且前一個標題是「正確答案」，則不顯示（已在 h2 中合併）
                                         const isAnswerText = /正確答案[：:]\s*\(?[A-D]\)?/.test(text)
                                         if (isAnswerText) {
-                                            let prevSibling = node?.previousSibling
+                                            // ✅ 修復：使用類型斷言處理 AST 節點的 previousSibling
+                                            let prevSibling = (node as any)?.previousSibling
                                             while (prevSibling) {
                                                 if (prevSibling.type === 'heading' && prevSibling.depth === 2) {
                                                     const headingText = String(prevSibling.children?.[0]?.value || '')
@@ -129,19 +131,20 @@ export function NoteViewerModal({ isOpen, onClose, file }: NoteViewerModalProps)
                                         }
 
                                         // 檢查前一個節點是否是「題幹」標題
-                                        let prevSibling = node?.previousSibling
+                                        // ✅ 修復：使用類型斷言處理 AST 節點
+                                        let prevSibling2 = (node as any)?.previousSibling
                                         let isAfterQuestionStem = false
 
                                         // 向上查找最近的 h2 標題
-                                        while (prevSibling) {
-                                            if (prevSibling.type === 'heading' && prevSibling.depth === 2) {
-                                                const headingText = String(prevSibling.children?.[0]?.value || '')
+                                        while (prevSibling2) {
+                                            if (prevSibling2.type === 'heading' && prevSibling2.depth === 2) {
+                                                const headingText = String(prevSibling2.children?.[0]?.value || '')
                                                 if (headingText.includes('題幹') || headingText.includes('題目')) {
                                                     isAfterQuestionStem = true
                                                     break
                                                 }
                                             }
-                                            prevSibling = prevSibling.previousSibling
+                                            prevSibling2 = prevSibling2.previousSibling
                                         }
 
                                         // 檢查內容是否看起來像題目（包含選項或問號）

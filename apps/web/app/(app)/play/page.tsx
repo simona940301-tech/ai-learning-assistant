@@ -511,7 +511,7 @@ function PlayPageContent() {
           opponentName="對手"
           opponentStatus={battleState.opponentStatus || 'idle'}
           opponentAnswer={battleState.opponentAnswer || null}
-          playerPresetId={userStatus?.presetId}
+          playerPresetId={userStatus?.presetId ?? undefined}
         />
       )
     }
@@ -591,7 +591,7 @@ function PlayPageContent() {
 
   return (
     <>
-      <AppBar title="知識對戰" showEnergy={true} maxWidthClass="max-w-3xl" />
+      <AppBar title="知識對戰" maxWidthClass="max-w-3xl" />
 
       {/* Mobile-first: 減少 padding，確保在 360×800、390×844 等尺寸下完整顯示 */}
       <main className="mx-auto max-w-3xl px-4 py-4 pb-20 md:py-10 md:pb-24">

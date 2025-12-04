@@ -89,7 +89,7 @@ function CommunityPageContent() {
 
   return (
     <>
-      <AppBar title="Community" showEnergy={false} />
+      <AppBar title="Community" />
 
       <main className="mx-auto max-w-lg">
         {/* Removed Tabs - only showing latest posts */}

@@ -151,7 +151,7 @@ export default function HomePage() {
 
   return (
     <>
-      <AppBar title="首頁" showEnergy={false} />
+      <AppBar title="首頁" />
 
       <main className="mx-auto max-w-lg px-4 pt-6 pb-24 bg-[#FFFBF0] min-h-screen">
         {isLoading ? (

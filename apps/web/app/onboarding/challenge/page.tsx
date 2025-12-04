@@ -62,6 +62,7 @@ type AnonymousData = {
   results?: Result[]
   userLevel?: number
   startedAt?: string
+  avatarId?: string  // ✅ 新增 avatarId 支援
   goalData?: {
     target_university?: string
     target_department?: string
@@ -69,6 +70,19 @@ type AnonymousData = {
     current_grade?: string
     mock_exam_level?: number
   }
+}
+
+// ✅ API 返回的原始題目格式（snake_case）
+type ApiQuestion = {
+  id: string
+  question_text: string
+  option_a: string
+  option_b: string
+  option_c: string
+  option_d: string
+  correct_answer: 'A' | 'B' | 'C' | 'D'
+  difficulty_level: number
+  explanation?: string
 }
 
 export default function OnboardingChallengePage() {
@@ -121,7 +135,9 @@ export default function OnboardingChallengePage() {
                 setPlayerAvatarId(data.avatarId)
               }
               // 如果已有進行中的測驗，恢復狀態
-              if (data.results.length > 0 && data.results.length < 7) {
+              // ✅ 修復：安全訪問 data.results
+              const resultsArray = data.results || []
+              if (resultsArray.length > 0 && resultsArray.length < 7) {
                 // 可以選擇恢復或重新開始
                 // 這裡選擇重新開始以簡化流程
               }
@@ -214,16 +230,19 @@ export default function OnboardingChallengePage() {
         const data = await response.json()
 
         if (data.success && data.questions && data.questions.length >= 7) {
+          // ✅ 明確類型：API 返回的是 ApiQuestion[]
+          const apiQuestions = data.questions as ApiQuestion[]
+          
           // 先對 API 返回的題目去重（以防萬一）
-          const uniqueApiQuestions = Array.from(
-            new Map(data.questions.map((q: any) => [q.id, q])).values()
+          const uniqueApiQuestions: ApiQuestion[] = Array.from(
+            new Map(apiQuestions.map((q) => [q.id, q])).values()
           )
 
           // 根據難度序列分配題目
-          const questionsByDifficulty: Record<number, Question[]> = {}
+          const questionsByDifficulty: Record<number, ApiQuestion[]> = {}
           uniqueDifficulties.forEach(diff => {
             questionsByDifficulty[diff] = uniqueApiQuestions.filter(
-              (q: any) => q.difficulty_level === diff
+              (q) => q.difficulty_level === diff
             )
           })
 
@@ -231,14 +250,14 @@ export default function OnboardingChallengePage() {
           const selectedQuestionIds = new Set<string>()
           const fetchedQuestions: Question[] = difficultySequence.map((diff, index) => {
             // 先從該難度的題目中選擇未選過的
-            let available = (questionsByDifficulty[diff] || []).filter(
-              (q: any) => !selectedQuestionIds.has(q.id)
+            let available: ApiQuestion[] = (questionsByDifficulty[diff] || []).filter(
+              (q) => !selectedQuestionIds.has(q.id)
             )
             
             // 如果該難度的題目都用完了，從所有題目中選擇未選過的
             if (available.length === 0) {
               available = uniqueApiQuestions.filter(
-                (q: any) => !selectedQuestionIds.has(q.id)
+                (q) => !selectedQuestionIds.has(q.id)
               )
             }
             
@@ -255,6 +274,7 @@ export default function OnboardingChallengePage() {
             // 記錄已選題目
             selectedQuestionIds.add(selected.id)
             
+            // ✅ 轉換 API 格式（snake_case）到前端格式（camelCase）
             return {
               id: selected.id,
               questionText: selected.question_text,
@@ -561,8 +581,9 @@ export default function OnboardingChallengePage() {
           setTimeout(() => reject(new Error('Database update timeout')), 5000)
         )
         
-        const result = await Promise.race([updatePromise, timeoutPromise])
-        const updateError = result?.error
+        // ✅ 修復：正確處理 Promise.race 的類型
+        const result = await Promise.race([updatePromise, timeoutPromise]) as { error?: unknown } | null
+        const updateError = result && typeof result === 'object' && 'error' in result ? result.error : null
 
         if (updateError) {
           console.error('[Challenge] Failed to update session:', updateError)
@@ -732,7 +753,7 @@ export default function OnboardingChallengePage() {
           opponentName="AI 教練"
           opponentStatus={aiStatus}
           opponentAnswer={aiAnswer}
-          playerPresetId={playerAvatarId}
+          playerPresetId={playerAvatarId ?? undefined}
         />
       </div>
     </PlayMockProvider>

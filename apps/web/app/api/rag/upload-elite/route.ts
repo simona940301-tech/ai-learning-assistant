@@ -338,47 +338,35 @@ async function processCompleteAnalysisInBackground(
         const endSubjectDetect = telemetry.startStage('subject_detection')
         const endUltimateAnalysis = telemetry.startStage('ultimate_analysis')
 
-        let quickPreview: QuickPreview
-        let ultimateResult: UltimateAnalysisResult
+        // ✅ 最頂尖修復：使用 const 搭配 Promise.all 直接解構
+        console.log('[Background] 📡 Calling Gemini API for parallel analysis...')
+        const analysisStartTime = Date.now()
 
-        try {
-            console.log('[Background] 📡 Calling Gemini API for parallel analysis...')
-            const analysisStartTime = Date.now()
-
-            let quickPreview, ultimateResult;
-            [quickPreview, ultimateResult] = await Promise.all([
-                generateQuickPreview(extractedText).catch(err => {
-                    console.error('[Background] ❌ QuickPreview failed:', {
-                        error: err instanceof Error ? err.message : String(err),
-                        stack: err instanceof Error ? err.stack : undefined
-                    })
-                    throw new Error(`快速預覽生成失敗: ${err instanceof Error ? err.message : String(err)}`)
-                }),
-                generateUltimateAnalysis(extractedText, undefined).catch(err => {
-                    console.error('[Background] ❌ UltimateAnalysis failed:', {
-                        error: err instanceof Error ? err.message : String(err),
-                        stack: err instanceof Error ? err.stack : undefined
-                    })
-                    throw new Error(`完整分析生成失敗: ${err instanceof Error ? err.message : String(err)}`)
+        const [quickPreview, ultimateResult] = await Promise.all([
+            generateQuickPreview(extractedText).catch(err => {
+                console.error('[Background] ❌ QuickPreview failed:', {
+                    error: err instanceof Error ? err.message : String(err),
+                    stack: err instanceof Error ? err.stack : undefined
                 })
-            ])
+                throw new Error(`快速預覽生成失敗: ${err instanceof Error ? err.message : String(err)}`)
+            }),
+            generateUltimateAnalysis(extractedText, undefined).catch(err => {
+                console.error('[Background] ❌ UltimateAnalysis failed:', {
+                    error: err instanceof Error ? err.message : String(err),
+                    stack: err instanceof Error ? err.stack : undefined
+                })
+                throw new Error(`完整分析生成失敗: ${err instanceof Error ? err.message : String(err)}`)
+            })
+        ])
 
-            const analysisDuration = Number(Date.now()) - Number(analysisStartTime)
-            console.log(`[Background] ✅ Parallel analysis completed in ${analysisDuration}ms`)
-            console.log(`[Background] 📊 Results:`, {
-                subject: quickPreview.subject,
-                summaryLength: quickPreview.summary.length,
-                topicsCount: quickPreview.topics.length,
-                fullMarkdownLength: ultimateResult.fullMarkdown.length
-            })
-        } catch (parallelError) {
-            console.error('[Background] ❌ CRITICAL: Parallel analysis failed:', {
-                error: parallelError instanceof Error ? parallelError.message : String(parallelError),
-                stack: parallelError instanceof Error ? parallelError.stack : undefined,
-                duration: `${Date.now() - startTime}ms`
-            })
-            throw parallelError
-        }
+        const analysisDuration = Number(Date.now()) - Number(analysisStartTime)
+        console.log(`[Background] ✅ Parallel analysis completed in ${analysisDuration}ms`)
+        console.log(`[Background] 📊 Results:`, {
+            subject: quickPreview.subject,
+            summaryLength: quickPreview.summary.length,
+            topicsCount: quickPreview.topics.length,
+            fullMarkdownLength: ultimateResult.fullMarkdown.length
+        })
 
         endSubjectDetect()
         endUltimateAnalysis()

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Loader2, BookmarkPlus, Check, Sparkles, FileText } from 'lucide-react'
 import { experimental_useObject as useObject } from '@ai-sdk/react'
-import { FileAnalysis } from '@/lib/types'
+import { FileAnalysis, CoreConcept, ExamQuestion } from '@/lib/types'
 import { detectSubject } from '@/lib/utils/detect-subject'
 import { RAGMarkdownRenderer } from './RAGMarkdownRenderer'
 import { cn } from '@/lib/utils'
@@ -164,16 +164,18 @@ export default function ProgressiveAnalysisCard({
     useEffect(() => {
         if (!object) return
 
+        // ✅ 修復：使用類型斷言處理 streaming 數據的不完整類型
         const transformed: FileAnalysis = {
             id: object.analysisID || documentId || 'analysis',
             status: object.examPrediction && object.examPrediction.length > 0 ? 'prediction_ready' : 'analysis_ready',
             processingTimeMs: 0,
             quickSummary: object.summary,
             detectedSubject: object.subject,
-            detectedTopics: object.topics,
-            coreConcepts: object.keyConcepts,
+            detectedTopics: object.topics?.filter((t): t is string => Boolean(t)),
+            // ✅ 使用 as unknown as 進行安全類型轉換，因為 streaming 數據類型是 PartialObject
+            coreConcepts: object.keyConcepts?.filter(Boolean) as unknown as CoreConcept[] | undefined,
             structuredNotes: object.summary,
-            examPredictions: object.examPrediction,
+            examPredictions: object.examPrediction?.filter(Boolean) as unknown as ExamQuestion[] | undefined,
         }
 
         setAnalysis(transformed)
@@ -275,27 +277,30 @@ export default function ProgressiveAnalysisCard({
     const isAnalyzing = isLoading && !analysis
     return (
         <div className="w-full max-w-4xl mx-auto space-y-8">
-            {/* Status Header - Minimalist */}
-            <div className="flex items-center justify-between px-1">
-                <div className="flex items-center gap-3">
-                    <div className={cn(
-                        "w-2 h-2 rounded-full transition-colors duration-500",
-                        isComplete ? "bg-green-500" : "bg-blue-500 animate-pulse"
-                    )} />
-                    <span className="text-sm font-medium text-muted-foreground">
-                        {isComplete ? '分析完成' : '正在分析...'}
-                    </span>
+            {/* Status Header with Progress */}
+            <div className="space-y-3">
+                <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center gap-3">
+                        <div className={cn(
+                            "w-2 h-2 rounded-full transition-colors duration-500",
+                            isComplete ? "bg-green-500" : "bg-blue-500 animate-pulse"
+                        )} />
+                        <span className="text-sm font-medium text-muted-foreground">
+                            {isLoading && !analysis?.structuredNotes && '步驟 1/2：生成重點統整'}
+                            {analysis?.structuredNotes && !isComplete && '步驟 2/2：生成考題預測'}
+                            {isComplete && '✓ 分析完成'}
+                        </span>
 
-                    {/* Show document count if multiple */}
-                    {displayDocuments.length > 1 && (
-                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20">
-                            <FileText className="w-3.5 h-3.5 text-blue-600" />
-                            <span className="text-xs font-medium text-blue-600">
-                                {displayDocuments.length} 個文件
-                            </span>
-                        </div>
-                    )}
-                </div>
+                        {/* Show document count if multiple */}
+                        {displayDocuments.length > 1 && (
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20">
+                                <FileText className="w-3.5 h-3.5 text-blue-600" />
+                                <span className="text-xs font-medium text-blue-600">
+                                    {displayDocuments.length} 個文件
+                                </span>
+                            </div>
+                        )}
+                    </div>
 
                 {hasContent && (
                     <button
@@ -315,20 +320,40 @@ export default function ProgressiveAnalysisCard({
                 )}
             </div>
 
-            {/* Document List - Show when multiple documents */}
-            {displayDocuments.length > 1 && (
+                {/* Progress Bar */}
+                {!isComplete && (
+                    <div className="px-1">
+                        <div className="h-1 bg-gray-200 rounded-full overflow-hidden">
+                            <div
+                                className={cn(
+                                    "h-full bg-blue-500 transition-all duration-500",
+                                    analysis?.quickSummary && "w-1/2",
+                                    analysis?.structuredNotes && "w-3/4",
+                                    !analysis && "w-1/4 animate-pulse"
+                                )}
+                            />
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Document Source Chips - Always show */}
+            {displayDocuments.length > 0 && (
                 <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="flex flex-wrap gap-2 px-1"
                 >
+                    <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                        <FileText className="w-3 h-3" />
+                        來源：
+                    </span>
                     {displayDocuments.map((docName, idx) => (
                         <div
                             key={idx}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card border border-border text-sm"
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-xs font-medium text-blue-700 dark:text-blue-300"
                         >
-                            <FileText className="w-3.5 h-3.5 text-muted-foreground" />
-                            <span className="text-muted-foreground">{docName}</span>
+                            <span>{docName}</span>
                         </div>
                     ))}
                 </motion.div>
@@ -408,19 +433,22 @@ export default function ProgressiveAnalysisCard({
                         <h3 className="text-lg font-semibold text-[#6C4A2D]">考題預測</h3>
                     </div>
                     <div className="space-y-3">
-                        {analysis.examPredictions!.map((item, idx) => (
+                        {/* ✅ 修復：安全訪問 examPredictions，使用 optional chaining */}
+                        {analysis?.examPredictions?.map((item, idx) => (
                             <div
                                 key={idx}
                                 className="rounded-[10px] bg-[#F8F1E7] px-5 py-5 space-y-4"
                             >
-                                {item.type === 'question_set' || (item as any).questions ? (
+                                {/* ✅ 修復：使用 'in' 運算符檢查屬性是否存在 */}
+                                {'type' in item && (item as any).type === 'question_set' || (item as any).questions ? (
                                     <>
                                         <div className="text-sm font-semibold text-[#6C4A2D]">
                                             題組 {idx + 1}
                                         </div>
-                                        {'context' in item && item.context && (
+                                        {/* ✅ 修復：確保 context 是字符串 */}
+                                        {'context' in item && typeof (item as any).context === 'string' && (
                                             <p className="text-[16px] leading-[1.6] tracking-[0.2px] text-[#6C4A2F]">
-                                                {item.context}
+                                                {(item as any).context}
                                             </p>
                                         )}
                                         {'questions' in item && Array.isArray(item.questions) && (

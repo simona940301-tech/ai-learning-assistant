@@ -38,7 +38,8 @@ function useChickBehaviorPrompts() {
     }
 
     // 🟡 中優先級：心情差 → 提示去做錯題複習
-    if (emotionState === 'sad' || emotionState === 'cold') {
+    // ✅ 修復：使用正確的 ChickEmotion 類型值（'cold' | 'distant' | 'sick'）
+    if (emotionState === 'cold' || emotionState === 'distant' || emotionState === 'sick') {
       prompts.push({
         condition: true,
         message: '心情有點糟... 去做 5 題錯題複習讓我開心一點吧！',
