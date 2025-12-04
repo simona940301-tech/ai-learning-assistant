@@ -32,6 +32,21 @@ const SaveFromContractSchema = z.object({
   }),
 })
 
+// Enhanced schema with conversation history support
+const SaveEnhancedSchema = z.object({
+  user_id: z.string().min(1),
+  title: z.string().min(1),
+  subject: z.string().min(1),
+  content: z.string().min(1),
+  include_conversation: z.boolean().optional(),
+  conversation_history: z.array(z.object({
+    id: z.string(),
+    role: z.enum(['user', 'assistant', 'system']),
+    content: z.string(),
+    createdAt: z.string().optional(),
+  })).optional(),
+})
+
 // Legacy schema for backward compatibility
 const SaveLegacySchema = z.object({
   user_id: z.string().min(1),
@@ -70,7 +85,55 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
-    // Try Contract v2 format first
+    // Try Enhanced format first (with conversation history)
+    const enhancedParse = SaveEnhancedSchema.safeParse(body)
+    if (enhancedParse.success) {
+      const { user_id, title, subject, content, include_conversation, conversation_history } = enhancedParse.data
+      // SECURITY: Always use authenticated user ID, ignore client-provided user_id
+      const finalUserId = user.id
+
+      // Build markdown content with conversation if requested
+      let finalContent = content
+
+      if (include_conversation && conversation_history && conversation_history.length > 0) {
+        finalContent += '\n\n---\n\n## 📝 AI 問答記錄\n\n'
+
+        for (const message of conversation_history) {
+          if (message.role === 'user') {
+            finalContent += `### 問：\n${message.content}\n\n`
+          } else if (message.role === 'assistant') {
+            finalContent += `### 答：\n${message.content}\n\n`
+          }
+        }
+      }
+
+      // Save to notebook_entries
+      const supabase = getSupabaseClient(request)
+      const { data, error } = await supabase
+        .from('notebook_entries')
+        .insert({
+          user_id: finalUserId,
+          title,
+          content_md: finalContent,
+          source_type: 'summary',
+          tags: [subject],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single()
+
+      if (error) {
+        throw new Error(`Failed to save to notebook: ${error.message}`)
+      }
+
+      const latency = Date.now() - startTime
+      trackAPICall('/api/backpack/save', latency, true)
+
+      return NextResponse.json({ data, saved: true })
+    }
+
+    // Try Contract v2 format
     const contractParse = SaveFromContractSchema.safeParse(body)
     if (contractParse.success) {
       const { user_id, contract_response } = contractParse.data

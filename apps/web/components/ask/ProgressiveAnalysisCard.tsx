@@ -20,6 +20,7 @@ interface ProgressiveAnalysisCardProps {
     fileName?: string
     onAnalysisUpdate?: (analysis: FileAnalysis) => void
     onAnalysisComplete?: (result: any) => void
+    hideSaveButton?: boolean
 }
 
 const SUBJECT_KEYWORDS: Array<{ tag: SubjectTag; keywords: string[] }> = [
@@ -52,13 +53,15 @@ function normalizeOptionText(raw?: string): string {
     return raw.replace(/^\s*[A-D][\.\、\)]\s+/i, '').trim()
 }
 
-// Ensure multi-select questions render exactly 5 options (pad or trim) and never blank
+// Normalize options: remove empty ones, optionally cap at 5 for multi-select
 function normalizeOptions(options: string[] = [], isMulti: boolean): string[] {
-    if (!isMulti) return options
-    const arr = [...options]
-    if (arr.length > 5) return arr.slice(0, 5)
-    while (arr.length < 5) arr.push('（缺少選項）')
-    return arr.map(opt => opt && opt.trim() ? opt : '（缺少選項）')
+    // Filter out empty options
+    const validOptions = options.filter(opt => opt && opt.trim())
+
+    if (!isMulti) return validOptions
+
+    // For multi-select, cap at 5 but don't pad
+    return validOptions.slice(0, 5)
 }
 
 export default function ProgressiveAnalysisCard({
@@ -69,7 +72,8 @@ export default function ProgressiveAnalysisCard({
     initialText,
     fileName,
     onAnalysisUpdate,
-    onAnalysisComplete
+    onAnalysisComplete,
+    hideSaveButton = false
 }: ProgressiveAnalysisCardProps) {
     const hasStartedRef = useRef(false)
     const completionFiredRef = useRef(false)
@@ -79,6 +83,7 @@ export default function ProgressiveAnalysisCard({
     const [saveSuccess, setSaveSuccess] = useState(false)
     const [documentNames, setDocumentNames] = useState<Record<string, string>>({})
     const [showSubjectDialog, setShowSubjectDialog] = useState(false)
+    const predictionsReady = (analysis?.examPredictions?.length ?? 0) > 0
 
     const { object, error: streamError, isLoading, submit } = useObject({
         api: '/api/rag/analyze-object',
@@ -182,11 +187,15 @@ export default function ProgressiveAnalysisCard({
         setError(null)
         onAnalysisUpdate?.(transformed)
 
-        if (!completionFiredRef.current && (transformed.examPredictions?.length || transformed.structuredNotes)) {
+        // ✅ 修復內容截斷：只在流式傳輸完全結束後才調用 onAnalysisComplete
+        // isLoading === false 表示流已完成，此時 object.summary 包含完整內容
+        if (!completionFiredRef.current && !isLoading && (transformed.examPredictions?.length || transformed.structuredNotes)) {
+            console.log('[ProgressiveAnalysisCard] 🎯 Stream完成，觸發 onAnalysisComplete')
+            console.log('[ProgressiveAnalysisCard] 📄 完整內容長度:', transformed.structuredNotes?.length)
             completionFiredRef.current = true
             onAnalysisComplete?.(transformed)
         }
-    }, [object, documentId, onAnalysisComplete, onAnalysisUpdate])
+    }, [object, documentId, isLoading, onAnalysisComplete, onAnalysisUpdate])
 
     // Surface stream errors
     useEffect(() => {
@@ -277,56 +286,53 @@ export default function ProgressiveAnalysisCard({
     const isAnalyzing = isLoading && !analysis
     return (
         <div className="w-full max-w-4xl mx-auto space-y-8">
-            {/* Status Header with Progress */}
+            {/* Status Header - Merged source chips with save button */}
             <div className="space-y-3">
-                <div className="flex items-center justify-between px-1">
-                    <div className="flex items-center gap-3">
-                        <div className={cn(
-                            "w-2 h-2 rounded-full transition-colors duration-500",
-                            isComplete ? "bg-green-500" : "bg-blue-500 animate-pulse"
-                        )} />
-                        <span className="text-sm font-medium text-muted-foreground">
-                            {isLoading && !analysis?.structuredNotes && '步驟 1/2：生成重點統整'}
-                            {analysis?.structuredNotes && !isComplete && '步驟 2/2：生成考題預測'}
-                            {isComplete && '✓ 分析完成'}
-                        </span>
+                <div className="flex items-center justify-between gap-4 px-1">
+                    {/* Left: Source chips */}
+                    {displayDocuments.length > 0 && (
+                        <div className="flex items-center gap-2 flex-wrap flex-1">
+                            <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                                <FileText className="w-3 h-3" />
+                                來源:
+                            </span>
+                            {displayDocuments.map((docName, idx) => (
+                                <div
+                                    key={idx}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F8F1E7] border border-[#E8DCC9] text-xs font-medium text-[#6C4A2D]"
+                                >
+                                    <span>{docName}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
 
-                        {/* Show document count if multiple */}
-                        {displayDocuments.length > 1 && (
-                            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20">
-                                <FileText className="w-3.5 h-3.5 text-blue-600" />
-                                <span className="text-xs font-medium text-blue-600">
-                                    {displayDocuments.length} 個文件
-                                </span>
-                            </div>
-                        )}
-                    </div>
+                    {/* Right: Save button - only show if not hidden */}
+                    {hasContent && !hideSaveButton && (
+                        <button
+                            onClick={handleSaveToNotebook}
+                            disabled={isSaving}
+                            className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary/50 hover:bg-secondary text-sm font-medium transition-all duration-300 disabled:opacity-50 shrink-0"
+                        >
+                            {isSaving ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : saveSuccess ? (
+                                <Check className="w-4 h-4 text-green-600" />
+                            ) : (
+                                <BookmarkPlus className="w-4 h-4" />
+                            )}
+                            {saveSuccess ? '已儲存' : '存到筆記'}
+                        </button>
+                    )}
+                </div>
 
-                {hasContent && (
-                    <button
-                        onClick={handleSaveToNotebook}
-                        disabled={isSaving}
-                        className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary/50 hover:bg-secondary text-sm font-medium transition-all duration-300 disabled:opacity-50"
-                    >
-                        {isSaving ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : saveSuccess ? (
-                            <Check className="w-4 h-4 text-green-600" />
-                        ) : (
-                            <BookmarkPlus className="w-4 h-4" />
-                        )}
-                        {saveSuccess ? '已儲存' : '存到筆記'}
-                    </button>
-                )}
-            </div>
-
-                {/* Progress Bar */}
+                {/* Progress Bar - Only show during analysis */}
                 {!isComplete && (
                     <div className="px-1">
-                        <div className="h-1 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="h-1.5 bg-[#F1E8DB] rounded-full overflow-hidden shadow-inner">
                             <div
                                 className={cn(
-                                    "h-full bg-blue-500 transition-all duration-500",
+                                    "h-full bg-gradient-to-r from-[#8C6B4A] to-[#6C4A2D] transition-all duration-500 shadow-sm",
                                     analysis?.quickSummary && "w-1/2",
                                     analysis?.structuredNotes && "w-3/4",
                                     !analysis && "w-1/4 animate-pulse"
@@ -336,28 +342,6 @@ export default function ProgressiveAnalysisCard({
                     </div>
                 )}
             </div>
-
-            {/* Document Source Chips - Always show */}
-            {displayDocuments.length > 0 && (
-                <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-wrap gap-2 px-1"
-                >
-                    <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                        <FileText className="w-3 h-3" />
-                        來源：
-                    </span>
-                    {displayDocuments.map((docName, idx) => (
-                        <div
-                            key={idx}
-                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-xs font-medium text-blue-700 dark:text-blue-300"
-                        >
-                            <span>{docName}</span>
-                        </div>
-                    ))}
-                </motion.div>
-            )}
 
             {/* Content Area - Minimalist & Unified */}
             <AnimatePresence mode="wait">
@@ -405,8 +389,8 @@ export default function ProgressiveAnalysisCard({
                         className="flex flex-col items-center justify-center py-24 space-y-6 text-center"
                     >
                         <div className="relative">
-                            <div className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full animate-pulse" />
-                            <Loader2 className="w-12 h-12 text-blue-500 animate-spin relative z-10" />
+                            <div className="absolute inset-0 rounded-full bg-[#6C4A2D]/20 blur-xl animate-pulse" />
+                            <Loader2 className="relative z-10 h-12 w-12 text-[#6C4A2D] animate-spin" />
                         </div>
                         <div className="space-y-2">
                             <h3 className="text-lg font-medium text-foreground">正在深入分析文件</h3>
@@ -419,6 +403,16 @@ export default function ProgressiveAnalysisCard({
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            <div className="rounded-2xl border border-[#E8DCC9] bg-[#FCF6EE] px-4 py-3 flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-center gap-2 text-sm font-semibold text-[#6C4A2D]">
+                    <Sparkles className="w-4 h-4" />
+                    <span>{predictionsReady ? '考題預測完成' : '考題預測生成中'}</span>
+                </div>
+                <span className="text-xs text-[#8C6B4A]">
+                    {predictionsReady ? '可以開始練習 AI 命題' : 'AI 正在推演命題趨勢'}
+                </span>
+            </div>
 
             {/* Exam Predictions */}
             {(analysis?.examPredictions?.length ?? 0) > 0 && (
@@ -566,7 +560,7 @@ export default function ProgressiveAnalysisCard({
                 open={showSubjectDialog}
                 onOpenChange={setShowSubjectDialog}
                 detectedSubject={analysis?.detectedSubject || subject}
-                confidence={0.8} // TODO: Get actual confidence from analysis
+                confidence={0.8}
                 onConfirm={handleConfirmedSave}
                 isLoading={isSaving}
             />

@@ -6,12 +6,13 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { RAGMarkdownRenderer } from '@/components/ask/RAGMarkdownRenderer'
-import { useRAGChat } from '@/lib/hooks/useRAGChat'
+import { useRAGChat, type RAGMessage } from '@/lib/hooks/useRAGChat'
 
 interface RAGChatInterfaceProps {
     refreshKey?: string
     contextFileIds?: string[]
     onChatReady?: () => void
+    onMessagesUpdate?: (messages: RAGMessage[]) => void
 }
 
 const SUGGESTED_QUESTIONS = [
@@ -25,7 +26,8 @@ const SUGGESTED_QUESTIONS = [
 export default function RAGChatInterface({
     refreshKey,
     contextFileIds = [],
-    onChatReady
+    onChatReady,
+    onMessagesUpdate
 }: RAGChatInterfaceProps) {
     const [validationError, setValidationError] = useState<string | null>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -56,10 +58,12 @@ export default function RAGChatInterface({
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
 
-    // Scroll on messages change
+    // Scroll on messages change and notify parent
     useEffect(() => {
         scrollToBottom()
-    }, [messages])
+        // Notify parent component of message updates
+        onMessagesUpdate?.(messages)
+    }, [messages, onMessagesUpdate])
 
     // Notify ready (only on mount)
     useEffect(() => {

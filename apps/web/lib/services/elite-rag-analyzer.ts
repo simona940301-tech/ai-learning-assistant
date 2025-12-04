@@ -74,7 +74,7 @@ export async function generateStreamedAnalysis(
    - 你會收到多份文件，每份文件都有 \`<document index="N" filename="...">\` 標籤。
    - **絕對禁止**只總結第一份文件。
    - 必須**交叉比對**所有文件的內容。如果不同文件提到相同概念，請合併說明；如果有衝突或互補，請明確指出。
-   - 在解釋關鍵概念時，請標註來源，例如：*(來源: math_ch1.pdf)* 或 *(綜合整理)*。
+   - **重要**: 不要在內容文字中加入來源標註 (如 "來源: xxx.pdf")，請使用結構化的 sources 欄位。
 
 2. **動態豐富度 (Dynamic Richness)**:
    - **請根據輸入文件的內容長度與深度，自由調整輸出的豐富度。**
@@ -96,13 +96,14 @@ export async function generateStreamedAnalysis(
 - 這是一份跨文件的綜合摘要。
 - 主題重點：列出跨文件的核心主題 (數量不限，視內容豐富度而定，通常 3-8 點)。
 - 整合性：說明這些文件如何共同構成一個完整的知識體系。
+- **注意**: 不要在摘要文字中加入 "(來源: xxx.pdf)" 這類標註。
 
 ### 3. Key Concepts (Cross-Document)
 - concept: 核心知識點
-- explanation: 定義與詳細說明 (需整合多來源，若原文內容豐富，請提供詳盡解釋)
+- explanation: 定義與詳細說明 (需整合多來源，若原文內容豐富，請提供詳盡解釋)。**不要在 explanation 文字中加入來源標註**。
 - importance: 高/中/低
 - curriculumCode: 課綱代碼 (如: 數A-11-1)
-- sources: 來源文件列表 (如: ["math_ch1.pdf", "math_ch2.pdf"])，若該概念出現在多份文件中請全部列出
+- sources: 來源文件列表 (如: ["math_ch1.pdf", "math_ch2.pdf"])，若該概念出現在多份文件中請全部列出。**使用此欄位來標註來源，而非在文字中標註**。
 
 ### 4. Exam Prediction (Hybrid)
 - 必須包含至少 1 個 **跨章節題組 (Question Set)**。
@@ -118,12 +119,13 @@ export async function generateStreamedAnalysis(
 {
   "subject": "物理",
   "topics": ["牛頓運動定律", "萬有引力"],
-  "summary": "# 核心摘要\\n\\n本文綜合了牛頓三大運動定律與萬有引力定律... (來源: ch1.pdf, ch2.pdf)",
+  "summary": "# 核心摘要\\n\\n本文綜合了牛頓三大運動定律與萬有引力定律，探討物體運動的基本原理。這些定律構成了古典力學的基礎，對理解日常生活中的運動現象至關重要。",
   "keyConcepts": [
     {
       "concept": "F=ma",
-      "explanation": "牛頓第二運動定律... (綜合來源: ch1.pdf, ch2.pdf)",
+      "explanation": "牛頓第二運動定律指出，物體的加速度與作用力成正比，與質量成反比。這個定律是解決力學問題的核心工具。",
       "importance": "高",
+      "curriculumCode": "物理-1-2",
       "sources": ["ch1.pdf", "ch2.pdf"]
     }
   ],

@@ -1,7 +1,7 @@
 'use client'
 
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
-import { Sparkles, Loader2, AlertCircle, MessageSquare } from 'lucide-react'
+import { Sparkles, Loader2, AlertCircle, MessageSquare, Check } from 'lucide-react'
 import { FileUploader } from '@/components/ask/file-uploader'
 import { Button } from '@/components/ui/button'
 import { useAsk } from '@/lib/ask-context'
@@ -10,8 +10,10 @@ import ProgressiveAnalysisCard from '@/components/ask/ProgressiveAnalysisCard'
 import { motion, AnimatePresence } from 'framer-motion'
 import RAGChatInterface from '@/components/ask/RAGChatInterface'
 import { useSummaryWorkbench, DocumentGroup } from '@/hooks/useSummaryWorkbench'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { FileSelectionChips } from '@/components/ask/FileSelectionChips'
+import { SummarySaveDialog, type SaveData } from '@/components/ask/SummarySaveDialog'
+import { RAGMessage } from '@/lib/hooks/useRAGChat'
 
 /**
  * Elite RAG Upload Response
@@ -23,6 +25,13 @@ interface EliteUploadResponse {
         filename: string
         status: string
     }
+}
+
+interface ClassificationJobState {
+    jobId: string
+    status: 'pending' | 'processing' | 'completed' | 'failed'
+    etaMs?: number
+    error?: string | null
 }
 
 /**
@@ -42,6 +51,7 @@ class ClassificationError extends Error {
     }
 }
 
+
 /**
  * SummaryWorkbench Component
  *
@@ -54,6 +64,60 @@ class ClassificationError extends Error {
  * ⚡ Apex Update: State Machine Architecture
  * - Uses useSummaryWorkbench for deterministic state management
  */
+/**
+ * 🚀 Elite Upload with Real-time Progress Tracking
+ * Uses XMLHttpRequest to monitor actual upload progress
+ */
+function uploadWithProgress(
+    url: string,
+    formData: FormData,
+    accessToken: string,
+    onProgress: (progress: number) => void
+): Promise<Response> {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+
+        // Monitor upload progress
+        xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+                const percentComplete = (e.loaded / e.total) * 100
+                onProgress(percentComplete)
+            }
+        })
+
+        // Handle completion
+        xhr.addEventListener('load', () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                // Construct Response object for compatibility
+                const response = new Response(xhr.responseText, {
+                    status: xhr.status,
+                    statusText: xhr.statusText,
+                    headers: new Headers({
+                        'Content-Type': 'application/json',
+                    }),
+                })
+                resolve(response)
+            } else {
+                reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`))
+            }
+        })
+
+        // Handle errors
+        xhr.addEventListener('error', () => {
+            reject(new Error('Network error during upload'))
+        })
+
+        xhr.addEventListener('abort', () => {
+            reject(new Error('Upload aborted'))
+        })
+
+        // Send request
+        xhr.open('POST', url)
+        xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`)
+        xhr.send(formData)
+    })
+}
+
 export function SummaryWorkbench() {
     const { attachedFiles, clearAll } = useAsk()
 
@@ -66,6 +130,32 @@ export function SummaryWorkbench() {
     const [showConfirmToast, setShowConfirmToast] = useState(false)
     const [showChat, setShowChat] = useState(false)
 
+    // State for save dialog
+    const [showSaveDialog, setShowSaveDialog] = useState(false)
+    const [analysisContent, setAnalysisContent] = useState<string>('')
+    const [detectedSubject, setDetectedSubject] = useState<string>('')
+    const [conversationHistory, setConversationHistory] = useState<RAGMessage[]>([])
+    const [isSaving, setIsSaving] = useState(false)
+    const [saveSuccess, setSaveSuccess] = useState(false)
+
+    // 🚀 NEW: Per-file upload progress tracking
+    const [fileProgress, setFileProgress] = useState<Record<string, number>>({})
+    const [classificationJob, setClassificationJob] = useState<ClassificationJobState | null>(null)
+    const classificationPollRef = useRef<NodeJS.Timeout | null>(null)
+    const accessTokenRef = useRef<string | null>(null)
+    const [examPredictionReady, setExamPredictionReady] = useState(false)
+
+    const stopClassificationPolling = () => {
+        if (classificationPollRef.current) {
+            clearInterval(classificationPollRef.current)
+            classificationPollRef.current = null
+        }
+    }
+
+    useEffect(() => {
+        return () => stopClassificationPolling()
+    }, [])
+
     // Update selectedFileIds when uploads change
     useEffect(() => {
         if (state.uploadedDocIds.length > 0) {
@@ -76,6 +166,67 @@ export function SummaryWorkbench() {
 
     // Local UI state (ephemeral)
     const [showExpertQA, setShowExpertQA] = useState(false)
+
+    const handleClassificationSuccess = (groups: DocumentGroup[], originalIds: string[]) => {
+        classifyComplete(groups)
+        setPendingAnalysisIds(originalIds)
+        setUploadProgress(100)
+        stopClassificationPolling()
+        setClassificationJob(prev => prev ? { ...prev, status: 'completed' } : prev)
+        clearAll()
+    }
+
+    const handleClassificationFailure = (message: string, originalIds: string[]) => {
+        stopClassificationPolling()
+        setClassificationJob(prev => prev ? { ...prev, status: 'failed', error: message } : prev)
+        setError(message, 'CLASSIFICATION')
+        classifyComplete([{
+            subject: '其他',
+            documentIds: originalIds,
+            confidence: 0.5,
+            reasoning: '分類失敗，已合併為單一群組'
+        }])
+        setPendingAnalysisIds(originalIds)
+    }
+
+    const startClassificationPolling = (jobId: string, token: string, originalIds: string[]) => {
+        stopClassificationPolling()
+
+        const poll = async () => {
+            try {
+                const response = await fetch(`/api/rag/router-classify?jobId=${jobId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+
+                if (!response.ok) {
+                    const errorPayload = await response.json().catch(() => ({}))
+                    throw new Error(errorPayload.message || `分類狀態更新失敗 (${response.status})`)
+                }
+
+                const data = await response.json()
+
+                setClassificationJob({
+                    jobId,
+                    status: data.status,
+                    etaMs: data.etaMs,
+                    error: data.error ?? null
+                })
+
+                if (data.status === 'completed' && Array.isArray(data.groups)) {
+                    console.log('[SummaryWorkbench] ✅ Classification job resolved:', jobId)
+                    handleClassificationSuccess(data.groups, originalIds)
+                } else if (data.status === 'failed') {
+                    handleClassificationFailure(data.error || '分類失敗，請重新嘗試', originalIds)
+                }
+            } catch (pollError) {
+                console.error('[SummaryWorkbench] ❌ Classification poll error:', pollError)
+                handleClassificationFailure('分類狀態更新失敗', originalIds)
+            }
+        }
+
+        poll()
+        classificationPollRef.current = setInterval(poll, 1500)
+    }
 
     /**
      * ⚡ PHASE 5: Upload & Classification Handler
@@ -102,6 +253,9 @@ export function SummaryWorkbench() {
         // Reset all state
         reset()
         startUpload()
+        stopClassificationPolling()
+        setClassificationJob(null)
+        setExamPredictionReady(false)
 
         // Keep track of IDs locally for the flow, also update state
         let currentUploadedIds: string[] = []
@@ -118,6 +272,7 @@ export function SummaryWorkbench() {
             const { supabaseBrowser } = await import('@/lib/supabase')
             const { data: sessionData, error: sessionError } = await supabaseBrowser.auth.getSession()
             const accessToken = sessionData?.session?.access_token
+            accessTokenRef.current = accessToken || null
 
             console.log('[SummaryWorkbench] 🔐 Auth check:', {
                 hasSession: !!sessionData?.session,
@@ -131,20 +286,17 @@ export function SummaryWorkbench() {
                 throw new UploadError('未登入，請先登入後再試')
             }
 
-            // Upload each file individually with granular progress
-            for (let i = 0; i < attachedFiles.length; i++) {
-                const attachedFile = attachedFiles[i]
-                if (!attachedFile.url) continue
+            // 🚀 ELITE PARALLEL UPLOAD: Upload ALL files simultaneously with real-time progress
+            console.log(`[SummaryWorkbench] 🚀 Starting parallel upload of ${totalFiles} files...`)
 
-                // ⚡ OPTIMIZATION: Granular progress (files completed + current file progress)
-                // Progress range: 0-90% for uploads, 90-100% for classification
-                const filesCompleted = i
-                const baseProgress = (filesCompleted / totalFiles) * 90
-                const currentFileProgress = 0.5 // Assume 50% through current file
-                const totalProgress = baseProgress + (currentFileProgress / totalFiles) * 90
-                setUploadProgress(Math.round(totalProgress))
+            // Reset file progress
+            setFileProgress({})
 
-                console.log(`[SummaryWorkbench] 📄 Uploading file ${i + 1}/${totalFiles}:`, attachedFile.name)
+            const uploadPromises = attachedFiles.map(async (attachedFile, i) => {
+                if (!attachedFile.url) return null
+
+                const fileId = `file-${i}`
+                console.log(`[SummaryWorkbench] 📄 [${i + 1}/${totalFiles}] Uploading:`, attachedFile.name)
 
                 // Fetch blob from object URL or storage path
                 let fetchUrl = attachedFile.url
@@ -215,7 +367,7 @@ export function SummaryWorkbench() {
                     throw new UploadError(`不支援的檔案類型: ${file.name}`)
                 }
 
-                // Upload to Elite RAG
+                // Upload to Elite RAG with real-time progress tracking
                 const formData = new FormData()
                 formData.append('file', file)
 
@@ -224,13 +376,26 @@ export function SummaryWorkbench() {
                     tokenPrefix: accessToken?.substring(0, 20) + '...',
                 })
 
-                const uploadResponse = await fetch('/api/rag/upload', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`
-                    },
-                    body: formData,
-                })
+                // 🚀 Use XMLHttpRequest for real-time progress tracking
+                const uploadResponse = await uploadWithProgress(
+                    '/api/rag/upload',
+                    formData,
+                    accessToken,
+                    (progress) => {
+                        // Update individual file progress
+                        setFileProgress(prev => {
+                            const updated = { ...prev, [fileId]: progress }
+
+                            // Calculate overall progress (0-90% for upload phase)
+                            const totalProgress = Object.values(updated).reduce((sum, p) => sum + p, 0) / totalFiles
+                            setUploadProgress(Math.floor(totalProgress * 0.9))
+
+                            return updated
+                        })
+
+                        console.log(`[SummaryWorkbench] 📊 [${i + 1}/${totalFiles}] ${attachedFile.name}: ${progress.toFixed(1)}%`)
+                    }
+                )
 
                 console.log('[SummaryWorkbench] 📨 Response received:', {
                     status: uploadResponse.status,
@@ -250,10 +415,16 @@ export function SummaryWorkbench() {
                     throw new UploadError(`上傳回應格式錯誤: ${file.name}`)
                 }
 
-                currentUploadedIds.push(uploadData.document.id)
+                console.log(`[SummaryWorkbench] ✅ [${i + 1}/${totalFiles}] Uploaded:`, file.name, '→', uploadData.document.id)
+                return uploadData.document.id
+            })
 
-                console.log('[SummaryWorkbench] ✅ Uploaded:', file.name, '→', uploadData.document.id)
-            }
+            // ⚡ Wait for ALL uploads to complete in parallel (no limit on concurrency)
+            const uploadResults = await Promise.all(uploadPromises)
+            const validIds = uploadResults.filter((id): id is string => id !== null)
+
+            currentUploadedIds = validIds
+            console.log(`[SummaryWorkbench] 🎉 All ${validIds.length} files uploaded in parallel!`)
 
             setUploadProgress(90)
             uploadComplete(currentUploadedIds)
@@ -263,40 +434,41 @@ export function SummaryWorkbench() {
             // ========================================
             // Step 2: Classify Documents (if multiple)
             // ========================================
-            if (currentUploadedIds.length > 1) {
-                startClassify()
-                setUploadProgress(95)
-                console.log('[SummaryWorkbench] 🔍 Classifying', currentUploadedIds.length, 'documents...')
+                if (currentUploadedIds.length > 1) {
+                    startClassify()
+                    setUploadProgress(95)
+                    console.log('[SummaryWorkbench] 🔍 Classifying', currentUploadedIds.length, 'documents...')
 
-                const classifyResponse = await fetch('/api/rag/router-classify', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${accessToken}`
-                    },
-                    body: JSON.stringify({ documentIds: currentUploadedIds }),
-                })
+                    const classifyResponse = await fetch('/api/rag/router-classify', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${accessToken}`
+                        },
+                        body: JSON.stringify({ documentIds: currentUploadedIds }),
+                    })
 
-                if (!classifyResponse.ok) {
-                    const errorData = await classifyResponse.json().catch(() => ({}))
-                    throw new ClassificationError(errorData.message || '文件分類失敗')
-                }
+                    const classifyData = await classifyResponse.json().catch(() => ({}))
 
-                const { groups } = await classifyResponse.json()
+                    if (!classifyResponse.ok) {
+                        throw new ClassificationError(classifyData.message || '文件分類失敗')
+                    }
 
-                console.log('[SummaryWorkbench] ✅ Classification complete:', groups.length, 'groups')
-                groups.forEach((g: DocumentGroup, i: number) => {
-                    console.log(`  Group ${i + 1}:`, g.subject, `(${g.documentIds.length} docs, confidence: ${(g.confidence * 100).toFixed(0)}%)`)
-                })
-
-                classifyComplete(groups)
-                setUploadProgress(100)
-                clearAll() // Clear attached files from context
-
-            } else {
-                // ========================================
-                // Single Document: Set Single Group
-                // ========================================
+                    console.log('[SummaryWorkbench] 🧠 Classification job queued:', classifyData.jobId)
+                    setClassificationJob({
+                        jobId: classifyData.jobId,
+                        status: classifyData.status,
+                        etaMs: classifyData.etaMs
+                    })
+                    startClassificationPolling(
+                        classifyData.jobId,
+                        accessToken,
+                        currentUploadedIds
+                    )
+                } else {
+                    // ========================================
+                    // Single Document: Set Single Group
+                    // ========================================
                 console.log('[SummaryWorkbench] ℹ️ Single document, skipping classification')
 
                 // Set documentGroups for consistent rendering
@@ -306,6 +478,7 @@ export function SummaryWorkbench() {
                     confidence: 1.0,
                 }])
 
+                setPendingAnalysisIds(currentUploadedIds)
                 setUploadProgress(100)
                 clearAll()
             }
@@ -320,12 +493,12 @@ export function SummaryWorkbench() {
                 setError(err.message, 'CLASSIFICATION')
                 // Fallback: treat all docs as single group
                 if (currentUploadedIds.length > 0) {
-                    classifyComplete([{
-                        subject: '其他',
-                        documentIds: currentUploadedIds,
-                        confidence: 0.5,
-                        reasoning: '分類失敗，已合併為單一群組'
-                    }])
+                classifyComplete([{
+                    subject: '其他',
+                    documentIds: currentUploadedIds,
+                    confidence: 0.5,
+                    reasoning: '分類失敗，已合併為單一群組'
+                }])
                 }
             } else {
                 // Unknown error
@@ -340,8 +513,68 @@ export function SummaryWorkbench() {
      */
     const handleReset = () => {
         reset()
+        stopClassificationPolling()
+        setClassificationJob(null)
         clearAll()
         setShowChat(false)
+        setAnalysisContent('')
+        setDetectedSubject('')
+        setConversationHistory([])
+        setSaveSuccess(false)
+        setExamPredictionReady(false)
+    }
+
+    /**
+     * Handle save to backpack
+     */
+    const handleSaveToBackpack = async (saveData: SaveData) => {
+        console.log('[handleSaveToBackpack] 🚀 Starting save process')
+        console.log('[handleSaveToBackpack] 📦 SaveData received:', {
+            title: saveData.title,
+            subject: saveData.subject,
+            contentLength: saveData.content.length,
+            contentPreview: saveData.content.substring(0, 300),
+            includeConversation: saveData.includeConversation,
+            conversationCount: saveData.conversationHistory?.length || 0
+        })
+        console.log('[handleSaveToBackpack] 📄 Full content:', saveData.content)
+
+        setIsSaving(true)
+        try {
+            const payload = {
+                user_id: 'auto',
+                title: saveData.title,
+                subject: saveData.subject,
+                content: saveData.content,
+                include_conversation: saveData.includeConversation,
+                conversation_history: saveData.conversationHistory,
+            }
+            console.log('[handleSaveToBackpack] 📡 API Payload:', payload)
+
+            const response = await fetch('/api/backpack/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            })
+
+            const data = await response.json()
+
+            if (!response.ok) {
+                throw new Error(data.message || '保存失敗')
+            }
+
+            console.log('[SummaryWorkbench] ✅ Saved to backpack:', data)
+            setSaveSuccess(true)
+            setShowSaveDialog(false)
+
+            // Show success toast
+            setTimeout(() => setSaveSuccess(false), 3000)
+        } catch (error) {
+            console.error('[SummaryWorkbench] ❌ Save error:', error)
+            alert('保存失敗，請稍後再試')
+        } finally {
+            setIsSaving(false)
+        }
     }
 
     // Derived state for UI
@@ -349,6 +582,11 @@ export function SummaryWorkbench() {
     const isClassifying = state.status === 'CLASSIFYING'
     const isAnalysisReady = state.status === 'ANALYSIS'
     const hasError = state.status === 'ERROR'
+    const showDetailedUploadProgress = isUploading && Object.keys(fileProgress).length > 0 && state.uploadProgress < 95
+    const classificationEtaSeconds = classificationJob?.etaMs
+        ? Math.max(2, Math.ceil(classificationJob.etaMs / 1000))
+        : 2
+    const showClassificationCard = (classificationJob && ['pending', 'processing'].includes(classificationJob.status)) || isClassifying
 
     return (
         <div className="mx-auto max-w-4xl px-4 pb-20 pt-8">
@@ -399,15 +637,15 @@ export function SummaryWorkbench() {
                                     initial={{ opacity: 0, y: -10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -10 }}
-                                    className="flex items-center justify-between gap-3 p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl"
+                                    className="flex items-center justify-between gap-3 p-4 bg-[#F8F1E7] border border-[#E8DCC9] rounded-xl"
                                 >
                                     <div className="flex items-center gap-3">
-                                        <Sparkles className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                                        <Sparkles className="w-5 h-5 text-[#6C4A2D]" />
                                         <div>
-                                            <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                                            <p className="text-sm font-medium text-[#6C4A2D]">
                                                 已選擇 {selectedFileIds.length} 個文件
                                             </p>
-                                            <p className="text-xs text-blue-700 dark:text-blue-300 mt-0.5">
+                                            <p className="text-xs text-[#8C6B4A] mt-0.5">
                                                 {selectedFileIds.length !== pendingAnalysisIds.length
                                                     ? `點擊「重新統整」以分析 ${selectedFileIds.length} 個文件 (當前分析 ${pendingAnalysisIds.length} 個)`
                                                     : '當前正在分析這些文件'}
@@ -445,7 +683,7 @@ export function SummaryWorkbench() {
                                 onClick={handleStartAnalysis}
                                 disabled={isUploading || isClassifying || attachedFiles.length === 0}
                                 className={cn(
-                                    "h-14 px-10 rounded-full text-lg font-medium shadow-lg transition-all duration-300",
+                                    "h-14 px-10 rounded-full text-lg font-medium shadow-lg transition-all duration-300 bg-[#6C4A2D] text-white hover:bg-[#5C3F25]",
                                     (isUploading || isClassifying) ? "w-64" : "w-48 hover:scale-105"
                                 )}
                             >
@@ -467,41 +705,67 @@ export function SummaryWorkbench() {
                                 )}
                             </Button>
 
-                            {/* Upload Progress Bar */}
-                            {isUploading && state.uploadProgress > 0 && (
+                            {/* 🚀 Elite Upload Progress Display - Per-file tracking */}
+                            {showDetailedUploadProgress && (
                                 <motion.div
                                     initial={{ opacity: 0, y: -10 }}
                                     animate={{ opacity: 1, y: 0 }}
-                                    className="w-64 space-y-2"
+                                    className="w-full max-w-md space-y-3"
                                 >
-                                    <div className="h-2 bg-secondary/20 rounded-full overflow-hidden">
-                                        <motion.div
-                                            className="h-full bg-primary rounded-full"
-                                            initial={{ width: 0 }}
-                                            animate={{ width: `${state.uploadProgress}%` }}
-                                            transition={{ duration: 0.3 }}
-                                        />
+                                    {attachedFiles.map((file, i) => {
+                                        const fileId = `file-${i}`
+                                        const progress = fileProgress[fileId] || 0
+
+                                        return (
+                                            <div key={fileId} className="space-y-1.5">
+                                                <div className="flex items-center justify-between text-xs">
+                                                    <span className="text-muted-foreground truncate max-w-[220px]" title={file.name}>
+                                                        {file.name}
+                                                    </span>
+                                                    <span className="text-primary font-semibold tabular-nums">
+                                                        {progress.toFixed(0)}%
+                                                    </span>
+                                                </div>
+                                                <div className="h-1.5 bg-secondary/20 rounded-full overflow-hidden">
+                                                    <motion.div
+                                                        className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-full"
+                                                        initial={{ width: 0 }}
+                                                        animate={{ width: `${progress}%` }}
+                                                        transition={{ duration: 0.2, ease: 'easeOut' }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+
+                                    {/* Overall Progress Summary */}
+                                    <div className="pt-2 border-t border-border/50">
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span className="font-medium text-foreground">總體進度</span>
+                                            <span className="text-primary font-bold tabular-nums">
+                                                {state.uploadProgress}%
+                                            </span>
+                                        </div>
                                     </div>
-                                    <p className="text-xs text-center text-muted-foreground">
-                                        正在上傳檔案...
-                                    </p>
                                 </motion.div>
                             )}
 
                             {/* ⚡ NEW: Classification Loading State */}
-                            {isClassifying && (
+                            {showClassificationCard && (
                                 <motion.div
                                     initial={{ opacity: 0, y: -10 }}
                                     animate={{ opacity: 1, y: 0 }}
-                                    className="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg max-w-md"
+                                    className="flex items-center gap-3 p-4 bg-[#F8F1E7] border border-[#E8DCC9] rounded-xl max-w-md shadow-sm"
                                 >
-                                    <Loader2 className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400" />
+                                    <Loader2 className="h-5 w-5 animate-spin text-[#6C4A2D]" />
                                     <div>
-                                        <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                                        <p className="text-sm font-medium text-[#6C4A2D]">
                                             正在智能分組 {state.uploadedDocIds.length} 個文件...
                                         </p>
-                                        <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                                            使用 AI 分析文件主題，自動分類科目
+                                        <p className="text-xs text-[#8C6B4A] mt-1">
+                                            {classificationJob?.status === 'pending'
+                                                ? '等待背景分析器啟動'
+                                                : `AI 推論中 · 約 ${classificationEtaSeconds} 秒`}
                                         </p>
                                     </div>
                                 </motion.div>
@@ -560,12 +824,32 @@ export function SummaryWorkbench() {
                                     relatedDocIds={pendingAnalysisIds.slice(1)}
                                     subject={state.documentGroups[0]?.subject}
                                     selectedDocIds={pendingAnalysisIds} // ⚡ NEW: Pass all selected IDs
+                                    onAnalysisUpdate={(analysis) => {
+                                        if ((analysis.examPredictions?.length ?? 0) > 0) {
+                                            setExamPredictionReady(true)
+                                        }
+                                    }}
                                     onAnalysisComplete={(analysis) => {
-                                        console.log('[SummaryWorkbench] Analysis complete:', analysis)
+                                        console.log('[SummaryWorkbench] ✅ Analysis complete:', analysis)
+                                        console.log('[DEBUG] 📊 structuredNotes length:', analysis.structuredNotes?.length)
+                                        console.log('[DEBUG] 📊 structuredNotes preview:', analysis.structuredNotes?.substring(0, 200))
+                                        console.log('[DEBUG] 📊 quickSummary length:', analysis.quickSummary?.length)
+                                        console.log('[DEBUG] 📊 quickSummary preview:', analysis.quickSummary?.substring(0, 200))
+
+                                        // Capture analysis content for saving
+                                        const capturedContent = analysis.structuredNotes || analysis.quickSummary || ''
+                                        console.log('[DEBUG] 💾 Final captured content length:', capturedContent.length)
+                                        console.log('[DEBUG] 💾 Final captured content preview:', capturedContent.substring(0, 300))
+                                        console.log('[DEBUG] 💾 Full captured content:', capturedContent)
+
+                                        setAnalysisContent(capturedContent)
+                                        setDetectedSubject(analysis.detectedSubject || state.documentGroups[0]?.subject || '')
+                                        setExamPredictionReady((analysis.examPredictions?.length ?? 0) > 0)
                                         if (analysis.showExpertQA) {
                                             setShowExpertQA(true)
                                         }
                                     }}
+                                    hideSaveButton={true} // Hide individual save button, use bottom CTA instead
                                 />
                             </div>
                         </div>
@@ -597,12 +881,59 @@ export function SummaryWorkbench() {
                                                     refreshKey={state.uploadedDocIds[0]}
                                                     contextFileIds={selectedFileIds}
                                                     onChatReady={() => console.log('[SummaryWorkbench] Chat ready')}
+                                                    onMessagesUpdate={(messages) => {
+                                                        // Capture conversation history for saving
+                                                        setConversationHistory(messages)
+                                                    }}
                                                 />
                                             </div>
                                         </motion.div>
                                     )}
                                 </AnimatePresence>
                             </div>
+                        )}
+
+                        {/* Save to Backpack CTA - Sticky at bottom */}
+                        {analysisContent && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="sticky bottom-8 flex justify-center pt-12 pb-4 z-50"
+                            >
+                                <div className="relative">
+                                    {/* Backdrop blur effect */}
+                                    <div className="absolute inset-0 bg-background/80 backdrop-blur-lg rounded-full -z-10" />
+
+                                    <Button
+                                        onClick={() => {
+                                            console.log('[Bottom CTA] 🔘 Save button clicked')
+                                            console.log('[Bottom CTA] 📊 Current analysisContent length:', analysisContent.length)
+                                            console.log('[Bottom CTA] 📊 Current analysisContent preview:', analysisContent.substring(0, 300))
+                                            console.log('[Bottom CTA] 📊 Full analysisContent:', analysisContent)
+                                            setShowSaveDialog(true)
+                                        }}
+                                        size="lg"
+                                        className={cn(
+                                            "h-14 px-8 rounded-full text-base font-semibold shadow-xl",
+                                            "bg-gradient-to-r from-primary to-primary/90",
+                                            "hover:scale-105 active:scale-95 transition-all duration-300",
+                                            saveSuccess && "bg-green-600 hover:bg-green-600"
+                                        )}
+                                    >
+                                        {saveSuccess ? (
+                                            <>
+                                                <Check className="w-5 h-5 mr-2" />
+                                                <span>已儲存到書包</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Sparkles className="w-5 h-5 mr-2" />
+                                                <span>存到書包</span>
+                                            </>
+                                        )}
+                                    </Button>
+                                </div>
+                            </motion.div>
                         )}
 
                         {/* Reset Button */}
@@ -618,6 +949,18 @@ export function SummaryWorkbench() {
                     </div>
                 )}
             </div>
+
+            {/* Save Dialog */}
+            <SummarySaveDialog
+                open={showSaveDialog}
+                onOpenChange={setShowSaveDialog}
+                summaryContent={analysisContent}
+                conversationHistory={conversationHistory}
+                detectedSubject={detectedSubject}
+                confidence={0.8}
+                onConfirm={handleSaveToBackpack}
+                isLoading={isSaving}
+            />
         </div>
     )
 }

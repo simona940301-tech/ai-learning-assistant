@@ -14,6 +14,9 @@ interface RAGMarkdownRendererProps {
 /**
  * Helper to parse source citations and render them as minimalist chips
  * Pattern: (來源: filename.pdf) or (Source: filename.pdf)
+ * 
+ * NOTE: This is now a fallback for legacy content. New content should use
+ * the structured 'sources' field in keyConcepts instead of inline citations.
  */
 function renderWithSourceChips(text: string | React.ReactNode): React.ReactNode {
     if (typeof text !== 'string') return text
@@ -39,7 +42,7 @@ function renderWithSourceChips(text: string | React.ReactNode): React.ReactNode 
             return (
                 <span
                     key={index}
-                    className="inline-flex items-center px-1.5 py-0.5 mx-1 rounded-md text-[10px] font-medium bg-stone-100 text-stone-600 border border-stone-200 dark:bg-stone-800 dark:text-stone-400 dark:border-stone-700 align-baseline select-none cursor-help transition-colors hover:bg-stone-200 dark:hover:bg-stone-700"
+                    className="inline-flex items-center px-2 py-0.5 mx-1 rounded-full text-xs font-medium bg-[#F8F1E7] text-[#6C4A2D] border border-[#E8DCC9] align-baseline select-none cursor-help transition-colors hover:bg-[#F1E8DB]"
                     title={fullSource}
                 >
                     {truncated}

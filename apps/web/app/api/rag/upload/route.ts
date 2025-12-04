@@ -247,117 +247,162 @@ export async function POST(req: NextRequest) {
 
         console.log('[RAG Upload] 數據插入成功，document ID:', docRecord?.id)
 
-        // 7. 🚀 優化：對於小文件，使用快速摘要策略
-        // 對於大文件（> 10KB），使用完整摘要；小文件使用簡單提取
-        const isLargeFile = cleanedText.length > 10000
-        let summary: string
-        let keywords: string[] = []
-        let theme: string = ''
+        // 🚀 ELITE OPTIMIZATION: 立即返回，所有處理都在背景執行
+        const documentId = docRecord.id
 
-        try {
-            if (isLargeFile) {
-                // 大文件：使用完整摘要生成
-                const summaryResult = await generateSummary(cleanedText, {
-                    numSentences: 5,
-                    numKeywords: 10,
-                })
-                summary = summaryResult.summary
-                keywords = summaryResult.keywords
-                theme = summaryResult.theme
-            } else {
-                // 🚀 小文件：快速策略（提取前 200 字作為摘要）
-                summary = cleanedText.substring(0, 200).trim() + (cleanedText.length > 200 ? '...' : '')
-                // 簡單關鍵詞提取（從前 500 字提取）
-                const previewText = cleanedText.substring(0, 500)
-                const quickKeywords = await extractKeywords(previewText, 5).catch(() => [])
-                keywords = quickKeywords
-                theme = previewText.substring(0, 30).trim() + '...'
-                console.log('[RAG Upload] ⚡ Using fast summary strategy for small file')
-            }
+        // 背景任務：智能路由 (Context Cache vs File Search) + 摘要生成
+        Promise.resolve().then(async () => {
+            try {
+                console.log(`[RAG Upload] 🚀 Starting background processing for ${documentId}...`)
 
-            // 8. 更新資料庫記錄（狀態：ready）
-            const { error: updateError } = await supabase
-                .from('rag_documents')
-                .update({
-                    summary,
-                    keywords,
-                    status: 'ready',
-                    processed_at: new Date().toISOString(),
-                })
-                .eq('id', docRecord.id)
+                // ========================================
+                // Step 1: Token Counting (Routing Decision)
+                // ========================================
+                const { TokenCounterService } = await import('@/lib/services/token-counter')
+                const tokenCount = await TokenCounterService.countTokens(cleanedText)
 
-            if (updateError) {
-                console.error('[RAG Upload] Database update error:', updateError)
-            }
+                console.log(`[RAG Upload] Token count: ${tokenCount} (threshold: ${TokenCounterService.THRESHOLD})`)
 
-            // 9. 🚀 優化：在背景創建 Context Cache（非阻塞）
-            // 這樣可以立即返回給用戶，Cache 在背景創建
-            Promise.resolve().then(async () => {
-                try {
-                    console.log('[RAG Upload] 🚀 Creating Context Cache in background...');
-                    const cacheResult = await createContextCache(
-                        docRecord.id,
-                        cleanedText,
-                        `${fileName}-${docRecord.id}`
-                    );
+                let storageType: 'CONTEXT_CACHE' | 'FILE_SEARCH'
+                let googleResourceId: string | null = null
 
-                    if (cacheResult.success && cacheResult.cacheName) {
-                        // 更新資料庫記錄 Cache 資訊
-                        await supabase
-                            .from('rag_documents')
-                            .update({
-                                cache_name: cacheResult.cacheName,
-                                cache_expires_at: cacheResult.expiresAt?.toISOString(),
-                            })
-                            .eq('id', docRecord.id);
+                // ========================================
+                // Step 2: Intelligent Routing
+                // ========================================
+                if (tokenCount <= TokenCounterService.THRESHOLD) {
+                    // 🎯 Small File → Context Cache (High Quality)
+                    storageType = 'CONTEXT_CACHE'
+                    console.log(`[RAG Upload] 📦 Routing to Context Cache (${tokenCount} tokens)`)
 
-                        console.log('[RAG Upload] ✅ Context Cache created in background:', cacheResult.cacheName);
-                    } else {
-                        console.log('[RAG Upload] ⚠️ Context Cache skipped:', cacheResult.error);
+                    try {
+                        const { GeminiContextCacheService } = await import('@/lib/services/gemini-context-cache')
+
+                        const cacheResult = await GeminiContextCacheService.createCache(
+                            cleanedText,
+                            `${fileName}-${documentId}`,
+                            `You are a helpful academic assistant. Answer questions based on the document "${fileName}".`
+                        )
+
+                        googleResourceId = cacheResult.cacheName
+                        console.log(`[RAG Upload] ✅ Context Cache created: ${googleResourceId}`)
+                        console.log(`[RAG Upload] Cache expires at: ${cacheResult.expiresAt}`)
+
+                    } catch (cacheError) {
+                        console.error('[RAG Upload] ❌ Context Cache creation failed:', cacheError)
+                        // Fallback: still save as CONTEXT_CACHE but without google_resource_id
+                        // The chat route will fall back to direct prompting
                     }
-                } catch (cacheError) {
-                    // Cache 創建失敗不影響上傳流程
-                    console.warn('[RAG Upload] ⚠️ Context Cache creation failed (non-blocking):', cacheError);
+
+                } else {
+                    // 🎯 Large File → File Search (High Capacity)
+                    storageType = 'FILE_SEARCH'
+                    console.log(`[RAG Upload] 📚 Routing to File Search (${tokenCount} tokens)`)
+
+                    try {
+                        const { GoogleFileSearchService } = await import('@/lib/services/google-file-search')
+                        const fs = await import('fs')
+                        const path = await import('path')
+                        const os = await import('os')
+
+                        // Create temp file
+                        const tempFilePath = path.join(os.tmpdir(), `upload-${documentId}-${fileName}`)
+                        await fs.promises.writeFile(tempFilePath, buffer)
+
+                        // Upload to Google File Search
+                        const googleFile = await GoogleFileSearchService.uploadFile(
+                            tempFilePath,
+                            fileType || 'text/plain',
+                            fileName
+                        )
+
+                        // Clean up temp file
+                        await fs.promises.unlink(tempFilePath)
+
+                        googleResourceId = googleFile.name
+                        console.log(`[RAG Upload] ✅ File Search upload complete: ${googleResourceId}`)
+
+                        // Wait for file to be active
+                        await GoogleFileSearchService.waitForFileActive(googleFile.name)
+
+                        // Add to User's File Search Store
+                        const userStore = await GoogleFileSearchService.getUserStore(finalUser.id)
+                        await GoogleFileSearchService.importFileToStore(userStore.name, googleFile.name)
+
+                        console.log(`[RAG Upload] ✅ Added to User Store: ${userStore.name}`)
+
+                    } catch (fileSearchError) {
+                        console.error('[RAG Upload] ❌ File Search upload failed:', fileSearchError)
+                        // Don't fail the whole process, just log it
+                    }
                 }
-            }).catch((err) => {
-                // 完全忽略背景任務錯誤
-                console.warn('[RAG Upload] Background cache task error (ignored):', err);
-            });
 
-            // 10. 立即返回成功結果（不等待 Cache 創建）
-            return NextResponse.json({
-                success: true,
-                document: {
-                    id: docRecord.id,
-                    filename: fileName,
-                    summary,
-                    keywords,
-                    theme, // 新增主題
-                    numPages,
-                    status: 'ready',
-                    // 注意：cacheName 會在背景創建後更新到資料庫
-                },
-            })
-        } catch (summaryError) {
-            // 摘要生成失敗，更新狀態為 error
-            console.error('[RAG Upload] Summary generation error:', summaryError)
+                // ========================================
+                // Step 3: Generate Summary (Parallel)
+                // ========================================
+                const isLargeFile = cleanedText.length > 10000
+                let summary: string
+                let keywords: string[] = []
 
-            await supabase
-                .from('rag_documents')
-                .update({
-                    status: 'error',
-                    error_message: summaryError instanceof Error ? summaryError.message : '摘要生成失敗',
-                })
-                .eq('id', docRecord.id)
+                if (isLargeFile) {
+                    const summaryResult = await generateSummary(cleanedText, {
+                        numSentences: 5,
+                        numKeywords: 10,
+                    })
+                    summary = summaryResult.summary
+                    keywords = summaryResult.keywords
+                } else {
+                    summary = cleanedText.substring(0, 200).trim() + (cleanedText.length > 200 ? '...' : '')
+                    const previewText = cleanedText.substring(0, 500)
+                    const quickKeywords = await extractKeywords(previewText, 5).catch(() => [])
+                    keywords = quickKeywords
+                }
 
-            return NextResponse.json(
-                {
-                    error: 'SUMMARY_GENERATION_ERROR',
-                    message: '摘要生成失敗，請稍後再試',
-                },
-                { status: 500 }
-            )
-        }
+                // ========================================
+                // Step 4: Update Database (Final State)
+                // ========================================
+                const { error: updateError } = await supabase
+                    .from('rag_documents')
+                    .update({
+                        summary,
+                        keywords,
+                        storage_type: storageType,
+                        google_resource_id: googleResourceId,
+                        token_count: tokenCount,
+                        status: 'ready',
+                        processed_at: new Date().toISOString(),
+                    })
+                    .eq('id', documentId)
+
+                if (updateError) {
+                    console.error('[RAG Upload] Database update error:', updateError)
+                } else {
+                    console.log(`[RAG Upload] ✅ Document ready: ${documentId} (${storageType})`)
+                }
+
+            } catch (bgError) {
+                console.error(`[RAG Upload] ❌ Background processing failed for ${documentId}:`, bgError)
+                await supabase
+                    .from('rag_documents')
+                    .update({
+                        status: 'error',
+                        error_message: bgError instanceof Error ? bgError.message : '背景處理失敗',
+                    })
+                    .eq('id', documentId)
+            }
+        }).catch((err) => {
+            console.warn(`[RAG Upload] Background task error for ${documentId}:`, err)
+        })
+
+        // 🚀 立即返回（不等待摘要生成和 Cache 創建）
+        return NextResponse.json({
+            success: true,
+            document: {
+                id: documentId,
+                filename: fileName,
+                status: 'processing', // 狀態為 processing，摘要正在背景生成
+                numPages,
+            },
+        })
     } catch (error) {
         console.error('[RAG Upload] Unexpected error:', error)
         return NextResponse.json(
