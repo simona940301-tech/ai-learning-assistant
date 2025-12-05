@@ -77,11 +77,18 @@ export function usePWAInstall() {
     useEffect(() => {
         const platform = detectPlatform()
         const isInstalled = checkIfInstalled()
+        const shouldForceIOSPrompt = platform === 'ios' && !isInstalled && canShowPrompt()
 
         setInstallState(prev => ({
             ...prev,
             platform,
             isInstalled,
+            ...(platform === 'ios'
+                ? {
+                    canInstall: shouldForceIOSPrompt,
+                    promptEvent: null,
+                }
+                : {}),
         }))
 
         if (isInstalled) {
