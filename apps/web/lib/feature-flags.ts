@@ -1,10 +1,17 @@
 /**
- * Feature flag system for Batch 1 + Batch 1.5 Hotfix
- * Allows safe rollback of UI changes
+ * Feature Flags Configuration
+ * 
+ * Enterprise-grade feature flag system for controlling feature visibility.
+ * Supports environment variable overrides for easy deployment management.
+ * 
+ * @module feature-flags
  */
 
-// Feature flags - can be controlled via environment variables
-const FLAGS = {
+// ============================================
+// Hotfix Feature Flags (Existing)
+// ============================================
+
+const HOTFIX_FLAGS = {
   // Batch 1
   HOTFIX_BATCH1: process.env.NEXT_PUBLIC_HOTFIX_BATCH1 !== 'false', // Enabled by default
   HOTFIX_QR_ONE_STEP: process.env.NEXT_PUBLIC_HOTFIX_QR_ONE_STEP !== 'false',
@@ -18,36 +25,146 @@ const FLAGS = {
     process.env.NEXT_PUBLIC_HOTFIX_BATCH1_5_NEAR_DIFFICULTY !== 'false',
   HOTFIX_BATCH1_5_BATCH_API: process.env.NEXT_PUBLIC_HOTFIX_BATCH1_5_BATCH_API !== 'false',
   HOTFIX_BATCH1_5_SAMPLER_PERF: process.env.NEXT_PUBLIC_HOTFIX_BATCH1_5_SAMPLER_PERF !== 'false',
-} as const;
+} as const
 
-type FeatureFlag = keyof typeof FLAGS;
+type HotfixFlag = keyof typeof HOTFIX_FLAGS
+
+// ============================================
+// Game Mode Feature Flags (New)
+// ============================================
 
 /**
- * Check if a feature flag is enabled
+ * Game mode feature flags
  */
-export function isFeatureEnabled(flag: FeatureFlag): boolean {
-  return FLAGS[flag] === true;
+export type GameModeFlag =
+  | 'DETECTIVE_MODE'
+  | 'EDITOR_MODE'
+  | 'FOCUS_MODE'
+  | 'PRACTICE_MODE'
+  | 'UGC_MODE'
+  | 'SYSTEM_BATTLE'
+  | 'CUSTOM_BATTLE'
+
+/**
+ * Game mode defaults
+ * Production-ready features are enabled by default.
+ * Incomplete features are disabled by default.
+ */
+const GAME_MODE_DEFAULTS: Record<GameModeFlag, boolean> = {
+  // ✅ Production-ready features (enabled by default)
+  SYSTEM_BATTLE: true,
+  CUSTOM_BATTLE: true,
+  UGC_MODE: true,
+  PRACTICE_MODE: true,
+  FOCUS_MODE: true,
+
+  // ❌ Incomplete features (disabled by default)
+  DETECTIVE_MODE: false,
+  EDITOR_MODE: false,
 }
+
+/**
+ * Environment variable mapping for game modes
+ */
+const GAME_MODE_ENV_MAP: Record<GameModeFlag, string> = {
+  DETECTIVE_MODE: 'NEXT_PUBLIC_ENABLE_DETECTIVE',
+  EDITOR_MODE: 'NEXT_PUBLIC_ENABLE_EDITOR',
+  FOCUS_MODE: 'NEXT_PUBLIC_ENABLE_FOCUS',
+  PRACTICE_MODE: 'NEXT_PUBLIC_ENABLE_PRACTICE',
+  UGC_MODE: 'NEXT_PUBLIC_ENABLE_UGC',
+  SYSTEM_BATTLE: 'NEXT_PUBLIC_ENABLE_SYSTEM_BATTLE',
+  CUSTOM_BATTLE: 'NEXT_PUBLIC_ENABLE_CUSTOM_BATTLE',
+}
+
+// ============================================
+// Unified API
+// ============================================
+
+/**
+ * Check if a hotfix feature flag is enabled (legacy)
+ */
+export function isFeatureEnabled(flag: HotfixFlag): boolean {
+  return HOTFIX_FLAGS[flag] === true
+}
+
+/**
+ * Check if a game mode is enabled
+ * 
+ * Priority:
+ * 1. Environment variable (if set)
+ * 2. Default value
+ * 
+ * @param mode - Game mode to check
+ * @returns true if mode is enabled, false otherwise
+ * 
+ * @example
+ * ```ts
+ * if (isGameModeEnabled('DETECTIVE_MODE')) {
+ *   // Show detective mode UI
+ * }
+ * ```
+ */
+export function isGameModeEnabled(mode: GameModeFlag): boolean {
+  const envVar = GAME_MODE_ENV_MAP[mode]
+  const envValue = process.env[envVar]
+
+  // If environment variable is explicitly set, use it
+  if (envValue !== undefined) {
+    return envValue === 'true'
+  }
+
+  // Otherwise, use default
+  return GAME_MODE_DEFAULTS[mode]
+}
+
+/**
+ * Get all enabled game modes
+ * 
+ * Useful for debugging and logging
+ * 
+ * @returns Array of enabled game mode flags
+ */
+export function getEnabledGameModes(): GameModeFlag[] {
+  return (Object.keys(GAME_MODE_DEFAULTS) as GameModeFlag[]).filter(isGameModeEnabled)
+}
+
+/**
+ * Get all disabled game modes
+ * 
+ * Useful for debugging and logging
+ * 
+ * @returns Array of disabled game mode flags
+ */
+export function getDisabledGameModes(): GameModeFlag[] {
+  return (Object.keys(GAME_MODE_DEFAULTS) as GameModeFlag[]).filter(
+    (mode) => !isGameModeEnabled(mode)
+  )
+}
+
+// ============================================
+// Legacy Exports (Preserved)
+// ============================================
 
 /**
  * Check if entire Batch 1 hotfix is enabled
  */
 export function isBatch1Enabled(): boolean {
-  return FLAGS.HOTFIX_BATCH1;
+  return HOTFIX_FLAGS.HOTFIX_BATCH1
 }
 
 /**
  * Check if entire Batch 1.5 hotfix is enabled
  */
 export function isBatch15Enabled(): boolean {
-  return FLAGS.HOTFIX_BATCH1_5;
+  return HOTFIX_FLAGS.HOTFIX_BATCH1_5
 }
 
 /**
- * React hook for feature flags
+ * React hook for hotfix feature flags
  */
-export function useFeatureFlag(flag: FeatureFlag): boolean {
-  return isFeatureEnabled(flag);
+export function useFeatureFlag(flag: HotfixFlag): boolean {
+  return isFeatureEnabled(flag)
 }
 
-export { FLAGS };
+export { HOTFIX_FLAGS as FLAGS }
+

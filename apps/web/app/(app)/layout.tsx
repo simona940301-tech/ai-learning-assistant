@@ -8,12 +8,17 @@ import { SimpleErrorBoundary } from '@/components/error-boundary'
 import { CompanionProvider } from '@/lib/companion-context'
 import { AuthGuard } from '@/components/auth/AuthGuard'
 import { ReunionGate } from '@/components/chick/ReunionGate'
+import { UpdateNotification } from '@/components/layout/UpdateNotification'
+import { useServiceWorkerUpdate } from '@/lib/hooks/useServiceWorkerUpdate'
 
 export default function AppLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  // PWA auto-update detection
+  const { updateAvailable, refreshApp } = useServiceWorkerUpdate()
+
   return (
     <SimpleErrorBoundary>
       <SafeAreaLayout enableBottom={false} enableTop={true}>
@@ -37,6 +42,9 @@ export default function AppLayout({
                     <TabBar />
                   </div>
                 </div>
+
+                {/* PWA Update Notification */}
+                {updateAvailable && <UpdateNotification onRefresh={refreshApp} />}
               </CompanionProvider>
             </PlayProvider>
           </AskProvider>
@@ -45,3 +53,4 @@ export default function AppLayout({
     </SimpleErrorBoundary>
   )
 }
+

@@ -13,6 +13,7 @@ import { UGCContractModal } from '@/components/play/UGCContractModal'
 import { BattleQuestionV3 } from '@/components/play/BattleQuestionV3'
 import { BattleTransitionOverlay } from '@/components/play/BattleTransitionOverlay'
 import { EditorGameModal } from '@/components/play/EditorGameModal'
+import { PracticeSourceModal } from '@/components/play/PracticeSourceModal'
 import { FileText } from 'lucide-react'
 import {
   calculateBaseScore,
@@ -31,6 +32,8 @@ import { FocusModeModal } from '@/components/play/FocusModeModal'
 import { Brain } from 'lucide-react'
 import { useGuidance, useErrorCorrection } from '@/lib/guidance/useGuidance'
 import { AppBar } from '@/components/layout/app-bar'
+import { PracticeRoomSetupModal } from '@/components/play/PracticeRoomSetupModal'
+import { isGameModeEnabled } from '@/lib/feature-flags'
 
 
 // ============================================
@@ -141,6 +144,8 @@ function PlayPageContent() {
   const [isChestModalOpen, setChestModalOpen] = useState(false)
   const [isFocusModalOpen, setFocusModalOpen] = useState(false)
   const [isEditorModalOpen, setEditorModalOpen] = useState(false)
+  const [isPracticeSourceModalOpen, setIsPracticeSourceModalOpen] = useState(false)
+  const [isPracticeSetupModalOpen, setPracticeSetupModalOpen] = useState(false)
 
   // 🎯 引導系統：自動檢測 T04 (Onboarding 完成後) 和 T01 (停留過久)
   const { recordOperation } = useGuidance({
@@ -520,9 +525,11 @@ function PlayPageContent() {
     }
   }
 
-  const modeCards = [
+  // Define all available mode cards
+  const allModeCards = [
     {
       id: 'system',
+      flagId: 'SYSTEM_BATTLE' as const,
       label: '系統對戰',
       description: 'AI 訓練、弱點會戰、排位賽',
       icon: Sword,
@@ -533,6 +540,7 @@ function PlayPageContent() {
     },
     {
       id: 'custom',
+      flagId: 'CUSTOM_BATTLE' as const,
       label: '自訂對戰',
       description: '創建房間、邀請好友',
       icon: Users,
@@ -542,7 +550,19 @@ function PlayPageContent() {
       estimatedTime: '8-12 分鐘',
     },
     {
+      id: 'detective',
+      flagId: 'DETECTIVE_MODE' as const,
+      label: '偵探檔案：真相拼圖',
+      description: '碎片閱讀、證據判讀、邏輯推理',
+      icon: FileText, // Using FileText as placeholder, ideally a Search or Eye icon
+      onClick: () => router.push('/play/detective/case-001'),
+      accent: 'bg-gradient-to-br from-slate-700 to-slate-900 text-amber-400 border border-amber-500/30',
+      energyCost: 2,
+      estimatedTime: '15-20 分鐘',
+    },
+    {
       id: 'editor',
+      flagId: 'EDITOR_MODE' as const,
       label: '實習編輯',
       description: '找錯、修稿、主旨判斷',
       icon: FileText,
@@ -553,6 +573,7 @@ function PlayPageContent() {
     },
     {
       id: 'ugc',
+      flagId: 'UGC_MODE' as const,
       label: '內容貢獻',
       description: '創建題目、管理題目、發起挑戰',
       icon: Sparkles,
@@ -563,33 +584,18 @@ function PlayPageContent() {
     },
     {
       id: 'practice',
+      flagId: 'PRACTICE_MODE' as const,
       label: '無限練習',
-      description: 'TikTok 式刷題，多人同樂',
+      description: 'TikTok 式刷題，可使用我的題本',
       icon: Brain,
-      onClick: async () => {
-        // Create a new room with default settings (mixed subjects)
-        try {
-          const res = await fetch('/api/play/practice/create', {
-            method: 'POST',
-            body: JSON.stringify({ sourceType: 'MIXED' })
-          })
-          const data = await res.json()
-          if (data.success) {
-            router.push(`/play/practice/${data.room.room_code}`)
-          } else {
-            alert('無法建立練習室')
-          }
-        } catch (e) {
-          console.error(e)
-          alert('連線錯誤')
-        }
-      },
+      onClick: () => setIsPracticeSourceModalOpen(true),
       accent: 'bg-gradient-to-br from-cyan-400/60 to-blue-500/60 text-white',
       energyCost: 0,
       estimatedTime: '無限制',
     },
     {
       id: 'focus',
+      flagId: 'FOCUS_MODE' as const,
       label: '專注修煉',
       description: '番茄鐘冥想，提升學習定力',
       icon: Brain,
@@ -599,6 +605,10 @@ function PlayPageContent() {
       estimatedTime: '25 分鐘',
     },
   ]
+
+  // Filter mode cards based on feature flags
+  const modeCards = allModeCards.filter((card) => isGameModeEnabled(card.flagId))
+
 
 
 
@@ -768,6 +778,13 @@ function PlayPageContent() {
       <AnimatePresence>
         {isFocusModalOpen && <FocusModeModal onClose={() => setFocusModalOpen(false)} />}
         {isEditorModalOpen && <EditorGameModal isOpen={isEditorModalOpen} onClose={() => setEditorModalOpen(false)} />}
+        {isPracticeSourceModalOpen && (
+          <PracticeSourceModal
+            isOpen={isPracticeSourceModalOpen}
+            onClose={() => setIsPracticeSourceModalOpen(false)}
+          />
+        )}
+        {isPracticeSetupModalOpen && <PracticeRoomSetupModal isOpen={isPracticeSetupModalOpen} onClose={() => setPracticeSetupModalOpen(false)} />}
       </AnimatePresence>
 
     </>
