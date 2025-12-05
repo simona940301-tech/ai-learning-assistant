@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { GameEventType, type GameEventPayload } from '@/lib/telemetry/event-types'
 
 // ============================================
 // Types
@@ -32,13 +33,22 @@ interface EditorState {
     chips: ChipData[] // Available chips in the pool
     removedChips: string[] // IDs of chips swiped away
 
-    // Telemetry
+    // Telemetry (Legacy - for backward compatibility)
     telemetry: Record<string, BlankAttemptData>
     startTime: number
     blankEntryTimes: Record<string, number> // When a blank entered viewport or game started
 
+    // Event System (Phase A-1)
+    events: Array<{
+        eventType: GameEventType
+        payload: any
+        timestamp: number
+    }>
+    sessionId: string | null
+
     // Actions
     initializeGame: (chips: ChipData[], blankIds: number[]) => void
+    setSessionId: (sessionId: string) => void
     handleDragStart: (chipId: string) => void
     handleChipDrop: (chipId: string, blankNumber: number) => void
     handleSwipeAway: (chipId: string) => void
@@ -46,6 +56,11 @@ interface EditorState {
 
     // Telemetry Helpers
     recordBlankEntry: (blankId: string) => void
+
+    // Event Helpers (Phase A-1)
+    recordEvent: (eventType: GameEventType, payload: any) => void
+    getEvents: () => Array<{ eventType: GameEventType; payload: any; timestamp: number }>
+    clearEvents: () => void
 }
 
 // ============================================
@@ -59,6 +74,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     telemetry: {},
     startTime: 0,
     blankEntryTimes: {},
+    events: [],
+    sessionId: null,
 
     initializeGame: (chips, blankIds) => {
         const initialTelemetry: Record<string, BlankAttemptData> = {}
@@ -93,7 +110,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         const now = Date.now()
         const blankId = blankNumber.toString()
 
-        // Telemetry Update
+        // Find chip data
+        const chip = state.chips.find(c => c.id === chipId)
+        const entryTime = state.blankEntryTimes[blankId] || state.startTime
+        const hesitationTime = now - entryTime
+        const previousChipId = state.blanks[blankNumber]
+
+        // Record event (Phase A-1)
+        get().recordEvent(GameEventType.EDITOR_CHIP_DROPPED, {
+            blankId,
+            blankNumber,
+            chipId,
+            chipText: chip?.text || '',
+            interferenceLevel: chip?.interferenceLevel || 'Low',
+            previousChipId,
+            hesitationTime,
+            timestamp: now - state.startTime
+        })
+
+        // Telemetry Update (Legacy)
         const prevTelemetry = state.telemetry[blankId] || {
             blankId,
             timeToFirstAction: 0,
@@ -104,9 +139,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             chipSequence: []
         }
 
-        const entryTime = state.blankEntryTimes[blankId] || state.startTime
         const timeToFirstAction = prevTelemetry.timeToFirstAction === 0
-            ? now - entryTime
+            ? hesitationTime
             : prevTelemetry.timeToFirstAction
 
         const newSequence = [
@@ -143,6 +177,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             // Trigger vibration in UI (handled by component state usually, but could be tracked here)
             return
         }
+
+        // Record event (Phase A-1)
+        get().recordEvent(GameEventType.EDITOR_CHIP_SWIPED, {
+            chipId,
+            chipText: chip.text,
+            interferenceLevel: chip.interferenceLevel,
+            timestamp: Date.now() - state.startTime
+        })
 
         set(state => ({
             removedChips: [...state.removedChips, chipId]
@@ -185,6 +227,49 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             set(state => ({
                 blankEntryTimes: { ...state.blankEntryTimes, [blankId]: Date.now() }
             }))
+
+            // Record event
+            get().recordEvent(GameEventType.EDITOR_BLANK_VIEWED, {
+                blankId,
+                blankNumber: parseInt(blankId),
+                timestamp: Date.now() - state.startTime
+            })
         }
+    },
+
+    // ============================================
+    // Event System Methods (Phase A-1)
+    // ============================================
+
+    setSessionId: (sessionId) => {
+        set({ sessionId })
+    },
+
+    recordEvent: (eventType, payload) => {
+        const state = get()
+        const timestamp = Date.now() - state.startTime
+
+        set(state => ({
+            events: [
+                ...state.events,
+                {
+                    eventType,
+                    payload: {
+                        ...payload,
+                        sessionId: state.sessionId,
+                        timestamp
+                    },
+                    timestamp
+                }
+            ]
+        }))
+    },
+
+    getEvents: () => {
+        return get().events
+    },
+
+    clearEvents: () => {
+        set({ events: [] })
     }
 }))

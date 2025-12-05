@@ -77,7 +77,7 @@ export async function grantErrorReviewFoodReward(
 ): Promise<{ success: boolean; bowlsGranted: number }> {
   // 計算應該給予的碗數（每 5 題 1 碗）
   const bowlsAmount = Math.floor(reviewCount / 5)
-  
+
   if (bowlsAmount === 0) {
     return { success: true, bowlsGranted: 0 }
   }
@@ -89,3 +89,20 @@ export async function grantErrorReviewFoodReward(
   }
 }
 
+/**
+ * 遊戲模式獎勵：根據表現給予飼料
+ * Perfect (100%): +3 份
+ * Good (80%+): +2 份
+ * Normal: +1 份
+ */
+export async function grantGameFoodReward(
+  supabase: SupabaseClient,
+  userId: string,
+  foodAmount: number
+): Promise<{ success: boolean; bowlsGranted: number }> {
+  const result = await addFoodBowls(supabase, userId, foodAmount)
+  return {
+    success: result.success,
+    bowlsGranted: result.success ? foodAmount : 0,
+  }
+}

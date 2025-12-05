@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
         const body = await req.json()
         const { sourceType, sourceConfig, subject, setId, selectedQuestionIds } = body
 
-        if (!sourceType || !['FILE_RAG', 'SUBJECT_TAG', 'MIXED', 'ERROR_BOOK', 'QUESTION_SET'].includes(sourceType)) {
+        if (!sourceType || !['FILE_RAG', 'SUBJECT_TAG', 'MIXED', 'ERROR_BOOK', 'QUESTION_SET', 'UGC', 'ENGLISH'].includes(sourceType)) {
             return NextResponse.json({ error: 'INVALID_SOURCE_TYPE' }, { status: 400 })
         }
 

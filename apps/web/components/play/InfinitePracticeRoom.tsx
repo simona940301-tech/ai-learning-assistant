@@ -3,11 +3,13 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
-import { Loader2, CheckCircle2, XCircle, Share2, Users, ArrowLeft, BookOpen, Flame, Trophy } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, Share2, Users, ArrowLeft, BookOpen, Flame, Trophy, Copy, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { supabaseBrowserClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { toast } from 'sonner'
 
 interface Question {
     id: string
@@ -116,6 +118,7 @@ export function InfinitePracticeRoom({ roomCode }: InfinitePracticeRoomProps) {
     const [showStreakFire, setShowStreakFire] = useState(false)
     const [streakCount, setStreakCount] = useState(0)
     const [showLeaderboard, setShowLeaderboard] = useState(false)
+    const [showRoomInfo, setShowRoomInfo] = useState(false)
 
     const supabase = supabaseBrowserClient
     const streakAudioRef = useRef<HTMLAudioElement | null>(null)
@@ -331,6 +334,41 @@ export function InfinitePracticeRoom({ roomCode }: InfinitePracticeRoomProps) {
         setExpandedExplanation(questionId)
     }
 
+    // 🎯 Room Sharing Functions
+    const handleCopyRoomCode = () => {
+        navigator.clipboard.writeText(roomCode)
+        toast.success('已複製房間碼', {
+            description: `房間碼：${roomCode}`,
+            duration: 2000,
+        })
+    }
+
+    const handleShareLink = async () => {
+        const shareUrl = `${window.location.origin}/play/practice/${roomCode}`
+
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: '加入我的練習室',
+                    text: `一起來刷題！房間碼：${roomCode}`,
+                    url: shareUrl
+                })
+            } catch (error) {
+                // User cancelled share or error occurred
+                if ((error as Error).name !== 'AbortError') {
+                    console.error('Share failed:', error)
+                }
+            }
+        } else {
+            // Fallback: copy to clipboard
+            navigator.clipboard.writeText(shareUrl)
+            toast.success('已複製分享連結', {
+                description: '可以傳送給朋友一起練習',
+                duration: 2000,
+            })
+        }
+    }
+
     return (
         <div className="fixed inset-0 bg-black z-50 flex flex-col">
             {/* 🏎️ Live Race Track */}
@@ -352,12 +390,27 @@ export function InfinitePracticeRoom({ roomCode }: InfinitePracticeRoomProps) {
                     <span className="font-mono text-white/60 text-xs">ROOM: {roomCode}</span>
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
                         <Users className="w-4 h-4 text-white/40" />
                         <span className="text-sm text-white">{participants.length}</span>
                     </div>
-                    <Button size="sm" variant="ghost" className="rounded-full w-10 h-10 p-0">
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        className="rounded-full w-10 h-10 p-0 text-white/60 hover:text-white hover:bg-white/10"
+                        onClick={() => setShowRoomInfo(true)}
+                        title="房間資訊"
+                    >
+                        <Info className="w-4 h-4" />
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        className="rounded-full w-10 h-10 p-0 text-white/60 hover:text-white hover:bg-white/10"
+                        onClick={handleShareLink}
+                        title="分享房間"
+                    >
                         <Share2 className="w-4 h-4" />
                     </Button>
                 </div>
@@ -562,6 +615,76 @@ export function InfinitePracticeRoom({ roomCode }: InfinitePracticeRoomProps) {
                     </motion.div>
                 </div>
             )}
+
+            {/* 🎯 Room Info Modal */}
+            <Dialog open={showRoomInfo} onOpenChange={setShowRoomInfo}>
+                <DialogContent className="max-w-md bg-[#1A1A1A] border border-white/10 text-white">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-bold text-white">房間資訊</DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-6 py-4">
+                        {/* Room Code */}
+                        <div className="space-y-2">
+                            <label className="text-sm text-white/60">房間碼</label>
+                            <div className="flex items-center gap-2">
+                                <div className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 font-mono text-lg text-center text-white">
+                                    {roomCode}
+                                </div>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-white/20 text-white hover:bg-white/10"
+                                    onClick={handleCopyRoomCode}
+                                >
+                                    <Copy className="w-4 h-4" />
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Participants */}
+                        <div className="space-y-2">
+                            <label className="text-sm text-white/60">參與者 ({participants.length})</label>
+                            <div className="max-h-32 overflow-y-auto space-y-2">
+                                {participants.map(p => (
+                                    <div key={p.user_id} className="flex items-center gap-3 p-2 rounded-lg bg-white/5">
+                                        <Avatar className="w-8 h-8">
+                                            <AvatarImage src={p.avatar_url} />
+                                            <AvatarFallback className="text-xs">{p.username?.substring(0, 2) || 'P'}</AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm text-white truncate">{p.username || 'Unknown'}</p>
+                                            <p className="text-xs text-white/40">進度: {p.net_progress} pts</p>
+                                        </div>
+                                        {p.user_id === currentUserId && (
+                                            <span className="text-xs text-yellow-400">你</span>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Share Actions */}
+                        <div className="flex gap-3">
+                            <Button
+                                variant="outline"
+                                className="flex-1 border-white/20 text-white hover:bg-white/10"
+                                onClick={handleCopyRoomCode}
+                            >
+                                <Copy className="w-4 h-4 mr-2" />
+                                複製房間碼
+                            </Button>
+                            <Button
+                                className="flex-1 bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:from-blue-600 hover:to-cyan-600"
+                                onClick={handleShareLink}
+                            >
+                                <Share2 className="w-4 h-4 mr-2" />
+                                分享連結
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

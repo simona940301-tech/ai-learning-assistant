@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { CheckCircle2, XCircle, Trophy, ArrowRight, Sparkles } from 'lucide-react'
+import { CheckCircle2, XCircle, Trophy, ArrowRight, Sparkles, Loader2 } from 'lucide-react'
 import { useEditorStore, ChipData } from '@/store/editorStore'
 import { Chip } from '@/components/game/Chip'
 
@@ -137,16 +137,52 @@ export function EditorGame({ onComplete }: { onComplete?: (score: number, total:
         handleSwipeAway,
         handleRemoveFromBlank,
         recordBlankEntry,
-        telemetry
+        telemetry,
+        setSessionId: setStoreSessionId,
+        getEvents
     } = useEditorStore()
 
     const [showValidation, setShowValidation] = useState(false)
+    const [sessionId, setSessionId] = useState<string | null>(null)
+    const [startTime, setStartTime] = useState<number>(0)
+    const [isSubmitting, setIsSubmitting] = useState(false)
+    const [progressionResult, setProgressionResult] = useState<any>(null)
+    const [error, setError] = useState<string | null>(null)
 
-    // Initialize
+    // Initialize game and start session
     useEffect(() => {
         const blankIds = Object.keys(ANSWER_KEY).map(Number)
         initializeGame(MOCK_CHIPS, blankIds)
+        setStartTime(Date.now())
+
+        // Start session
+        startSession()
     }, [])
+
+    const startSession = async () => {
+        try {
+            const response = await fetch('/api/play/editor/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    difficulty: 'medium',
+                    metadata: { questionCount: Object.keys(ANSWER_KEY).length }
+                })
+            })
+
+            if (!response.ok) {
+                throw new Error('Failed to start session')
+            }
+
+            const data = await response.json()
+            setSessionId(data.sessionId)
+            setStoreSessionId(data.sessionId)
+            console.log('[EditorGame] Session started:', data.sessionId)
+        } catch (err) {
+            console.error('[EditorGame] Failed to start session:', err)
+            setError('無法啟動遊戲會話')
+        }
+    }
 
     // Parse text
     const segments = useMemo(() => {
@@ -160,8 +196,16 @@ export function EditorGame({ onComplete }: { onComplete?: (score: number, total:
         })
     }, [])
 
-    const checkAnswers = () => {
+    const checkAnswers = async () => {
+        if (!sessionId) {
+            setError('遊戲會話未初始化')
+            return
+        }
+
         setShowValidation(true)
+        setIsSubmitting(true)
+        setError(null)
+
         let correctCount = 0
         Object.entries(blanks).forEach(([num, optId]) => {
             if (ANSWER_KEY[parseInt(num)] === optId) {
@@ -169,11 +213,60 @@ export function EditorGame({ onComplete }: { onComplete?: (score: number, total:
             }
         })
 
-        // Log Telemetry to Console (for verification)
-        console.log('[EditorGame] Telemetry Data:', telemetry)
+        const timeSpentSeconds = Math.floor((Date.now() - startTime) / 1000)
 
-        if (onComplete) {
-            onComplete(correctCount, Object.keys(ANSWER_KEY).length)
+        // Get events from store (Phase A-1)
+        const events = getEvents()
+
+        // Generate telemetry summary from events
+        const eventSummary = {
+            totalEvents: events.length,
+            eventsByType: events.reduce((acc, e) => {
+                acc[e.eventType] = (acc[e.eventType] || 0) + 1
+                return acc
+            }, {} as Record<string, number>),
+            sessionDuration: timeSpentSeconds * 1000
+        }
+
+        try {
+            const response = await fetch('/api/play/editor/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sessionId,
+                    score: correctCount,
+                    totalPossible: Object.keys(ANSWER_KEY).length,
+                    timeSpentSeconds,
+                    telemetry: {
+                        blanks,
+                        blankAttempts: telemetry,
+                        // Phase A-1: Add event summary
+                        eventSummary,
+                        events: events.map(e => ({
+                            type: e.eventType,
+                            payload: e.payload,
+                            timestamp: e.timestamp
+                        }))
+                    }
+                })
+            })
+
+            if (!response.ok) {
+                throw new Error('Failed to submit session')
+            }
+
+            const data = await response.json()
+            setProgressionResult(data.progression)
+            console.log('[EditorGame] Session submitted:', data)
+
+            if (onComplete) {
+                onComplete(correctCount, Object.keys(ANSWER_KEY).length)
+            }
+        } catch (err) {
+            console.error('[EditorGame] Failed to submit session:', err)
+            setError('提交失敗，請稍後再試')
+        } finally {
+            setIsSubmitting(false)
         }
     }
 
@@ -259,25 +352,65 @@ export function EditorGame({ onComplete }: { onComplete?: (score: number, total:
                     </div>
 
                     {/* Action Button */}
+                    {error && (
+                        <div className="text-sm text-red-500 text-center mb-2">
+                            {error}
+                        </div>
+                    )}
                     {!showValidation ? (
                         <Button
                             className="w-full h-14 text-base font-medium rounded-full shadow-xl shadow-primary/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                            disabled={!isAllFilled}
+                            disabled={!isAllFilled || isSubmitting || !sessionId}
                             onClick={checkAnswers}
                         >
-                            {isAllFilled ? 'Submit for Review' : 'Fill all blanks'}
-                            {isAllFilled && <ArrowRight className="w-4 h-4 ml-2" />}
+                            {isSubmitting ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    提交中...
+                                </>
+                            ) : isAllFilled ? (
+                                <>
+                                    Submit for Review
+                                    <ArrowRight className="w-4 h-4 ml-2" />
+                                </>
+                            ) : (
+                                'Fill all blanks'
+                            )}
                         </Button>
                     ) : (
-                        <Button
-                            variant="secondary"
-                            className="w-full h-14 text-base rounded-full"
-                            onClick={() => {
-                                // Reset or Close
-                            }}
-                        >
-                            Assessment Complete
-                        </Button>
+                        <div className="space-y-4">
+                            {progressionResult && (
+                                <Card className="p-6 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950 dark:to-teal-950 border-emerald-200 dark:border-emerald-800">
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm font-medium text-muted-foreground">XP 獲得</span>
+                                            <span className="text-2xl font-bold text-emerald-600">+{progressionResult.xpGained}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm font-medium text-muted-foreground">金幣獲得</span>
+                                            <span className="text-xl font-bold text-yellow-600">+{progressionResult.coinsGained}</span>
+                                        </div>
+                                        {progressionResult.leveledUp && (
+                                            <div className="pt-2 border-t border-emerald-200 dark:border-emerald-800">
+                                                <div className="flex items-center gap-2 text-emerald-600 font-bold">
+                                                    <Trophy className="w-5 h-5" />
+                                                    <span>升級到 Level {progressionResult.newLevel}!</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </Card>
+                            )}
+                            <Button
+                                variant="secondary"
+                                className="w-full h-14 text-base rounded-full"
+                                onClick={() => {
+                                    window.location.reload()
+                                }}
+                            >
+                                再玩一次
+                            </Button>
+                        </div>
                     )}
                 </div>
             </div>

@@ -1,0 +1,156 @@
+2024 學測英文 - Detective Mode（偵探檔案）
+
+📝 案件 1
+案件名稱：The Mystery of the Disappearing Bees
+主題：環境科學 - 蜜蜂消失之謎
+
+完整文章：
+---
+Over the past decade, beekeepers around the world have reported alarming declines in honeybee populations. This phenomenon, known as Colony Collapse Disorder (CCD), has puzzled scientists and raised concerns about global food security.
+
+Honeybees are essential pollinators, responsible for pollinating approximately one-third of the crops humans consume. Without bees, many fruits, vegetables, and nuts would become scarce or disappear entirely. The economic value of bee pollination is estimated at over $15 billion annually in the United States alone.
+
+Several theories have emerged to explain CCD. Some researchers point to pesticides, particularly neonicotinoids, which can impair bees' navigation and immune systems. Others suggest that parasites, such as the Varroa mite, weaken bee colonies and make them more susceptible to disease. Climate change may also play a role, as shifting weather patterns disrupt the timing of flower blooming and bee foraging.
+
+However, most scientists now believe that CCD results from a combination of factors rather than a single cause. Habitat loss, poor nutrition due to monoculture farming, and increased exposure to pathogens all contribute to colony stress. When multiple stressors occur simultaneously, bee colonies become overwhelmed and collapse.
+
+Recent research has shown some promising developments. Organic farming practices that avoid synthetic pesticides have been associated with healthier bee populations. Additionally, planting diverse wildflower meadows provides bees with better nutrition and helps them resist disease. Some countries have even banned certain pesticides to protect pollinators.
+
+The future of honeybees depends on coordinated action from farmers, policymakers, and consumers. By supporting sustainable agriculture and reducing pesticide use, we can help ensure that these vital pollinators continue to thrive.
+---
+
+正確關鍵句（學生需要選出的句子）：
+1. "Honeybees are essential pollinators, responsible for pollinating approximately one-third of the crops humans consume."
+   - 類型：核心事實
+   - 重要性：極高
+   - 原因：說明蜜蜂的重要性，是理解整篇文章的基礎
+
+2. "However, most scientists now believe that CCD results from a combination of factors rather than a single cause."
+   - 類型：主要論點
+   - 重要性：極高
+   - 原因：這是文章的核心結論，推翻了單一原因的假設
+
+3. "When multiple stressors occur simultaneously, bee colonies become overwhelmed and collapse."
+   - 類型：因果關係
+   - 重要性：高
+   - 原因：解釋了蜜蜂消失的機制
+
+4. "Organic farming practices that avoid synthetic pesticides have been associated with healthier bee populations."
+   - 類型：解決方案
+   - 重要性：高
+   - 原因：提供了具體的改善方法
+
+5. "The future of honeybees depends on coordinated action from farmers, policymakers, and consumers."
+   - 類型：總結呼籲
+   - 重要性：中高
+   - 原因：總結全文，提出行動呼籲
+
+評分標準：
+- 選出 5 個關鍵句：滿分
+- 選出 4 個關鍵句：優秀
+- 選出 3 個關鍵句：良好
+- 選出 2 個關鍵句：及格
+- 選出 1 個或以下：需加強
+
+🧠 詳解
+**文章結構分析**：
+1. 第一段：引入問題（蜜蜂消失現象）
+2. 第二段：說明重要性（蜜蜂對農業的貢獻）
+3. 第三段：列舉可能原因（農藥、寄生蟲、氣候變遷）
+4. 第四段：提出核心論點（多重因素導致）
+5. 第五段：討論解決方案（有機農業、野花草地）
+6. 第六段：總結呼籲（需要共同行動）
+
+**關鍵句選擇策略**：
+1. **主題句**：通常在段落開頭，概括段落主旨
+2. **轉折句**：包含 however, but, although 等轉折詞的句子往往很重要
+3. **因果句**：說明原因和結果的句子是理解文章邏輯的關鍵
+4. **總結句**：通常在段落或文章結尾，總結核心觀點
+5. **數據句**：包含具體數據或事實的句子支撐論點
+
+**常見錯誤**：
+- 選擇細節描述而非主要論點
+- 忽略轉折詞後的重要觀點
+- 只選開頭或結尾，忽略中間的核心論證
+- 選擇過多相似內容的句子
+
+---
+
+📝 案件 2
+案件名稱：The Rise of Artificial Intelligence
+主題：科技發展 - 人工智慧的興起
+
+完整文章：
+---
+Artificial Intelligence (AI) has evolved from a futuristic concept to an integral part of modern life. From voice assistants like Siri and Alexa to recommendation algorithms on Netflix and Spotify, AI systems are increasingly shaping how we work, communicate, and make decisions.
+
+The recent breakthroughs in AI can be attributed to three key factors: massive increases in computing power, the availability of large datasets, and advances in machine learning algorithms. Deep learning, a subset of machine learning, has proven particularly effective at tasks such as image recognition, natural language processing, and game playing. In 2016, Google's AlphaGo defeated the world champion in Go, a game long considered too complex for computers to master.
+
+Despite these impressive achievements, AI still faces significant limitations. Current AI systems excel at narrow, well-defined tasks but struggle with general intelligence and common sense reasoning. They require enormous amounts of data to learn and can be fooled by subtle changes that humans would easily detect. Moreover, AI systems often operate as "black boxes," making decisions through processes that even their creators cannot fully explain.
+
+The ethical implications of AI are equally concerning. Bias in training data can lead to discriminatory outcomes in areas like hiring, lending, and criminal justice. Facial recognition technology raises privacy concerns, while autonomous weapons pose risks to international security. As AI becomes more powerful, questions about accountability and control become increasingly urgent.
+
+Nevertheless, AI also offers tremendous potential benefits. In healthcare, AI algorithms can detect diseases earlier and more accurately than human doctors. In climate science, AI helps model complex environmental systems and optimize energy use. AI-powered tutoring systems could personalize education for millions of students worldwide.
+
+The key to harnessing AI's benefits while minimizing its risks lies in thoughtful regulation and ethical guidelines. Researchers are developing techniques to make AI more transparent and accountable. Policymakers are crafting laws to protect privacy and prevent discrimination. Ultimately, the impact of AI will depend on the choices we make today about how to develop and deploy this transformative technology.
+---
+
+正確關鍵句（學生需要選出的句子）：
+1. "The recent breakthroughs in AI can be attributed to three key factors: massive increases in computing power, the availability of large datasets, and advances in machine learning algorithms."
+   - 類型：核心解釋
+   - 重要性：極高
+   - 原因：說明 AI 發展的三大關鍵因素
+
+2. "Current AI systems excel at narrow, well-defined tasks but struggle with general intelligence and common sense reasoning."
+   - 類型：限制說明
+   - 重要性：極高
+   - 原因：指出 AI 的核心局限性
+
+3. "Bias in training data can lead to discriminatory outcomes in areas like hiring, lending, and criminal justice."
+   - 類型：倫理問題
+   - 重要性：高
+   - 原因：說明 AI 的重要倫理風險
+
+4. "In healthcare, AI algorithms can detect diseases earlier and more accurately than human doctors."
+   - 類型：正面應用
+   - 重要性：高
+   - 原因：展示 AI 的實際益處
+
+5. "The key to harnessing AI's benefits while minimizing its risks lies in thoughtful regulation and ethical guidelines."
+   - 類型：核心結論
+   - 重要性：極高
+   - 原因：總結全文，提出平衡發展的關鍵
+
+評分標準：
+- 選出 5 個關鍵句：滿分
+- 選出 4 個關鍵句：優秀
+- 選出 3 個關鍵句：良好
+- 選出 2 個關鍵句：及格
+- 選出 1 個或以下：需加強
+
+🧠 詳解
+**文章結構分析**：
+1. 第一段：引入主題（AI 已融入日常生活）
+2. 第二段：說明發展原因（三大關鍵因素）
+3. 第三段：指出局限性（窄任務 vs 通用智能）
+4. 第四段：討論倫理問題（偏見、隱私、安全）
+5. 第五段：展示正面應用（醫療、環境、教育）
+6. 第六段：提出解決方案（監管與倫理指引）
+
+**關鍵句選擇策略**：
+1. **論點句**：表達作者核心觀點的句子
+2. **對比句**：展示兩面性的句子（如優點 vs 缺點）
+3. **列舉句**：包含多個要點的句子（如三大因素）
+4. **轉折句**：改變論述方向的句子（Despite, Nevertheless）
+5. **結論句**：總結全文主旨的句子
+
+**文章論證邏輯**：
+- 引入 → 發展原因 → 局限性 → 倫理問題 → 正面應用 → 平衡方案
+- 這是典型的「問題-分析-解決」結構
+
+**閱讀技巧**：
+1. 注意段落主題句（通常在段首）
+2. 留意轉折詞（however, despite, nevertheless）
+3. 關注列舉和分類（three factors, areas like...）
+4. 識別因果關係（can lead to, attributed to）
+5. 把握總結性語言（the key to, ultimately）

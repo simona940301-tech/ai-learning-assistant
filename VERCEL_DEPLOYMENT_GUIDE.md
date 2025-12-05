@@ -1,140 +1,150 @@
-# Vercel 部署指南
+# Vercel Deployment Guide - MVP 部署準備
 
-## 快速部署步骤
+本指南涵蓋如何部署 MVP 版本，包括功能旗標管理、PWA 自動更新和環境配置。
 
-### Step 1: 登录 Vercel
+---
 
+## 📋 部署前檢查清單
+
+### 1. 功能旗標檢查
+
+**✅ 生產就緒功能（預設啟用）：**
+- System Battle（系統對戰）
+- Custom Battle（自訂對戰）
+- UGC Mode（內容貢獻）
+- Practice Mode（無限練習）
+- Focus Mode（專注修煉）
+
+**❌ 未完成功能（預設禁用）：**
+- Detective Mode（偵探檔案）- UI 完整但 API 未實作
+- Editor Mode（實習編輯）- 功能性待確認
+
+---
+
+## 🚀 Vercel 部署步驟
+
+### 步驟 1: 設定環境變數
+
+1. 前往 [Vercel Dashboard](https://vercel.com/dashboard)
+2. 選擇專案
+3. 進入 **Settings** → **Environment Variables**
+4. 添加以下變數（參考 `.env.production.example`）
+
+**必要變數：**
 ```bash
-cd "/Users/simonac/Desktop/moonshot idea"
-vercel login
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
-选择登录方式：GitHub、GitLab 或 Email
-
-### Step 2: 部署项目
-
+**功能旗標（MVP 階段）：**
 ```bash
-vercel
+NEXT_PUBLIC_ENABLE_SYSTEM_BATTLE=true
+NEXT_PUBLIC_ENABLE_CUSTOM_BATTLE=true
+NEXT_PUBLIC_ENABLE_UGC=true
+NEXT_PUBLIC_ENABLE_PRACTICE=true
+NEXT_PUBLIC_ENABLE_FOCUS=true
+NEXT_PUBLIC_ENABLE_DETECTIVE=false
+NEXT_PUBLIC_ENABLE_EDITOR=false
 ```
 
-按提示回答：
-- "Set up and deploy?" → **Yes**
-- "Which scope?" → 选择团队 `team_AU75Q3xAosycSaeFNySuPVju`
-- "Link to existing project?" → **Yes**，选择 `plms-learning`
-- "What’s your project’s directory?" → 输入 `./`
-
-### Step 3: 设置环境变量
-
-部署完成后，添加环境变量：
+### 步驟 2: 部署
 
 ```bash
-# OpenAI API Key
-vercel env add OPENAI_API_KEY
-# 粘贴: 你的 OpenAI API Key（請從環境變數或 Vercel Dashboard 中取得）
-
-# Supabase URL (Public)
-vercel env add NEXT_PUBLIC_SUPABASE_URL
-# 粘贴: https://umzqjgxsetsmwzhniemw.supabase.co
-
-# Supabase Anon Key (Public)
-vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY
-# 粘贴: 你的 Supabase Anon Key（請從環境變數或 Supabase Dashboard 中取得）
-```
-
-**对于每个变量，选择环境：**
-- ✅ Production
-- ✅ Preview  
-- ✅ Development
-
-### Step 4: 重新部署（应用环境变量）
-
-```bash
+# CLI 方式
 vercel --prod
+
+# 或透過 Git Push（如已連接）
+git push origin main
 ```
 
-### Step 5: 访问你的网站
+### 步驟 3: 驗證
 
-部署完成后，Vercel 会提供 URL，例如：
-- https://plms-learning.vercel.app
+訪問 `/play` 頁面，確認：
+- ✅ 看到 5 個生產就緒功能
+- ❌ 看不到 Detective Mode 和 Editor Mode
 
-测试页面：
-- https://plms-learning.vercel.app/ask
+---
 
-## 项目配置
+## 🎯 功能旗標管理
 
-已创建 `vercel.json`：
-- Root Directory: `./`
-- Install Command: `pnpm install --frozen-lockfile`
-- Build Command: `pnpm --filter web build`
-- Output Directory: `apps/web/.next`
-- Framework: Next.js
-- Node.js Version: `20.x`
+### 啟用新功能
 
-## 环境变量清单
+1. Vercel Dashboard → Environment Variables
+2. 找到對應旗標（例如 `NEXT_PUBLIC_ENABLE_DETECTIVE`）
+3. 改為 `true`
+4. Redeploy
 
-### 必需的环境变量：
+**無需更改程式碼！**
 
-| 变量名 | 说明 | 环境 |
-|--------|------|------|
-| `OPENAI_API_KEY` | OpenAI API 密钥 | Production, Preview, Development |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase 项目 URL | Production, Preview, Development |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase 匿名密钥 | Production, Preview, Development |
+---
 
-### 可选的环境变量：
+## 🔄 PWA 自動更新
 
-| 变量名 | 说明 | 默认值 |
-|--------|------|--------|
-| `NEXT_PUBLIC_USE_STREAMING` | 启用 streaming 功能 | `true` |
-| `DEBUG` | 调试模式 | `false` |
-| `NEXT_PUBLIC_DEBUG` | 前端调试模式 | `false` |
-| `NEXT_PUBLIC_HIDE_DEV_BANNER` | 隐藏开发横幅 | `false` |
+### 工作原理
 
-## 替代方案：通过 Vercel Dashboard 部署
+1. Service Worker 每 60 秒檢查更新
+2. 檢測到新版本時顯示通知
+3. 用戶點擊「重新整理」立即更新
 
-如果 CLI 不熟悉，可以：
+### 測試
 
-1. 访问 [vercel.com](https://vercel.com) 并登录
-2. 点击 "Add New Project"
-3. 导入 GitHub 仓库（或上传文件夹）
-4. **设置 Root Directory 为**: `./`
-5. 在 Dashboard 中添加环境变量
-6. 点击 "Deploy"
-
-## 故障排除
-
-### 构建失败
-
-如果构建失败，检查：
-1. Root Directory 是否正确设置为 `./`
-2. 所有环境变量是否已设置
-3. 查看 Vercel 构建日志中的错误信息
-
-### 环境变量未生效
-
-1. 确保在 **所有环境**（Production, Preview, Development）中都设置了变量
-2. 重新部署：`vercel --prod`
-3. 清除缓存：在 Vercel Dashboard → Settings → Environment Variables → 重新部署
-
-### Streaming 功能不工作
-
-1. 检查 `NEXT_PUBLIC_USE_STREAMING` 环境变量
-2. 查看浏览器控制台是否有错误
-3. 检查 Network 标签中的 `/api/ai/route-solver-stream` 请求
-
-## 部署后验证
-
-✅ 访问首页：`https://your-project.vercel.app`
-✅ 访问解题页面：`https://your-project.vercel.app/ask`
-✅ 测试 streaming 功能：输入题目，查看打字机效果
-✅ 检查浏览器控制台：确保没有错误
-
-## 后续更新
-
-部署后，每次 push 到 GitHub 会自动触发 Preview 部署。
-
-要部署到 Production：
 ```bash
-vercel --prod
+# 1. 建立並啟動
+pnpm build && pnpm start
+
+# 2. 修改程式碼並重建
+pnpm build && pnpm start
+
+# 3. 返回瀏覽器（不刷新）
+# 應看到更新通知
 ```
 
-或者合并到 main 分支会自动部署到 Production（如果配置了自动部署）。
+---
+
+## 📊 監控
+
+### 檢查功能旗標
+```javascript
+console.log('Enabled:', getEnabledGameModes())
+console.log('Disabled:', getDisabledGameModes())
+```
+
+### 檢查 Service Worker
+```javascript
+navigator.serviceWorker.ready.then(reg => {
+  console.log('Active:', reg.active)
+  console.log('Waiting:', reg.waiting)
+})
+```
+
+---
+
+## 🚨 常見問題
+
+### Q: 功能旗標沒生效？
+- 確認已儲存並重新部署
+- 清除瀏覽器快取
+
+### Q: PWA 更新沒通知？
+- 確認已安裝 PWA（加入主畫面）
+- 檢查 Console 是否有錯誤
+
+---
+
+## ✅ 部署檢查清單
+
+部署前：
+- [ ] 環境變數已設定
+- [ ] 功能旗標符合 MVP 計劃
+- [ ] 建構成功無錯誤
+
+部署後：
+- [ ] Play 頁面顯示正確
+- [ ] 所有功能正常運作
+- [ ] PWA 可安裝
+- [ ] 更新通知正常
+
+---
+
+**最後更新**: 2025-12-05
