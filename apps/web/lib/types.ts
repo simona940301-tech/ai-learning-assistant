@@ -248,10 +248,11 @@ export interface ExplainViewModel {
 // ============================================
 
 export interface CoreConcept {
-  name: string
+  concept: string
   explanation: string
-  importance: number
-  pageRefs: number[]
+  importance: '高' | '中' | '低'
+  curriculumCode?: string
+  sources?: string[]
 }
 
 export interface KeyInsight {

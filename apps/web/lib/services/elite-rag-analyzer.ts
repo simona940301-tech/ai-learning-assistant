@@ -23,6 +23,7 @@ import { streamObject } from 'ai'
 import { smartChunk, extractPreviewText } from '@/lib/utils/smart-chunk'
 import { getModelParams } from '@/lib/config/model-config'
 import { GSATAnalysisSchema } from '@/lib/schemas/gsat-analysis-schema'
+import { STYLE_LIBRARY, StyleExample } from '@/lib/data/style-library'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
 const google = createGoogleGenerativeAI({
@@ -51,6 +52,34 @@ const google = createGoogleGenerativeAI({
  * @returns Streaming response with structured analysis
  */
 /**
+ * Dynamic Few-Shot: Retrieve relevant examples from Style Library
+ */
+function getFewShotExamples(subject?: string): StyleExample[] {
+    // Default to English if subject is related to English, otherwise try to map or fallback
+    let targetSubject = 'English' // Defaulting to English as we only have English examples for now
+
+    if (subject) {
+        if (subject.toLowerCase().includes('english') || subject.toLowerCase().includes('英文')) {
+            targetSubject = 'English'
+        } else if (subject.toLowerCase().includes('math') || subject.toLowerCase().includes('數學')) {
+            targetSubject = 'Math'
+        }
+        // Add more mappings as library grows
+    }
+
+    const examples = STYLE_LIBRARY[targetSubject] || []
+
+    // If we have examples, pick 2-3 random ones
+    if (examples.length > 0) {
+        // Shuffle and pick 2
+        const shuffled = [...examples].sort(() => 0.5 - Math.random())
+        return shuffled.slice(0, 2)
+    }
+
+    return []
+}
+
+/**
  * Raw version of generateStreamedAnalysis that returns the StreamObjectResult directly
  * This allows API routes to implement custom streaming protocols (like NDJSON)
  */
@@ -66,8 +95,32 @@ export async function generateAnalysisStream(
     // Get model configuration from centralized config
     const modelParams = getModelParams('analysis-simple')
 
+    // ⚡ Dynamic Few-Shot: Get examples
+    const fewShotExamples = getFewShotExamples(subject)
+    const fewShotSection = fewShotExamples.length > 0
+        ? `
+    ## 🎨 出題風格參考 (Few-Shot Examples)
+    請詳細參考以下【真題範例】的**出題語氣**、**陷阱設計邏輯**、**選項長度**與**解析風格**。
+    你生成的題目必須模仿這些範例的風格，不要生成生硬的 AI 題目。
+
+    ${JSON.stringify(fewShotExamples, null, 2)}
+    `
+        : ''
+
     // ⚡ OPTIMIZED PROMPT (NotebookLM-level Synthesis + Dynamic Richness)
     const systemPrompt = `你是台灣學測 (GSAT) 頂尖分析專家。你的任務是閱讀並**綜合分析**多份文件，生成一份極具深度的學術級報告。
+    ${fewShotSection}
+
+    ## ⛔ 避雷區 (Negative Constraints - CRITICAL)
+    1. **英文科嚴格限制**:
+       - **絕對禁止**在英文題目題幹 (Question Stem) 中出現中文名字 (如 "小明", "Xiao Ming") 或中文語境。
+       - 題目必須是 **全英文** (Full English Context)。
+       - 名字請使用國際通用姓名 (e.g., John, Emma, The student, A researcher)。
+       - 只有「解析 (Explanation)」可以用中文說明。
+    2. **題型品質**:
+       - 不要出「填充題」風格的選擇題 (如 "It is a _____.")，除非是考特定文法。優先出「情境應用題」。
+       - 選項長度要平衡，不要讓正確答案明顯特別長或特別短。
+
 
 ## 核心規則 (CRITICAL)
 1. **多文件綜合 (Synthesis)**:
@@ -110,7 +163,8 @@ export async function generateAnalysisStream(
 - curriculumCode: 課綱代碼 (如: 數A-11-1)
 - sources: 來源文件列表 (如: ["math_ch1.pdf", "math_ch2.pdf"])，若該概念出現在多份文件中請全部列出。**使用此欄位來標註來源，而非在文字中標註**。
 
-### 4. Exam Prediction (Hybrid)
+### 4. Exam Prediction (Hybrid + Style Mimicry)
+- **Reflect Style**: 必須參考上述【真題範例】的風格來出題。
 - 必須包含至少 1 個 **跨章節題組 (Question Set)**。
 - 題目設計應測試學生整合不同文件資訊的能力。
 - 格式要求：

@@ -11,6 +11,7 @@ import { UGCSubmissionForm, UGCFormData } from './UGCSubmissionForm'
 import { ContractBrowseModal } from './ContractBrowseModal'
 import { ContractCreateModal } from './ContractCreateModal'
 import { MyQuestionsModal } from './MyQuestionsModal'
+import { toast } from 'sonner'
 
 interface UGCContractModalProps {
   onClose: () => void
@@ -58,7 +59,7 @@ export function UGCContractModal({ onClose }: UGCContractModalProps) {
     if (mode.requiresEnergy) {
       const result = await consumeEnergy()
       if (!result.success) {
-        alert('羽毛不足！')
+        toast.error('羽毛不足！')
         return
       }
     }

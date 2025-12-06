@@ -10,3 +10,10 @@ export const featureFlags = {
 export function getFlag(key: keyof typeof featureFlags): boolean {
   return featureFlags[key];
 }
+
+export function createFeatureFlags(platform: 'web' | 'mobile') {
+  return {
+    isEnabled: (key: keyof typeof featureFlags) => getFlag(key),
+    platform,
+  };
+}

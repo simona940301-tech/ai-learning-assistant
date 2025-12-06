@@ -5,7 +5,7 @@ import { usePlay, type BattleState } from '@/lib/play-context'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Users, Sparkles, Sword } from 'lucide-react'
+import { Users, Sparkles, Sword, Music } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { SystemBattleModal } from '@/components/play/SystemBattleModal'
 import { CustomBattleModal } from '@/components/play/CustomBattleModal'
@@ -548,6 +548,17 @@ function PlayPageContent() {
       accent: 'bg-gradient-to-br from-fuchsia-500/60 to-pink-500/60 text-white',
       energyCost: 2,
       estimatedTime: '8-12 分鐘',
+    },
+    {
+      id: 'lyrical-flow',
+      flagId: 'LYRICAL_FLOW' as const,
+      label: '歌詞流動 (Beta)',
+      description: '跟著音樂節奏，沈浸式單字記憶',
+      icon: Music, // Ensure Music is imported
+      onClick: () => router.push('/play/lyrical-flow'),
+      accent: 'bg-gradient-to-br from-pink-500/70 to-rose-500/70 text-white',
+      energyCost: 0,
+      estimatedTime: '無限',
     },
     {
       id: 'detective',

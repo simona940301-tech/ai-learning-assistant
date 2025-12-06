@@ -41,7 +41,7 @@ async function loadPdfJs() {
 
             // ✅ FIX: Use legacy worker build for compatibility
             if (pdfjs.GlobalWorkerOptions) {
-                pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@4.0.379/legacy/build/pdf.worker.min.mjs`
+                pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js`
             }
 
             pdfjsLib = pdfjs
@@ -119,6 +119,18 @@ export function BackpackReaderSimple({ fileId, fileUrl, fileName, onClose }: Bac
                     // ✅ Already a signed URL, use directly
                     console.log('[BackpackReaderSimple] Using existing signed URL')
                     finalUrl = fileUrl
+                } else if (fileUrl.startsWith('/api/backpack/file-url')) {
+                    // ✅ API URL handling: Fetch the actual signed URL from the API response
+                    console.log('[BackpackReaderSimple] Resolving API URL:', fileUrl)
+                    const response = await fetch(fileUrl)
+                    if (!response.ok) {
+                        throw new Error(`無法取得檔案網址 (HTTP ${response.status})`)
+                    }
+                    const data = await response.json()
+                    if (!data.url) {
+                        throw new Error('API 未返回有效的檔案網址')
+                    }
+                    finalUrl = data.url
                 } else {
                     // ✅ Legacy public URL format - test if accessible
                     console.log('[BackpackReaderSimple] Testing legacy public URL:', fileUrl)
@@ -148,7 +160,7 @@ export function BackpackReaderSimple({ fileId, fileUrl, fileName, onClose }: Bac
 
                 const loadingTask = pdfjs.getDocument({
                     url: finalUrl,
-                    cMapUrl: `https://unpkg.com/pdfjs-dist@4.0.379/cmaps/`,
+                    cMapUrl: `https://unpkg.com/pdfjs-dist@3.11.174/cmaps/`,
                     cMapPacked: true,
                 })
 

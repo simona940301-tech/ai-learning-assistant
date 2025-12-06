@@ -20,18 +20,64 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const path = searchParams.get('path')
+    const fileId = searchParams.get('file_id')
 
-    if (!path) {
+    if (!path && !fileId) {
       return NextResponse.json(
-        { error: 'VALIDATION_ERROR', message: 'Missing path parameter' },
+        { error: 'VALIDATION_ERROR', message: 'Missing path or file_id parameter' },
         { status: 400 }
+      )
+    }
+
+    let targetPath = path
+
+    // If file_id is provided, look up the file_url from database
+    if (fileId) {
+      const { data: item, error: dbError } = await supabase
+        .from('backpack_items')
+        .select('file_url')
+        .eq('id', fileId)
+        .eq('user_id', user.id)
+        .single()
+
+      if (dbError || !item) {
+        return NextResponse.json(
+          { error: 'NOT_FOUND', message: 'File not found' },
+          { status: 404 }
+        )
+      }
+
+      // Check if it's a storage URI
+      if (item.file_url && item.file_url.startsWith('storage://')) {
+        targetPath = item.file_url.replace('storage://backpack_files/', '')
+      } else if (item.file_url && item.file_url.startsWith('http')) {
+        // If it's already a URL (e.g. legacy public URL or long-lived signed URL), return it directly
+        // Note: If valid long-lived signed URL, we just return it. 
+        // If it's expired, we can't easily recover unless we stored the path. 
+        // Assuming recently uploaded files use storage:// or 1-year keys.
+        return NextResponse.json({
+          success: true,
+          url: item.file_url,
+        })
+      } else {
+        return NextResponse.json(
+          { error: 'INVALID_FILE', message: 'Invalid file URL format' },
+          { status: 500 }
+        )
+      }
+    }
+
+    if (!targetPath) {
+      return NextResponse.json(
+        { error: 'RESOLVE_ERROR', message: 'Could not resolve file path' },
+        { status: 500 }
       )
     }
 
     // Generate signed URL (valid for 1 hour)
     const { data, error } = await supabase.storage
       .from('backpack_files')
-      .createSignedUrl(path, 3600) // 1 hour
+      .createSignedUrl(targetPath, 3600) // 1 hour
 
     if (error) {
       console.error('[Backpack File URL] Error:', error)

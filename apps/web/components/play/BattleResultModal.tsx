@@ -15,6 +15,7 @@ import { GameHaptics } from '@/lib/haptics'
 import { useLearningChain } from '@/lib/hooks/useLearningChain'
 import { sendBattleEndAction } from '@/lib/chick/action-bus'
 import { useChickStore } from '@/src/store/chickStore'
+import { toast } from 'sonner'
 
 interface BattleResultModalProps {
   onClose: () => void
@@ -229,7 +230,7 @@ export function BattleResultModal({
         await navigator.share({ title: 'PLMS 對戰戰報', text: summary })
       } else if (navigator.clipboard) {
         await navigator.clipboard.writeText(summary)
-        alert('戰報已複製，快去分享吧！')
+        toast.success('戰報已複製，快去分享吧！')
       }
     } catch (error) {
       console.error('[BattleResultModal] Failed to share:', error)

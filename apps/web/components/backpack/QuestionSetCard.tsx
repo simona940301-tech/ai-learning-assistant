@@ -50,25 +50,48 @@ export function QuestionSetCard({
 
         {/* Right Content - Three Layers */}
         <div className="flex-1 min-w-0">
-          {/* Layer 1: Main Title */}
-          <div className="flex items-start justify-between mb-2">
-            <h3 className="font-semibold text-base text-foreground line-clamp-1 flex-1">
-              {item.title}
-            </h3>
-            {item.rating && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded ml-2 shrink-0">
-                <Star className="h-3 w-3 fill-primary text-primary" strokeWidth={1.75} />
-                {item.rating}
-              </div>
-            )}
+          {/* Layer 1: Main Title & Action */}
+          <div className="flex items-start justify-between mb-1">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <h3 className="font-semibold text-base text-foreground line-clamp-1">
+                {item.title}
+              </h3>
+              {item.rating && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded shrink-0">
+                  <Star className="h-3 w-3 fill-primary text-primary" strokeWidth={1.75} />
+                  {item.rating}
+                </div>
+              )}
+            </div>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 -mr-1 -mt-1 text-muted-foreground hover:text-foreground hover:bg-muted"
+                >
+                  <MoreVertical className="h-4 w-4" strokeWidth={1.75} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={(e) => {
+                  e.stopPropagation()
+                  onCreatePractice()
+                }}>開始練習</DropdownMenuItem>
+                <DropdownMenuItem>查看詳情</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
-          {/* Layer 2: Info Band */}
-          <div className="mb-3">
-            <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
-              {item.description}
-            </p>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+          {/* Layer 2: Description */}
+          <p className="text-sm text-muted-foreground line-clamp-1 mb-2">
+            {item.description}
+          </p>
+
+          {/* Layer 3: Info & Progress */}
+          <div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span className="px-2 py-0.5 rounded bg-muted text-muted-foreground border border-border">
                 {subjectName}
               </span>
@@ -80,7 +103,7 @@ export function QuestionSetCard({
             </div>
             {/* Progress */}
             {item.progress_data && item.practice_count > 0 && (
-              <div className="space-y-1">
+              <div className="mt-2 space-y-1">
                 <Progress
                   value={calculateProgressPercent(item.progress_data)}
                   className="h-1.5"
@@ -95,28 +118,6 @@ export function QuestionSetCard({
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Layer 3: Action Row */}
-          <div className="flex items-center justify-end">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
-                >
-                  <MoreVertical className="h-4 w-4" strokeWidth={1.75} />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={(e) => {
-                  e.stopPropagation()
-                  onCreatePractice()
-                }}>開始練習</DropdownMenuItem>
-                <DropdownMenuItem>查看詳情</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </div>
       </div>

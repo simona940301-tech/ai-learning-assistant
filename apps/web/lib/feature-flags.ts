@@ -44,6 +44,7 @@ export type GameModeFlag =
   | 'UGC_MODE'
   | 'SYSTEM_BATTLE'
   | 'CUSTOM_BATTLE'
+  | 'LYRICAL_FLOW'
 
 /**
  * Game mode defaults
@@ -57,6 +58,7 @@ const GAME_MODE_DEFAULTS: Record<GameModeFlag, boolean> = {
   UGC_MODE: true,
   PRACTICE_MODE: true,
   FOCUS_MODE: true,
+  LYRICAL_FLOW: true,
 
   // ❌ Incomplete features (disabled by default)
   DETECTIVE_MODE: false,
@@ -74,6 +76,7 @@ const GAME_MODE_ENV_MAP: Record<GameModeFlag, string> = {
   UGC_MODE: 'NEXT_PUBLIC_ENABLE_UGC',
   SYSTEM_BATTLE: 'NEXT_PUBLIC_ENABLE_SYSTEM_BATTLE',
   CUSTOM_BATTLE: 'NEXT_PUBLIC_ENABLE_CUSTOM_BATTLE',
+  LYRICAL_FLOW: 'NEXT_PUBLIC_ENABLE_LYRICAL_FLOW',
 }
 
 // ============================================

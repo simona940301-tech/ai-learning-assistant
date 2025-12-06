@@ -5,6 +5,7 @@ export * from './types';
 export * from './sdk';
 
 // Config
+export * from './config';
 export * from './config/flags';
 export * from './config/remoteConfig';
 

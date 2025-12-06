@@ -8,21 +8,22 @@ import UserMessage from '@/components/ask/messages/UserMessage'
 import AIMessage from '@/components/ask/messages/AIMessage'
 
 type FollowUpEntry = {
-  id: string
-  userText: string
-  createdAt: number
-  status: 'loading' | 'ready' | 'error'
-  response?: string
-  error?: string
+    id: string
+    userText: string
+    createdAt: number
+    status: 'loading' | 'ready' | 'error'
+    response?: string
+    error?: string
 }
 
 type QuestionTurn = {
-  id: string
-  questionText: string
-  questionId?: string | null
-  createdAt: number
-  snapshot?: ExplainCardSnapshot
-  followups: FollowUpEntry[]
+    id: string
+    questionText: string // 顯示給用戶的乾淨文本
+    apiText?: string // 發送給 API 的完整文本（包含檔案內容和系統指令）
+    questionId?: string | null
+    createdAt: number
+    snapshot?: ExplainCardSnapshot
+    followups: FollowUpEntry[]
 }
 
 interface ConversationItemProps {
@@ -67,7 +68,7 @@ const ConversationItem = ({
 
                 <motion.div initial={{ opacity: 0.8, y: 6 }} animate={{ opacity: 1, y: 0 }}>
                     <ExplainCardV2
-                        inputText={turn.questionText}
+                        inputText={turn.apiText || turn.questionText}
                         questionId={turn.questionId || undefined}
                         onLoadingChange={handleLoadingChange}
                         onExplainComplete={handleExplainComplete}

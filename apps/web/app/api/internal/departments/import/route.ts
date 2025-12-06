@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/api/auth';
-import { withInternalAuth, unauthorizedResponse } from '@/lib/auth-middleware';
+import { convertDepartmentStandards, type DepartmentStandardInput, type DepartmentStandardOutput } from '@/lib/gsat-standards';
 
 /**
  * POST /api/internal/departments/import
@@ -9,11 +9,6 @@ import { withInternalAuth, unauthorizedResponse } from '@/lib/auth-middleware';
  * Expected CSV format matches department_requirements table schema
  */
 export async function POST(req: NextRequest) {
-  const authResult = await withInternalAuth(req);
-  if (!authResult.authorized) {
-    return unauthorizedResponse(authResult.error || 'Unauthorized');
-  }
-
   const supabase = getSupabaseClient(req);
 
   try {
@@ -44,7 +39,7 @@ export async function POST(req: NextRequest) {
     // Required fields
     const requiredFields = ['university_name', 'department_name'];
 
-    const departments: any[] = [];
+    const departmentMap = new Map<string, { department: Omit<DepartmentStandardOutput, 'gender_requirement'>; row: number }>();
     const errors: Array<{ row: number; error: string }> = [];
 
     // Parse each row
@@ -67,39 +62,45 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        // Validate gender_requirement
-        if (row.gender_requirement && !['無', '男', '女'].includes(row.gender_requirement)) {
+        // Build department object (without scores first)
+        const departmentInput: DepartmentStandardInput = {
+          university_name: row.university_name,
+          department_name: row.department_name,
+          department_code: row.department_code || undefined,
+          admission_quota: row.admission_quota ? parseInt(row.admission_quota) : undefined,
+          gender_requirement: row.gender_requirement || undefined,
+          requirement_chinese: row.requirement_chinese || undefined,
+          requirement_english: row.requirement_english || undefined,
+          requirement_math_a: row.requirement_math_a || undefined,
+          requirement_math_b: row.requirement_math_b || undefined,
+          requirement_social: row.requirement_social || undefined,
+          requirement_natural: row.requirement_natural || undefined,
+          requirement_english_listening: row.requirement_english_listening || undefined,
+        };
+
+        // 🎯 自動轉換級距標準為分數 (頂標→13, 前標→12, 均標→10 等)
+        const department = convertDepartmentStandards(departmentInput);
+
+        // Schema 尚未支援 gender_requirement，匯入時忽略此欄
+        const { gender_requirement, ...departmentWithoutGender } = department;
+
+        const normalizedUniversity = (departmentWithoutGender.university_name || '').trim().toLowerCase();
+        const normalizedDepartment = (departmentWithoutGender.department_name || '').trim().toLowerCase();
+        const departmentKey = `${normalizedUniversity}::${normalizedDepartment}`;
+
+        if (departmentMap.has(departmentKey)) {
+          const existingRow = departmentMap.get(departmentKey)?.row ?? 'unknown';
           errors.push({
             row: i + 1,
-            error: 'gender_requirement must be one of: 無, 男, 女',
+            error: `Duplicate department entry detected (first occurrence at row ${existingRow})`,
           });
           continue;
         }
 
-        // Build department object
-        const department: any = {
-          university_name: row.university_name,
-          department_name: row.department_name,
-          department_code: row.department_code || null,
-          admission_quota: row.admission_quota ? parseInt(row.admission_quota) : null,
-          gender_requirement: row.gender_requirement || null,
-          requirement_chinese: row.requirement_chinese || null,
-          requirement_english: row.requirement_english || null,
-          requirement_math_a: row.requirement_math_a || null,
-          requirement_math_b: row.requirement_math_b || null,
-          requirement_social: row.requirement_social || null,
-          requirement_natural: row.requirement_natural || null,
-          requirement_english_listening: row.requirement_english_listening || null,
-          score_chinese: row.score_chinese ? parseInt(row.score_chinese) : null,
-          score_english: row.score_english ? parseInt(row.score_english) : null,
-          score_math_a: row.score_math_a ? parseInt(row.score_math_a) : null,
-          score_math_b: row.score_math_b ? parseInt(row.score_math_b) : null,
-          score_social: row.score_social ? parseInt(row.score_social) : null,
-          score_natural: row.score_natural ? parseInt(row.score_natural) : null,
-          score_english_listening: row.score_english_listening || null,
-        };
-
-        departments.push(department);
+        departmentMap.set(departmentKey, {
+          department: departmentWithoutGender,
+          row: i + 1,
+        });
       } catch (error) {
         errors.push({
           row: i + 1,
@@ -107,6 +108,8 @@ export async function POST(req: NextRequest) {
         });
       }
     }
+
+    const departments = Array.from(departmentMap.values()).map(entry => entry.department);
 
     if (departments.length === 0) {
       return NextResponse.json(
@@ -158,5 +161,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-
-

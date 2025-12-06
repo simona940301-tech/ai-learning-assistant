@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { motion } from 'framer-motion'
+import { toast } from 'sonner'
 
 interface WrongQuestion {
   id: string
@@ -34,7 +35,7 @@ export function QuestionAskModal({
 
   const handleSubmit = async () => {
     if (!questionText.trim()) {
-      alert('請輸入你的問題')
+      toast.error('請輸入你的問題')
       return
     }
 
@@ -80,7 +81,7 @@ export function QuestionAskModal({
       onClose()
     } catch (error) {
       console.error('[QuestionAskModal] Failed to submit:', error)
-      alert(error instanceof Error ? error.message : '發布失敗，請稍後再試')
+      toast.error(error instanceof Error ? error.message : '發布失敗，請稍後再試')
     } finally {
       setIsSubmitting(false)
     }

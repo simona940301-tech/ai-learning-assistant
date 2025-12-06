@@ -27,7 +27,7 @@
         "no-restricted-syntax": [
           "error",
           {
-            "selector": "CallExpression[callee.property.name='from']",
+            "selector": "CallExpression > MemberExpression[property.name='from']",
             "message": "❌ Route 禁止直接查詢數據庫（supabase.from()），請使用 Repo 層。參考：ARCHITECTURE.md"
           }
         ]

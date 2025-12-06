@@ -11,6 +11,7 @@ import { CheckCircle, XCircle, Loader2, FileText } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { LoadingSpinner, Skeleton } from '@/components/ui/loading-states'
 import { EmptyState } from '@/components/ui/empty-states'
+import { toast } from 'sonner'
 
 interface UGCReviewModalProps {
   onClose: () => void
@@ -50,7 +51,7 @@ export function UGCReviewModal({ onClose }: UGCReviewModalProps) {
 
       if (!response.ok) {
         if (response.status === 403) {
-          alert('您沒有權限訪問此功能')
+          toast.error('您沒有權限訪問此功能')
           onClose()
           return
         }
@@ -61,7 +62,7 @@ export function UGCReviewModal({ onClose }: UGCReviewModalProps) {
       setQuestions(data.questions || [])
     } catch (error) {
       console.error('[UGC Review] Failed to load questions:', error)
-      alert('載入題目失敗')
+      toast.error('載入題目失敗')
     } finally {
       setIsLoading(false)
     }
@@ -90,11 +91,11 @@ export function UGCReviewModal({ onClose }: UGCReviewModalProps) {
         throw new Error(data.message || '審核失敗')
       }
 
-      alert(action === 'APPROVE' ? '題目已通過審核' : '題目已拒絕')
+      toast.success(action === 'APPROVE' ? '題目已通過審核' : '題目已拒絕')
       setReviewNote('')
       loadQuestions()
     } catch (error: any) {
-      alert(error.message || '審核失敗')
+      toast.error(error.message || '審核失敗')
     } finally {
       setReviewingId(null)
     }

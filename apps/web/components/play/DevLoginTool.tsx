@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card'
 import { supabaseBrowserClient } from '@/lib/supabase'
 import { usePlay } from '@/lib/play-context'
 import { LogIn, Loader2, Chrome } from 'lucide-react'
+import { toast } from 'sonner'
 
 /**
  * 登錄工具
@@ -70,7 +71,7 @@ export function DevLoginTool() {
       // 如果用戶存在，提示使用 email/password 登錄或無密碼登錄
       if (data.email) {
         setEmail(data.email)
-        
+
         if (data.hasPassword === false || !data.hasPassword) {
           // 用戶沒有密碼，提供無密碼登錄選項
           setError(`找到用戶: ${data.username || data.email}，但沒有設置密碼。請使用「無密碼登錄」按鈕。`)
@@ -116,20 +117,20 @@ export function DevLoginTool() {
         try {
           const linkUrl = new URL(data.magicLink)
           const token = linkUrl.searchParams.get('token') || data.token
-          
+
           if (token) {
             const { data: sessionData, error: sessionError } = await supabaseBrowserClient.auth.setSession({
               access_token: token,
               refresh_token: '',
             })
-            
+
             if (!sessionError && sessionData.session) {
               await refreshStatus()
               setError(null)
               return
             }
           }
-          
+
           window.open(data.magicLink, '_blank')
           setError('已打開登錄鏈接，請在新窗口中完成登錄，然後刷新此頁面')
         } catch (err) {
@@ -181,9 +182,9 @@ export function DevLoginTool() {
   const checkAuth = async () => {
     const { data: { user } } = await supabaseBrowserClient.auth.getUser()
     if (user) {
-      alert(`已登錄: ${user.email || user.id}`)
+      toast.success(`已登錄: ${user.email || user.id}`)
     } else {
-      alert('未登錄')
+      toast.info('未登錄')
     }
   }
 

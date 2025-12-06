@@ -139,3 +139,4 @@ COMMENT ON COLUMN profiles.elo_rank IS
 
 
 
+

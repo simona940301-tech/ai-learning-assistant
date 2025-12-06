@@ -11,6 +11,7 @@ import { SubjectSelect } from '@/components/ui/subject-select'
 import { Book, Sparkles, Target, Shuffle, Loader2, Store } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { handleApiError } from '@/lib/error-handler'
+import { toast } from 'sonner'
 
 interface QuestionSet {
     id: string
@@ -81,14 +82,14 @@ export function PracticeSourceModal({ isOpen, onClose }: PracticeSourceModalProp
 
             if (sourceType === 'QUESTION_SET') {
                 if (!selectedQuestionSet) {
-                    alert('請選擇一個題本')
+                    toast.error('請選擇一個題本')
                     setIsCreatingRoom(false)
                     return
                 }
                 body.setId = selectedQuestionSet.id
             } else if (sourceType === 'SUBJECT_TAG') {
                 if (!selectedSubject) {
-                    alert('請選擇一個科目')
+                    toast.error('請選擇一個科目')
                     setIsCreatingRoom(false)
                     return
                 }

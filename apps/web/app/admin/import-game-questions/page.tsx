@@ -191,7 +191,7 @@ export default function ImportGameQuestionsPage() {
                                 遊戲題目匯入系統
                             </h1>
                             <p className="mt-1 text-sm text-slate-600">
-                                為 Detective's Log、Editor Mode 和 Infinite Practice 匯入題目
+                                為 Detective&apos;s Log、Editor Mode 和 Infinite Practice 匯入題目
                             </p>
                         </div>
                         <Button

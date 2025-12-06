@@ -67,12 +67,12 @@ export function ErrorBookCard({
         {/* Right Content - Three Layers */}
         <div className="flex-1 min-w-0">
           {/* Layer 1: Main Title */}
-          <h3 className="font-semibold text-base text-foreground mb-2 line-clamp-2">
+          <h3 className="font-semibold text-base text-foreground mb-1 line-clamp-2">
             {question?.stem || '題目'}
           </h3>
 
           {/* Layer 2: Info Band */}
-          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span>{subjectName}</span>
             {pack?.skill && (
               <>
@@ -81,7 +81,6 @@ export function ErrorBookCard({
               </>
             )}
           </div>
-
         </div>
       </div>
     </motion.div>

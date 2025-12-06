@@ -132,7 +132,37 @@ export async function GET(request: NextRequest) {
     }
 
     // 3. Define Requirements & Weights
-    const englishRequirement: EnglishRequirement = DEFAULT_ENGLISH_REQUIREMENT
+    // 🎯 動態查詢使用者目標科系的英文要求
+    let englishRequirement: EnglishRequirement = DEFAULT_ENGLISH_REQUIREMENT
+    let minReadyScore = 80 // 預設值
+
+    if (profile.target_university && profile.target_department) {
+      try {
+        const { data: deptReq, error: deptError } = await supabase
+          .from('department_requirements')
+          .select('score_english, requirement_english')
+          .eq('university_name', profile.target_university)
+          .eq('department_name', profile.target_department)
+          .maybeSingle()
+
+        if (!deptError && deptReq) {
+          // 如果查詢到該科系的英文要求,使用實際數據
+          if (deptReq.score_english) {
+            englishRequirement = {
+              requiredGradeLevel: deptReq.score_english,
+              passScore: 60,
+              excellentScore: 90,
+            }
+            // 根據要求級分動態調整最低分數
+            // 頂標(13) → 85分, 前標(12) → 80分, 均標(10) → 70分
+            minReadyScore = 50 + (deptReq.score_english * 3)
+          }
+        }
+      } catch (queryError) {
+        console.warn('[Dream School Progress] Failed to query department requirements:', queryError)
+        // 查詢失敗時使用預設值
+      }
+    }
 
     const skillWeights: SkillWeights = {
       vocabulary: 1.0,
@@ -160,7 +190,7 @@ export async function GET(request: NextRequest) {
       mockExamLevel: profile.mock_exam_level,
       streak: profile.streak || 0,
       eloRank: profile.elo_rank || 1200,
-      minReadyScore: 80,
+      minReadyScore, // 🎯 使用動態計算的最低分數
       englishRequirement,
     })
 

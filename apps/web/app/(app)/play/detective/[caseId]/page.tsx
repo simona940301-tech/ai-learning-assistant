@@ -55,7 +55,7 @@ export default function DetectiveGamePage() {
                         <ArrowLeft className="w-5 h-5" />
                     </Button>
                     <h1 className="font-serif text-lg font-bold tracking-wide text-amber-500">
-                        CASE #{params.caseId} // {MOCK_CASE.title}
+                        CASE #{params.caseId} {/* {MOCK_CASE.title} */}
                     </h1>
                 </div>
 

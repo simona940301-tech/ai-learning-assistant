@@ -28,7 +28,8 @@ type FollowUpEntry = {
 
 type QuestionTurn = {
   id: string
-  questionText: string
+  questionText: string // 顯示給用戶的乾淨文本
+  apiText?: string // 發送給 API 的完整文本（包含檔案內容和系統指令）
   questionId?: string | null
   createdAt: number
   snapshot?: ExplainCardSnapshot
@@ -83,29 +84,41 @@ export default function AnySubjectSolver() {
       const trimmed = text.trim()
       if (!trimmed) return
 
-      // 🎯 合併檔案內容到 text（方案一：前端合併）
-      let enhancedText = trimmed
+      // 🎯 Perfect UX: 分離顯示文本和 API 文本
+      // displayText: 用戶看到的乾淨文本（只顯示檔案標題）
+      // apiText: 發送給 API 的完整文本（包含檔案內容和系統指令）
+      let displayText = trimmed
+      let apiText = trimmed
 
       if (attachedFiles && attachedFiles.length > 0) {
         const fileContexts: string[] = []
+        const displayFileRefs: string[] = []
 
         attachedFiles.forEach((file) => {
+          // 🎯 顯示用：只顯示檔案名稱
+          displayFileRefs.push(`\n\n[參考檔案：${file.name}]`)
+
           if (file.content) {
-            // 有內容的檔案：直接添加內容
+            // 有內容的檔案：直接添加內容到 API 文本
             fileContexts.push(`\n\n[檔案：${file.name}]\n${file.content}`)
           } else if (file.url) {
-            // 只有 URL 的檔案（PDF/圖片）：添加檔案引用說明
-            // AI 可以根據檔案 URL 和類型進行分析
+            // 只有 URL 的檔案（PDF/圖片）：添加檔案引用說明到 API 文本
+            // 注意：這些內部細節不會顯示給用戶
             const fileTypeLabel = file.type === 'pdf' ? 'PDF' : file.type === 'image' ? '圖片' : '檔案'
             fileContexts.push(`\n\n[參考${fileTypeLabel}檔案：${file.name}]\n檔案類型：${fileTypeLabel}\n檔案 URL：${file.url}\n請根據此${fileTypeLabel}檔案內容協助回答問題。`)
           }
         })
 
+        if (displayFileRefs.length > 0) {
+          displayText = `${trimmed}${displayFileRefs.join('\n')}`
+        }
+
         if (fileContexts.length > 0) {
-          enhancedText = `${trimmed}${fileContexts.join('\n')}`
+          apiText = `${trimmed}${fileContexts.join('\n')}`
           console.log('[AnySubjectSolver] ✅ Enhanced text with files:', {
             originalLength: trimmed.length,
-            enhancedLength: enhancedText.length,
+            displayLength: displayText.length,
+            apiLength: apiText.length,
             fileCount: attachedFiles.length,
             filesWithContent: attachedFiles.filter(f => f.content).length,
             filesWithUrl: attachedFiles.filter(f => f.url && !f.content).length
@@ -115,7 +128,8 @@ export default function AnySubjectSolver() {
 
       const turn: QuestionTurn = {
         id: nanoid(),
-        questionText: enhancedText, // 使用合併後的文字
+        questionText: displayText, // 🎯 使用乾淨的顯示文本
+        apiText: apiText, // 🎯 新增：保存 API 文本用於後端調用
         questionId: options?.questionId ?? null,
         createdAt: Date.now(),
         followups: [],
@@ -178,7 +192,7 @@ export default function AnySubjectSolver() {
             context: buildFollowUpContext(parent.snapshot),
             ragContext: currentAnalysis ? {
               summary: currentAnalysis.quickSummary,
-              concepts: currentAnalysis.coreConcepts?.map(c => c.name),
+              concepts: currentAnalysis.coreConcepts?.map(c => c.concept),
               examQuestions: currentAnalysis.examPredictions?.map(q => q.questionText)
             } : undefined
           }),

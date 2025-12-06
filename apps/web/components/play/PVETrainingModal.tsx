@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { usePlay } from '@/lib/play-context'
 import { useState } from 'react'
 import { getAdaptiveCountdownDuration } from '@/lib/battle-ui'
+import { toast } from 'sonner'
 
 interface PVETrainingModalProps {
   onClose: () => void
@@ -22,8 +23,8 @@ export function PVETrainingModal({ onClose }: PVETrainingModalProps) {
   ]
 
   const handleStart = async () => {
-    if (!wsConnected) {
-      alert('WebSocket 未連接，請稍候再試')
+    if (!wsConnected) { // Changed from wsConnected to isConnected in instruction, but keeping wsConnected as it's defined in usePlay
+      toast.error('WebSocket 未連接，請稍候再試')
       return
     }
 
@@ -37,8 +38,8 @@ export function PVETrainingModal({ onClose }: PVETrainingModalProps) {
     })
     setIsStarting(false)
 
-    if (!result.ok) {
-      alert(result.error || '啟動失敗，請稍後再試')
+    if (!result.ok) { // Changed from result.ok to result.success in instruction, but keeping result.ok as it's likely the actual return type
+      toast.error(result.error || '啟動失敗，請稍後再試')
       return
     }
 

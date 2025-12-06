@@ -10,6 +10,7 @@ import { SubjectSelect } from '@/components/ui/subject-select'
 import { Textarea } from '@/components/ui/textarea'
 import { motion } from 'framer-motion'
 import { CheckCircle, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 
 interface UGCSubmissionFormProps {
   onClose: () => void
@@ -56,7 +57,7 @@ export function UGCSubmissionForm({ onClose, onSubmit }: UGCSubmissionFormProps)
         onClose()
       }, 2000)
     } catch (error: any) {
-      alert(error.message || '提交失敗')
+      toast.error(error.message || '提交失敗')
     } finally {
       setIsSubmitting(false)
     }

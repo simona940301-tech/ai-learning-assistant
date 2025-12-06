@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card'
 import { usePlay } from '@/lib/play-context'
 import { User, Bot, Trophy } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { toast } from 'sonner'
 import { useState, useRef } from 'react'
 import { MatchmakingModal } from './MatchmakingModal'
 
@@ -61,7 +62,7 @@ export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
       // 只檢查 Energy，不消耗（將在大廳確認完成時才消耗）
       const result = await checkEnergy()
       if (!result.success) {
-        alert('羽毛不足！')
+        toast.error('羽毛不足！')
         return
       }
     }
@@ -97,7 +98,7 @@ export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
     hasStartedRef.current = true
     try {
       if (!wsConnected) {
-        alert('尚未連線，請稍後再試')
+        toast.error('尚未連線，請稍後再試')
         hasStartedRef.current = false
         return
       }
@@ -112,8 +113,8 @@ export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
         timeLimit: quickTimeLimit,
         origin: 'QUICK_PVE',
       })
-      if (!startResult.ok) {
-        alert(startResult.error || '啟動失敗，請稍後再試')
+      if (!startResult.success) {
+        toast.error(startResult.error || '啟動失敗，請稍後再試')
         hasStartedRef.current = false
         setIsPveTransitioning(false)
         return
@@ -123,7 +124,8 @@ export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
       onClose()
     } catch (error) {
       console.error('[SystemBattleModal] Failed to start PVE match', error)
-      alert('啟動失敗，請稍後再試')
+      toast.error('啟動失敗，請稍後再試')
+    } finally {
       hasStartedRef.current = false
       setIsPveTransitioning(false) // 失敗時關閉過渡動畫
     }
@@ -217,7 +219,7 @@ export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
           <DialogHeader>
             <DialogTitle>選擇作答時間</DialogTitle>
             <DialogDescription>
-              {systemMode === 'RANKED' 
+              {systemMode === 'RANKED'
                 ? `選擇 ${subjects.find(s => s.id === selectedSubject)?.name} 排位賽的作答時間`
                 : '選擇弱點會戰的作答時間'}
             </DialogDescription>

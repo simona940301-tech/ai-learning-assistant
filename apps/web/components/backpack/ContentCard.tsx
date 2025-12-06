@@ -84,20 +84,20 @@ export function ContentCard({
         {/* Right Content */}
         <div className="flex-1 min-w-0">
           {/* Layer 1: Main Title (truncated) */}
-          <h3 className="font-semibold text-base text-foreground mb-2 line-clamp-1">
+          <h3 className="font-semibold text-base text-foreground mb-1 line-clamp-1">
             {item.title}
           </h3>
 
-          {/* Layer 2: Info Band - Date and Subject */}
-          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
-            <span>{subjectName}</span>
-            <span>•</span>
-            <span>{getRelativeTime(item.updated_at)}</span>
-          </div>
+          {/* Layer 2: Info Band & Action */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>{subjectName}</span>
+              <span>•</span>
+              <span>{getRelativeTime(item.updated_at)}</span>
+            </div>
 
-          {/* Layer 3: Ask CTA (only in normal mode, not in select/edit mode) */}
-          {!showCheckbox && (
-            <div className="flex items-center justify-end">
+            {/* Ask CTA (only in normal mode) */}
+            {!showCheckbox && (
               <button
                 onClick={(e) => {
                   e.stopPropagation()
@@ -105,12 +105,13 @@ export function ContentCard({
                     onImportToAsk('solve')
                   }
                 }}
-                className="text-xs px-3 py-1.5 rounded-full border border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                className="text-xs px-3 py-1 rounded-full border border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                style={{ height: '24px', lineHeight: '1' }}
               >
                 提問
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </motion.div>

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { BookOpen, Brain, Sparkles, Zap } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
 interface PracticeRoomSetupModalProps {
     isOpen: boolean
@@ -75,11 +76,11 @@ export function PracticeRoomSetupModal({ isOpen, onClose }: PracticeRoomSetupMod
             if (data.success) {
                 router.push(`/play/practice/${data.room.room_code}`)
             } else {
-                alert('無法建立練習室')
+                toast.error('無法建立練習室')
             }
         } catch (e) {
             console.error(e)
-            alert('連線錯誤')
+            toast.error('連線錯誤')
         } finally {
             setIsCreating(false)
         }
@@ -97,11 +98,11 @@ export function PracticeRoomSetupModal({ isOpen, onClose }: PracticeRoomSetupMod
             if (data.success) {
                 router.push(`/play/practice/${data.room.room_code}`)
             } else {
-                alert('無法建立練習室')
+                toast.error('無法建立練習室')
             }
         } catch (e) {
             console.error(e)
-            alert('連線錯誤')
+            toast.error('連線錯誤')
         } finally {
             setIsCreating(false)
         }

@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Loader2, Trash2, Edit, Eye, CheckCircle, XCircle, Clock } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { toast } from 'sonner'
 
 interface MyQuestionsModalProps {
   onClose: () => void
@@ -70,7 +71,7 @@ export function MyQuestionsModal({ onClose }: MyQuestionsModalProps) {
       setQuestions(data.questions || [])
     } catch (error: any) {
       console.error('[My Questions] Fetch error:', error)
-      alert(error.message || '獲取題目失敗')
+      toast.error(error.message || '獲取題目失敗')
     } finally {
       setIsLoading(false)
     }
@@ -94,11 +95,11 @@ export function MyQuestionsModal({ onClose }: MyQuestionsModalProps) {
         throw new Error(error.message || '刪除失敗')
       }
 
-      alert('題目已刪除')
+      toast.success('題目已刪除')
       fetchQuestions()
     } catch (error: any) {
       console.error('[My Questions] Delete error:', error)
-      alert(error.message || '刪除失敗')
+      toast.error(error.message || '刪除失敗')
     }
   }
 
@@ -133,9 +134,8 @@ export function MyQuestionsModal({ onClose }: MyQuestionsModalProps) {
                 return (
                   <div
                     key={option}
-                    className={`rounded-lg border p-3 ${
-                      isCorrect ? 'border-green-500 bg-green-50 dark:bg-green-950' : 'border-border'
-                    }`}
+                    className={`rounded-lg border p-3 ${isCorrect ? 'border-green-500 bg-green-50 dark:bg-green-950' : 'border-border'
+                      }`}
                   >
                     <div className="flex items-center gap-2">
                       <span className="font-semibold">{option}.</span>

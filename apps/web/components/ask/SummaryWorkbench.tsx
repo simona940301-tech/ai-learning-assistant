@@ -1,7 +1,7 @@
 'use client'
 
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
-import { Sparkles, Loader2, AlertCircle, MessageSquare, Check } from 'lucide-react'
+import { Sparkles, Loader2, AlertCircle, MessageSquare, Check, Menu } from 'lucide-react'
 import { FileUploader } from '@/components/ask/file-uploader'
 import { Button } from '@/components/ui/button'
 import { useAsk } from '@/lib/ask-context'
@@ -11,9 +11,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import RAGChatInterface from '@/components/ask/RAGChatInterface'
 import { useSummaryWorkbench, DocumentGroup } from '@/hooks/useSummaryWorkbench'
 import { useState, useEffect, useRef } from 'react'
-import { FileSelectionChips } from '@/components/ask/FileSelectionChips'
+import { SourceManagementSheet } from '@/components/ask/SourceManagementSheet'
 import { SummarySaveDialog, type SaveData } from '@/components/ask/SummarySaveDialog'
 import { RAGMessage } from '@/lib/hooks/useRAGChat'
+import type { FileAnalysis } from '@/lib/types'
 
 /**
  * Elite RAG Upload Response
@@ -51,6 +52,47 @@ class ClassificationError extends Error {
     }
 }
 
+
+/**
+ * Format full analysis content for saving
+ */
+const formatFullContent = (analysis: FileAnalysis): string => {
+    let md = ''
+
+    // 1. Summary
+    const summary = analysis.structuredNotes || analysis.quickSummary
+    if (summary) {
+        md += summary + '\n\n'
+    }
+
+    // 2. Core Concepts
+    if (analysis.coreConcepts && analysis.coreConcepts.length > 0) {
+        md += '---\n\n## 🔑 關鍵概念\n\n'
+        analysis.coreConcepts.forEach((c) => {
+            md += `### ${c.concept}\n${c.explanation}\n`
+            if (c.importance) md += `**重要性**: ${c.importance}\n`
+            md += '\n'
+        })
+    }
+
+    // 3. Exam Predictions
+    if (analysis.examPredictions && analysis.examPredictions.length > 0) {
+        md += '---\n\n## 📝 考題預測\n\n'
+        analysis.examPredictions.forEach((q, i) => {
+            md += `### 題目 ${i + 1}\n${q.questionText}\n\n`
+            if (q.options && q.options.length > 0) {
+                q.options.forEach((opt) => {
+                    md += `- ${opt.label}. ${opt.text}\n`
+                })
+                md += '\n'
+            }
+            if (q.correctAnswer) md += `**答案**: ${q.correctAnswer}\n`
+            if (q.explanation) md += `**解析**: ${q.explanation}\n\n`
+        })
+    }
+
+    return md
+}
 
 /**
  * SummaryWorkbench Component
@@ -129,6 +171,7 @@ export function SummaryWorkbench() {
     const [pendingAnalysisIds, setPendingAnalysisIds] = useState<string[]>([])
     const [showConfirmToast, setShowConfirmToast] = useState(false)
     const [showChat, setShowChat] = useState(false)
+    const [isSourceSheetOpen, setIsSourceSheetOpen] = useState(false)
 
     // State for save dialog
     const [showSaveDialog, setShowSaveDialog] = useState(false)
@@ -599,85 +642,102 @@ export function SummaryWorkbench() {
     return (
         <div className="mx-auto max-w-4xl px-4 pb-20 pt-8">
             <div className="space-y-6">
-                {/* Header Section */}
-                <div className="text-center space-y-2">
-                    <h1 className="text-2xl font-semibold text-foreground">
-                        上傳講義
-                    </h1>
-                    <p className="text-sm text-muted-foreground">
-                        AI 自動生成重點與考題
-                    </p>
+                {/* Header Section with Hamburger Menu */}
+                <div className="relative flex items-center justify-center py-2">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute left-0 top-1/2 -translate-y-1/2 hover:bg-black/5 rounded-full"
+                        onClick={() => setIsSourceSheetOpen(true)}
+                    >
+                        <Menu className="h-6 w-6 text-foreground/80" />
+                    </Button>
+
+                    <div className="text-center space-y-1">
+                        <h1 className="text-2xl font-semibold text-foreground">
+                            上傳講義
+                        </h1>
+                        <p className="text-sm text-muted-foreground">
+                            AI 自動生成重點與考題
+                        </p>
+                    </div>
+
+                    {/* Source Management Sheet */}
+                    <SourceManagementSheet
+                        isOpen={isSourceSheetOpen}
+                        onClose={() => setIsSourceSheetOpen(false)}
+                        currentUploadIds={state.uploadedDocIds}
+                        selectedIds={selectedFileIds}
+                        onSelectionChange={(selectedIds) => {
+                            console.log('[SummaryWorkbench] File selection changed:', selectedIds)
+                            setSelectedFileIds(selectedIds)
+
+                            // Show confirmation toast if selection differs from current analysis
+                            const selectionChanged =
+                                selectedIds.length !== pendingAnalysisIds.length ||
+                                selectedIds.some(id => !pendingAnalysisIds.includes(id))
+
+                            if (selectionChanged) {
+                                setShowConfirmToast(true)
+                                setTimeout(() => setShowConfirmToast(false), 5000)
+                            }
+                        }}
+                    />
                 </div>
 
-                {/* ⚡ NEW: File Selection Chips (Current Upload + 24-Hour History) */}
-                {isAnalysisReady && state.uploadedDocIds.length > 0 && (
-                    <div className="space-y-3">
-                        {/* Debug Info */}
-                        <div className="text-xs text-muted-foreground px-1">
-                            當前上傳: {state.uploadedDocIds.length} 個文件 |
-                            正在分析: {pendingAnalysisIds.length} 個文件 |
-                            已選擇: {selectedFileIds.length} 個文件
-                        </div>
+                {/* Toast Logic (kept for re-analysis prompts) */}
+                <AnimatePresence>
+                    {showConfirmToast && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="flex items-center justify-between gap-3 p-4 bg-[#F8F1E7] border border-[#E8DCC9] rounded-xl mb-4"
+                        >
+                            <div className="flex items-center gap-3">
+                                <Sparkles className="w-5 h-5 text-[#6C4A2D]" />
+                                <div>
+                                    <p className="text-sm font-medium text-[#6C4A2D]">
+                                        已選擇 {selectedFileIds.length} 個文件
+                                    </p>
+                                    <p className="text-xs text-[#8C6B4A] mt-0.5">
+                                        {selectedFileIds.length !== pendingAnalysisIds.length
+                                            ? `點擊「重新統整」以分析 ${selectedFileIds.length} 個文件`
+                                            : '當前正在分析這些文件'}
+                                    </p>
+                                </div>
+                            </div>
+                            {selectedFileIds.length !== pendingAnalysisIds.length && (
+                                <Button
+                                    onClick={() => {
+                                        console.log('[SummaryWorkbench] Starting re-analysis with:', selectedFileIds)
 
-                        <FileSelectionChips
-                            currentUploadIds={state.uploadedDocIds}
-                            onSelectionChange={(selectedIds) => {
-                                console.log('[SummaryWorkbench] File selection changed:', selectedIds)
-                                console.log('[SummaryWorkbench] Current pendingAnalysisIds:', pendingAnalysisIds)
-                                setSelectedFileIds(selectedIds)
+                                        // 1. Update active analysis IDs
+                                        setPendingAnalysisIds(selectedFileIds)
 
-                                // Show confirmation toast if selection differs from current analysis
-                                const selectionChanged =
-                                    selectedIds.length !== pendingAnalysisIds.length ||
-                                    selectedIds.some(id => !pendingAnalysisIds.includes(id))
+                                        // 2. Update state machine to recognize these as "active" uploads
+                                        // This ensures the chat interface and other components (that rely on uploadedDocIds) work correctly
+                                        uploadComplete(selectedFileIds)
 
-                                if (selectionChanged) {
-                                    setShowConfirmToast(true)
-                                    setTimeout(() => setShowConfirmToast(false), 5000)
-                                }
-                            }}
-                        />
+                                        // 3. Force state to ANALYSIS to render results
+                                        classifyComplete([{
+                                            subject: 'Summary',
+                                            documentIds: selectedFileIds,
+                                            confidence: 1.0,
+                                            reasoning: 'Manual selection from history'
+                                        }])
 
-                        {/* Confirmation Toast */}
-                        <AnimatePresence>
-                            {showConfirmToast && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: -10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -10 }}
-                                    className="flex items-center justify-between gap-3 p-4 bg-[#F8F1E7] border border-[#E8DCC9] rounded-xl"
+                                        setShowConfirmToast(false)
+                                    }}
+                                    size="sm"
+                                    className="shrink-0 bg-[#6C4A2D] text-white hover:bg-[#5C3F25]"
                                 >
-                                    <div className="flex items-center gap-3">
-                                        <Sparkles className="w-5 h-5 text-[#6C4A2D]" />
-                                        <div>
-                                            <p className="text-sm font-medium text-[#6C4A2D]">
-                                                已選擇 {selectedFileIds.length} 個文件
-                                            </p>
-                                            <p className="text-xs text-[#8C6B4A] mt-0.5">
-                                                {selectedFileIds.length !== pendingAnalysisIds.length
-                                                    ? `點擊「重新統整」以分析 ${selectedFileIds.length} 個文件 (當前分析 ${pendingAnalysisIds.length} 個)`
-                                                    : '當前正在分析這些文件'}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    {selectedFileIds.length !== pendingAnalysisIds.length && (
-                                        <Button
-                                            onClick={() => {
-                                                console.log('[SummaryWorkbench] Starting re-analysis with:', selectedFileIds)
-                                                setPendingAnalysisIds(selectedFileIds)
-                                                setShowConfirmToast(false)
-                                            }}
-                                            size="sm"
-                                            className="shrink-0"
-                                        >
-                                            重新統整
-                                        </Button>
-                                    )}
-                                </motion.div>
+                                    重新統整
+                                </Button>
                             )}
-                        </AnimatePresence>
-                    </div>
-                )}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
                 {/* ⚡ NEW LAYOUT: Upload area always visible, analysis results appear below */}
                 <div className="space-y-8">
@@ -864,7 +924,7 @@ export function SummaryWorkbench() {
                                                 console.log('[DEBUG] 📊 quickSummary preview:', analysis.quickSummary?.substring(0, 200))
 
                                                 // Capture analysis content for saving
-                                                const capturedContent = analysis.structuredNotes || analysis.quickSummary || ''
+                                                const capturedContent = formatFullContent(analysis)
                                                 console.log('[DEBUG] 💾 Final captured content length:', capturedContent.length)
                                                 console.log('[DEBUG] 💾 Final captured content preview:', capturedContent.substring(0, 300))
                                                 console.log('[DEBUG] 💾 Full captured content:', capturedContent)
@@ -876,7 +936,7 @@ export function SummaryWorkbench() {
                                                     setShowExpertQA(true)
                                                 }
                                             }}
-                                            hideSaveButton={true} // Hide individual save button, use bottom CTA instead
+                                            hideSaveButton={false} // Show individual save button as requested
                                         />
                                     </div>
                                 </div>

@@ -13,6 +13,7 @@ import { usePlay } from '@/lib/play-context'
 import { CoinCounter, XPCounter, EloChange } from '@/components/ui/count-up'
 import { GameHaptics } from '@/lib/haptics'
 import { LevelUpCelebration } from './LevelUpCelebration'
+import { toast } from 'sonner'
 import { WrongQuestionEditModal } from './WrongQuestionEditModal'
 import { QuestionAskModal } from './QuestionAskModal'
 import { trackMissionEvent } from '@/lib/mission-tracker'
@@ -345,14 +346,17 @@ export function GamifiedMatchResultModal({ onClose }: GamifiedMatchResultModalPr
       if (successCount > 0) {
         GameHaptics.celebrate()
         // 顯示成功提示
-        alert(`成功加入 ${successCount} 題到錯題本！`)
+        toast.success(`成功加入 ${successCount} 題到錯題本！`, {
+          description: '繼續保持！',
+          duration: 3000
+        })
         handleClose()
       } else {
-        alert('儲存失敗，請稍後再試')
+        toast.error('儲存失敗，請稍後再試')
       }
     } catch (error) {
       console.error('[GamifiedMatchResultModal] Failed to save to error book:', error)
-      alert('儲存失敗，請稍後再試')
+      toast.error('儲存失敗，請稍後再試')
     } finally {
       setIsSaving(false)
     }

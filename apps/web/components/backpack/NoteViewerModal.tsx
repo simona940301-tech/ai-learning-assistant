@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useRef, useCallback, useEffect } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { X, Calendar, Tag } from 'lucide-react'
@@ -14,6 +14,41 @@ interface NoteViewerModalProps {
 }
 
 export function NoteViewerModal({ isOpen, onClose, file }: NoteViewerModalProps) {
+    // ✅ 防止重複調用：使用 useRef 追蹤關閉狀態（避免狀態更新導致的重複渲染）
+    const isClosingRef = useRef(false)
+
+    // ✅ 統一的關閉處理函數：確保只調用一次 onClose
+    const handleClose = useCallback(() => {
+        // 如果已經在關閉過程中，直接返回
+        if (isClosingRef.current) return
+        
+        // 標記為正在關閉
+        isClosingRef.current = true
+        
+        // 調用 onClose
+        onClose()
+        
+        // 在短暫延遲後重置標記（允許重新打開）
+        // 使用 setTimeout 確保在下一個事件循環中重置
+        setTimeout(() => {
+            isClosingRef.current = false
+        }, 100)
+    }, [onClose])
+
+    // ✅ 處理 Dialog 的 onOpenChange：只在關閉時調用
+    const handleOpenChange = useCallback((open: boolean) => {
+        if (!open) {
+            handleClose()
+        }
+    }, [handleClose])
+
+    // ✅ 處理按鈕點擊：阻止事件冒泡，避免觸發 Dialog 的 onOpenChange
+    const handleButtonClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+        e.preventDefault()
+        e.stopPropagation()
+        handleClose()
+    }, [handleClose])
+
     // 預處理 markdown：將「正確答案」標題和答案段落合併為一行
     // ✅ 修復：將 useMemo 移到條件 return 之前，符合 React Hooks 規則
     const processedContent = useMemo(() => {
@@ -30,10 +65,17 @@ export function NoteViewerModal({ isOpen, onClose, file }: NoteViewerModalProps)
         })
     }, [file?.content])
 
+    // ✅ 當 Dialog 關閉時重置關閉標記
+    useEffect(() => {
+        if (!isOpen) {
+            isClosingRef.current = false
+        }
+    }, [isOpen])
+
     if (!file) return null
 
     return (
-        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <Dialog open={isOpen} onOpenChange={handleOpenChange}>
             <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 gap-0 overflow-hidden bg-background/95 backdrop-blur-xl border-none shadow-2xl [&>button]:hidden">
                 <DialogTitle className="sr-only">筆記內容檢視</DialogTitle>
                 <DialogDescription className="sr-only">
@@ -61,8 +103,9 @@ export function NoteViewerModal({ isOpen, onClose, file }: NoteViewerModalProps)
                     <Button 
                         variant="ghost" 
                         size="icon" 
-                        onClick={onClose} 
+                        onClick={handleButtonClick}
                         className="shrink-0 h-8 w-8 rounded-full hover:bg-muted z-50"
+                        aria-label="關閉"
                     >
                         <X className="w-4 h-4" />
                     </Button>

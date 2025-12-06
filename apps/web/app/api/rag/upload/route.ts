@@ -28,15 +28,6 @@ export async function POST(req: NextRequest) {
         // 1. 驗證用戶身份
         const { supabase, user, errorType } = await getApiUser(req)
 
-        // 🔍 診斷日誌：檢查認證狀態
-        console.log('[RAG Upload] ===== 認證診斷 =====')
-        console.log('[RAG Upload] User from getApiUser:', user ? { id: user.id, email: user.email } : 'null')
-        console.log('[RAG Upload] Error Type:', errorType)
-
-        // 測試 Supabase client 的認證狀態
-        const { data: { user: supabaseUser }, error: authError } = await supabase.auth.getUser()
-        console.log('[RAG Upload] Supabase Auth User:', supabaseUser ? { id: supabaseUser.id } : 'null')
-        console.log('[RAG Upload] Supabase Auth Error:', authError?.message || 'none')
 
         // 檢查是否為 mock mode
         const { isMockModeEnabled } = await import('@/lib/api/auth')
@@ -61,9 +52,6 @@ export async function POST(req: NextRequest) {
                         : '需要登入',
                     debug: {
                         errorType,
-                        supabaseUser: supabaseUser ? { id: supabaseUser.id } : null,
-                        authError: authError?.message,
-                        isMockMode,
                     }
                 },
                 { status: 401 }

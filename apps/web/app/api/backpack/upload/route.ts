@@ -19,8 +19,8 @@ export async function POST(req: NextRequest) {
         errorType === 'invalid-jwt'
           ? '登入狀態失效，請重新登入或清除 Cookies 後再試。'
           : errorType === 'unauthenticated'
-          ? 'Authentication required'
-          : 'Authentication error occurred'
+            ? 'Authentication required'
+            : 'Authentication error occurred'
 
       return NextResponse.json(
         {
@@ -154,11 +154,38 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // 🚀 NotebookLM Feature: Auto-index for RAG
+    try {
+      // Convert File to Buffer for service
+      const arrayBuffer = await file.arrayBuffer()
+      const buffer = Buffer.from(arrayBuffer)
+
+      const { RagIndexingService } = await import('@/lib/services/rag-indexing-service')
+
+      // Fire and forget (Background indexing)
+      RagIndexingService.processDocument(
+        buffer,
+        file.name,
+        file.type,
+        file.size,
+        user.id,
+        {
+          backpackItemId: dbData.id,
+          isBackground: true
+        }
+      ).catch(err => console.error('[Backpack Upload] Background indexing failed:', err))
+
+      console.log('[Backpack Upload] 🚀 Triggered background indexing for:', file.name)
+    } catch (indexError) {
+      // Don't fail the upload if indexing fails, just log it
+      console.error('[Backpack Upload] Failed to trigger indexing:', indexError)
+    }
+
     return NextResponse.json({
       success: true,
       fileId: dbData.id, // 🎯 添加 fileId 以兼容 BackpackUploader 組件
       item: dbData,
-      message: 'File uploaded successfully',
+      message: 'File uploaded and scheduled for indexing',
     })
   } catch (error) {
     console.error('[Backpack Upload] Unexpected error:', error)

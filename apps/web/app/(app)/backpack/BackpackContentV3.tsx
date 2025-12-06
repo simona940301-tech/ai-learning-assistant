@@ -91,10 +91,10 @@ export function BackpackContentV3() {
   const [isUploading, setIsUploading] = useState(false)
   const [viewingFile, setViewingFile] = useState<BackpackFile | null>(null) // 🎯 新增：追蹤正在查看的檔案（PDF/圖片）
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null) // 🎯 本地預覽 URL（用於上傳前預覽）
-  
+
   // 🎯 Phase 3: 多選模式（用於匯入到重點統整）
-  const [isSelectMode, setIsSelectMode] = useState(false)
-  const [selectedForSummary, setSelectedForSummary] = useState<Set<string>>(new Set())
+  // 🎯 Phase 3: 多選模式（用於匯入到重點統整）
+  // Merged into isEditMode and selectedNoteIds
 
   // Load data based on content type
   const loadData = useCallback(async () => {
@@ -206,70 +206,50 @@ export function BackpackContentV3() {
       toast.error('找不到檔案')
       return
     }
-    
-    // 🎯 如果是解題模式且有內容，構建特殊 prompt 要求不同解釋
-    if (taskType === 'solve' && file.content) {
-      // 提取題目（從 markdown 中提取第一個標題後的內容）
-      const questionMatch = file.content.match(/#\s*(.+?)\n\n(?:##[^\n]+\n\n)?(.+?)(?=\n\n##|\n\n---|$)/)
-      const questionText = questionMatch ? questionMatch[1] + '\n\n' + questionMatch[2] : file.title
-      
-      // 構建要求不同解釋的 prompt
-      const enhancedPrompt = `${questionText}\n\n[請用不同的角度重新解釋這題，並指出學生可能誤解的點]`
-      
-      // 使用 URL 參數傳遞特殊標記
-      router.push(`/ask?question=${encodeURIComponent(enhancedPrompt)}&mode=alternative`)
-      return
-    }
-    
-    // 🎯 匯入檔案到 Ask Context
+
+    // 🎯 Perfect UX: 統一使用 importFromBackpack 流程
+    // 不再在 URL 參數中傳遞增強的 prompt，避免顯示系統指令
+    // 檔案內容和系統指令會在 AnySubjectSolver 中自動處理
     console.log('[Backpack] Importing file to Ask:', { fileId, taskType, file })
     importFromBackpack([file], taskType)
     toast.success(`已匯入「${file.title}」到 Ask`)
-    router.push('/ask')
+
+    // 🎯 根據 taskType 跳轉到對應的 tab
+    const targetTab = taskType === 'summary' ? 'summary' : 'solve'
+    router.push(`/ask?tab=${targetTab}`)
   }
 
-  // 🎯 Phase 3: 多選後跳轉到重點統整 Tab
+  // 🎯 Phase 3: 多選後跳轉到重點統整
   const handleBatchSummary = () => {
-    if (selectedForSummary.size === 0) {
+    if (selectedNoteIds.size === 0) {
       toast.error('請先選擇檔案')
       return
     }
 
     // 獲取選中的檔案
-    const selectedFiles = items.filter((f) => selectedForSummary.has(f.id))
-    
+    const selectedFiles = items.filter((f) => selectedNoteIds.has(f.id))
+
     if (selectedFiles.length === 0) {
       toast.error('找不到選中的檔案')
       return
     }
 
     console.log('[Backpack] 🚀 Importing files to Summary Tab:', selectedFiles.length, 'files')
-    
+
     // 匯入到 Ask Context
     importFromBackpack(selectedFiles, 'summary')
-    
+
     // 清除選擇狀態
-    setIsSelectMode(false)
-    setSelectedForSummary(new Set())
-    
+    setIsEditMode(false)
+    setSelectedNoteIds(new Set())
+
     toast.success(`已匯入 ${selectedFiles.length} 個檔案，跳轉到重點統整...`)
-    
+
     // 🎯 跳轉到 Ask 頁面的 Summary Tab
     router.push('/ask?tab=summary')
   }
 
-  // 🎯 Phase 3: 切換檔案選擇
-  const toggleFileSelection = (fileId: string) => {
-    setSelectedForSummary((prev) => {
-      const next = new Set(prev)
-      if (next.has(fileId)) {
-        next.delete(fileId)
-      } else {
-        next.add(fileId)
-      }
-      return next
-    })
-  }
+
 
   const handleFileClick = (file: BackpackFile) => {
     trackManualOrganize() // 🎯 記錄手動整理操作，達到 3 次後自動觸發引導
@@ -278,7 +258,7 @@ export function BackpackContentV3() {
       setViewingNote(file)
       return
     }
-    
+
     // 🎯 處理上傳的檔案（PDF、圖片等）
     if (file.file_url) {
       // 檢查檔案類型
@@ -414,65 +394,9 @@ export function BackpackContentV3() {
             {subjectInfo?.name}
           </span>
         </div>
-        
-        {/* 🎯 Phase 3: 選擇模式和編輯模式按鈕 */}
-        {filteredItems.length > 0 && contentType === 'note' && (
-          <div className="flex items-center gap-2">
-            {/* 選擇模式按鈕 */}
-            <Button
-              variant={isSelectMode ? "default" : "outline"}
-              size="sm"
-              onClick={() => {
-                setIsSelectMode(!isSelectMode)
-                if (isSelectMode) {
-                  setSelectedForSummary(new Set())
-                }
-                // 退出編輯模式
-                if (isEditMode) {
-                  setIsEditMode(false)
-                  setSelectedNoteIds(new Set())
-                }
-              }}
-              className="h-8 px-3 text-xs"
-            >
-              <CheckSquare className="h-3 w-3 mr-1.5" />
-              {isSelectMode ? '取消選擇' : '選擇檔案'}
-            </Button>
-            
-            {/* 編輯按鈕 */}
-            {!isSelectMode && (
-              <Button
-                variant="ghost"
-                size="sm"
-                data-action="batch-organize"
-                onClick={() => {
-                  recordOperation()
-                  setIsEditMode(!isEditMode)
-                  if (isEditMode) {
-                    setSelectedNoteIds(new Set())
-                    setSelectedErrorBookIds(new Set())
-                  }
-                }}
-                className="h-8 px-3 text-xs"
-              >
-                {isEditMode ? (
-                  <>
-                    <X className="h-3 w-3 mr-1.5" />
-                    取消
-                  </>
-                ) : (
-                  <>
-                    <Edit2 className="h-3 w-3 mr-1.5" />
-                    編輯
-                  </>
-                )}
-              </Button>
-            )}
-          </div>
-        )}
-        
-        {/* 錯題本和題本的編輯按鈕 */}
-        {filteredItems.length > 0 && contentType !== 'note' && (
+
+        {/* 🎯 Phase 3: 選擇模式和編輯模式按鈕 - 合併為單一編輯按鈕 */}
+        {filteredItems.length > 0 && (
           <Button
             variant="ghost"
             size="sm"
@@ -501,72 +425,70 @@ export function BackpackContentV3() {
           </Button>
         )}
       </div>
-      
-      {/* 🎯 Phase 3: 選擇模式 - 統整按鈕 */}
-      {isSelectMode && (
-        <div className="px-4 py-3 border-b border-border bg-primary/5 flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">
-            已選擇 {selectedForSummary.size} 個檔案
-          </span>
-          <Button
-            size="sm"
-            onClick={handleBatchSummary}
-            disabled={selectedForSummary.size === 0}
-            className="h-8 px-4 text-xs bg-primary hover:bg-primary/90"
-          >
-            <Sparkles className="h-3 w-3 mr-1.5" />
-            統整
-          </Button>
-        </div>
-      )}
 
-      {/* Batch Delete Bar (when in edit mode) */}
+
+
+      {/* Batch Actions Bar (when in edit mode) */}
       {isEditMode && (
         <div className="px-4 py-3 border-b border-border bg-muted/30 flex items-center justify-between">
           <span className="text-sm text-muted-foreground">
             已選擇 {contentType === 'note' ? selectedNoteIds.size : selectedErrorBookIds.size} 項
           </span>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={async () => {
-              const idsToDelete = contentType === 'note' ? Array.from(selectedNoteIds) : Array.from(selectedErrorBookIds)
-              if (idsToDelete.length === 0) return
+          <div className="flex items-center gap-2">
+            {contentType === 'note' && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleBatchSummary}
+                disabled={selectedNoteIds.size === 0}
+                className="h-8 px-3 text-xs"
+              >
+                <Sparkles className="h-3 w-3 mr-1.5" />
+                統整
+              </Button>
+            )}
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={async () => {
+                const idsToDelete = contentType === 'note' ? Array.from(selectedNoteIds) : Array.from(selectedErrorBookIds)
+                if (idsToDelete.length === 0) return
 
-              try {
-                if (contentType === 'note') {
-                  // 刪除筆記
-                  const res = await fetch('/api/backpack', {
-                    method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ids: idsToDelete }),
-                  })
-                  if (!res.ok) throw new Error('刪除失敗')
-                } else if (contentType === 'wrong') {
-                  // 刪除錯題
-                  const res = await fetch('/api/error-book', {
-                    method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ids: idsToDelete }),
-                  })
-                  if (!res.ok) throw new Error('刪除失敗')
+                try {
+                  if (contentType === 'note') {
+                    // 刪除筆記
+                    const res = await fetch('/api/backpack', {
+                      method: 'DELETE',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ ids: idsToDelete }),
+                    })
+                    if (!res.ok) throw new Error('刪除失敗')
+                  } else if (contentType === 'wrong') {
+                    // 刪除錯題
+                    const res = await fetch('/api/error-book', {
+                      method: 'DELETE',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ ids: idsToDelete }),
+                    })
+                    if (!res.ok) throw new Error('刪除失敗')
+                  }
+                  toast.success(`已刪除 ${idsToDelete.length} 項`)
+                  setIsEditMode(false)
+                  setSelectedNoteIds(new Set())
+                  setSelectedErrorBookIds(new Set())
+                  loadData()
+                } catch (error) {
+                  console.error('Delete failed:', error)
+                  toast.error('刪除失敗，請稍後再試')
                 }
-                toast.success(`已刪除 ${idsToDelete.length} 項`)
-                setIsEditMode(false)
-                setSelectedNoteIds(new Set())
-                setSelectedErrorBookIds(new Set())
-                loadData()
-              } catch (error) {
-                console.error('Delete failed:', error)
-                toast.error('刪除失敗，請稍後再試')
-              }
-            }}
-            disabled={(contentType === 'note' ? selectedNoteIds.size : selectedErrorBookIds.size) === 0}
-            className="h-8 px-3 text-xs"
-          >
-            <Trash2 className="h-3 w-3 mr-1.5" />
-            刪除
-          </Button>
+              }}
+              disabled={(contentType === 'note' ? selectedNoteIds.size : selectedErrorBookIds.size) === 0}
+              className="h-8 px-3 text-xs"
+            >
+              <Trash2 className="h-3 w-3 mr-1.5" />
+              刪除
+            </Button>
+          </div>
         </div>
       )}
 
@@ -609,16 +531,22 @@ export function BackpackContentV3() {
                 </Button>
               </div>
             )}
-            
+
             {contentType === 'note' &&
               filteredItems.map((item) => (
                 <ContentCard
                   key={item.id}
                   item={item}
                   onClick={() => {
-                    // 🎯 Phase 3: 選擇模式下切換選中狀態
-                    if (isSelectMode) {
-                      toggleFileSelection(item.id)
+                    // 🎯 選擇模式下切換選中狀態
+                    if (isEditMode) {
+                      const next = new Set(selectedNoteIds)
+                      if (next.has(item.id)) {
+                        next.delete(item.id)
+                      } else {
+                        next.add(item.id)
+                      }
+                      setSelectedNoteIds(next)
                     } else {
                       handleFileClick(item)
                     }
@@ -627,24 +555,20 @@ export function BackpackContentV3() {
                   getRelativeTime={getRelativeTime}
                   subjectName={subjectInfo?.name || ''}
                   isEditMode={isEditMode}
-                  isSelected={isSelectMode ? selectedForSummary.has(item.id) : selectedNoteIds.has(item.id)}
+                  isSelected={selectedNoteIds.has(item.id)}
                   onToggleSelect={() => {
-                    if (isSelectMode) {
-                      toggleFileSelection(item.id)
-                    } else {
-                      setSelectedNoteIds((prev) => {
-                        const next = new Set(prev)
-                        if (next.has(item.id)) {
-                          next.delete(item.id)
-                        } else {
-                          next.add(item.id)
-                        }
-                        return next
-                      })
-                    }
+                    setSelectedNoteIds((prev) => {
+                      const next = new Set(prev)
+                      if (next.has(item.id)) {
+                        next.delete(item.id)
+                      } else {
+                        next.add(item.id)
+                      }
+                      return next
+                    })
                   }}
                   // 🎯 Phase 3: 傳遞選擇模式狀態
-                  isSelectMode={isSelectMode}
+                  isSelectMode={isEditMode}
                 />
               ))}
             {contentType === 'wrong' &&
@@ -820,7 +744,7 @@ export function BackpackContentV3() {
                 // 🎯 頂尖優化：創建本地預覽（零延遲，立即顯示）
                 const localUrl = URL.createObjectURL(file)
                 setLocalPreviewUrl(localUrl)
-                
+
                 // 判斷檔案類型
                 let fileType: 'text' | 'pdf' | 'image' = 'text'
                 if (file.type.startsWith('image/')) {
@@ -870,16 +794,16 @@ export function BackpackContentV3() {
                   }
 
                   const result = await response.json()
-                  
+
                   // 上傳成功，清理本地 URL 並切換到服務器 URL
                   if (localUrl) {
                     URL.revokeObjectURL(localUrl)
                     setLocalPreviewUrl(null)
                   }
-                  
+
                   // 重新載入數據
                   await loadData()
-                  
+
                   // 如果正在預覽，更新為服務器版本
                   if (viewingFile && viewingFile.id.startsWith('preview-')) {
                     const uploadedFile = result.item
@@ -890,9 +814,9 @@ export function BackpackContentV3() {
                       })
                     }
                   }
-                  
+
                   toast.success('檔案上傳成功！')
-                  
+
                   // 記錄操作（用於引導系統）
                   recordOperation()
                 } catch (err) {
@@ -900,7 +824,7 @@ export function BackpackContentV3() {
                   const errorMessage = err instanceof Error ? err.message : '上傳失敗'
                   toast.error(errorMessage)
                   setError(errorMessage)
-                  
+
                   // 上傳失敗時，清理本地預覽
                   if (localUrl) {
                     URL.revokeObjectURL(localUrl)

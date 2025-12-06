@@ -554,7 +554,10 @@ export default function ProgressiveAnalysisCard({
                                             </span>
                                         )}
                                     </div>
-                                    <p className="text-sm text-[#6C4A2F] leading-relaxed">{concept.explanation}</p>
+                                    <RAGMarkdownRenderer
+                                        content={concept.explanation}
+                                        className="text-sm text-[#6C4A2F] leading-relaxed prose-p:my-1 prose-strong:text-[#6C4A2D]"
+                                    />
                                 </div>
                             ))}
                         </div>

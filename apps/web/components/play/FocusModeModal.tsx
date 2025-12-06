@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { X, Play, Pause, RotateCcw, CheckCircle2, AlertTriangle } from 'lucide-react'
 import Image from 'next/image'
+import { toast } from 'sonner'
 
 interface FocusModeModalProps {
     onClose: () => void
@@ -26,6 +27,7 @@ export function FocusModeModal({ onClose }: FocusModeModalProps) {
     const [timeError, setTimeError] = useState('')
 
     const isRunningRef = useRef(false)
+    const gracePeriodTimeout = useRef<NodeJS.Timeout | null>(null)
 
     useEffect(() => {
         isRunningRef.current = focusState === 'running'
@@ -46,29 +48,109 @@ export function FocusModeModal({ onClose }: FocusModeModalProps) {
         return () => clearInterval(interval)
     }, [isActive, isPaused, timeLeft])
 
-    // Visibility Change Logic (Strict Mode)
+    // Visibility Change Logic (Grace Period Mode)
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (document.hidden && isRunningRef.current) {
-                console.log('[FocusMode] Window hidden detected, failing focus session')
-                handleFail()
+                console.log('[FocusMode] Window hidden detected, starting grace period')
+                toast.warning('專注模式將在 5 秒後失敗', {
+                    description: '請立即回到頁面！',
+                    duration: 5000,
+                    id: 'focus-warning'
+                })
+
+                if (gracePeriodTimeout.current) clearTimeout(gracePeriodTimeout.current)
+
+                gracePeriodTimeout.current = setTimeout(() => {
+                    if (document.hidden && isRunningRef.current) {
+                        console.log('[FocusMode] Grace period expired, failing session')
+                        handleFail()
+                    }
+                }, 5000)
+            } else {
+                // Back to visible
+                console.log('[FocusMode] Window visible again')
+                if (gracePeriodTimeout.current) {
+                    clearTimeout(gracePeriodTimeout.current)
+                    gracePeriodTimeout.current = null
+                    toast.dismiss('focus-warning')
+                    toast.success('已回到專注模式', { duration: 2000 })
+                }
             }
         }
 
-        // Also listen for blur event as fallback
         const handleBlur = () => {
-            if (isRunningRef.current) {
-                console.log('[FocusMode] Window blur detected, failing focus session')
-                handleFail()
+            // Treat blur same as hidden for strictness, but share the grace logic
+            // Actually, usually visibilitychange covers tab switching. Blur covers clicking outside iframe?
+            // Let's rely mainly on visibilitychange for tab switching, but blur might trigger on some interactions.
+            // To be safe, we can use the same logic or just ignore blur if we want to be lenient.
+            // The requirement is "Window switching detection".
+            // document.hidden is reliable for tab switching.
+            // If user just alt-tabs, document.hidden might not trigger on all OS/Browsers immediately?
+            // Actually it usually does.
+            // Let's keep `handleBlur` but route it through the same grace logic if we want strictness.
+            // However, strictly adhering to the plan: "Modify FocusModeModal to prevent immediate failure".
+            // If I remove handleBlur immediate fail, and rely on the same grace period logic, it matches.
+
+            if (isRunningRef.current && !document.hidden) {
+                // If blurred but still "visible" (e.g. clicked browser bar), maybe we don't fail immediately?
+                // Or we do. Let's apply the same logic.
+                // checking document.hidden inside blur might be tricky.
+
+                // Implementation Plan said: "On visibilitychange (hidden)..."
+                // I will map blur to the same warning if not already hidden.
+                if (!gracePeriodTimeout.current) {
+                    handleVisibilityChange() // Re-use logic (assuming document.hidden might be true or we treat blur as hide)
+                }
             }
         }
 
-        document.addEventListener('visibilitychange', handleVisibilityChange)
-        window.addEventListener('blur', handleBlur)
-        
+        // Simplified: Just use the same handler logic but we need to know if it's "away" or "back".
+        // Blur = Away, Focus = Back.
+
+        const onAway = () => {
+            if (!isRunningRef.current) return
+
+            console.log('[FocusMode] User away (blur/hidden)')
+            toast.warning('專注模式將在 5 秒後失敗', {
+                description: '請立即回到頁面！',
+                duration: 5000,
+                id: 'focus-warning'
+            })
+
+            if (gracePeriodTimeout.current) clearTimeout(gracePeriodTimeout.current)
+
+            gracePeriodTimeout.current = setTimeout(() => {
+                if (isRunningRef.current) {
+                    handleFail()
+                }
+            }, 5000)
+        }
+
+        const onBack = () => {
+            if (!isRunningRef.current) return
+
+            console.log('[FocusMode] User back (focus/visible)')
+            if (gracePeriodTimeout.current) {
+                clearTimeout(gracePeriodTimeout.current)
+                gracePeriodTimeout.current = null
+                toast.dismiss('focus-warning')
+                // toast.success('已回到專注模式', { duration: 1500 }) // Optional
+            }
+        }
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) onAway()
+            else onBack()
+        })
+        window.addEventListener('blur', onAway)
+        window.addEventListener('focus', onBack)
+
         return () => {
-            document.removeEventListener('visibilitychange', handleVisibilityChange)
-            window.removeEventListener('blur', handleBlur)
+            document.removeEventListener('visibilitychange', () => { })
+            window.removeEventListener('blur', onAway)
+            window.removeEventListener('focus', onBack)
+            if (gracePeriodTimeout.current) clearTimeout(gracePeriodTimeout.current)
         }
     }, [])
 
@@ -95,7 +177,7 @@ export function FocusModeModal({ onClose }: FocusModeModalProps) {
     const handleCustomTimeChange = (value: string) => {
         setCustomMinutes(value)
         setTimeError('')
-        
+
         if (value === '') {
             return
         }
@@ -118,7 +200,7 @@ export function FocusModeModal({ onClose }: FocusModeModalProps) {
             setTimeError(`時間必須在 ${MIN_DURATION}-${MAX_DURATION} 分鐘之間`)
             return
         }
-        
+
         const finalSeconds = finalMinutes * 60
         setInitialDuration(finalSeconds)
         setTimeLeft(finalSeconds)
@@ -219,22 +301,20 @@ export function FocusModeModal({ onClose }: FocusModeModalProps) {
 
                     {/* 小雞插圖 - 根據狀態調整顯示 */}
                     <div className="mb-8 flex justify-center">
-                        <div className={`relative h-24 w-24 ${
-                            focusState === 'failed' 
-                                ? 'opacity-100' 
+                        <div className={`relative h-24 w-24 ${focusState === 'failed'
+                                ? 'opacity-100'
                                 : focusState === 'running' || focusState === 'paused'
-                                ? 'opacity-70'
-                                : 'opacity-60'
-                        }`}>
+                                    ? 'opacity-70'
+                                    : 'opacity-60'
+                            }`}>
                             <Image
                                 src={focusState === 'failed' ? '/chicks/statussick.png' : '/chicks/meditation.png'}
                                 alt={focusState === 'failed' ? '生病小雞' : '專注小雞'}
                                 fill
-                                className={`object-contain ${
-                                    focusState === 'failed' 
-                                        ? '' 
+                                className={`object-contain ${focusState === 'failed'
+                                        ? ''
                                         : 'grayscale-[20%]'
-                                }`}
+                                    }`}
                             />
                         </div>
                     </div>
@@ -282,11 +362,10 @@ export function FocusModeModal({ onClose }: FocusModeModalProps) {
                                         <button
                                             key={minutes}
                                             onClick={() => handleQuickTimeSelect(minutes)}
-                                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                                isSelected
+                                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isSelected
                                                     ? 'bg-[#4A3728] text-white'
                                                     : 'border border-[#C8C2BB] bg-transparent text-[#5A5248] hover:border-[#8C847C]'
-                                            }`}
+                                                }`}
                                         >
                                             {minutes}
                                         </button>
@@ -307,7 +386,7 @@ export function FocusModeModal({ onClose }: FocusModeModalProps) {
                                 />
                                 <span className="text-sm text-[#C8C2BB]">分鐘</span>
                             </div>
-                            
+
                             {/* 錯誤提示 */}
                             {timeError && (
                                 <p className="text-xs text-[#DC2626]">{timeError}</p>
@@ -318,11 +397,10 @@ export function FocusModeModal({ onClose }: FocusModeModalProps) {
                                 <button
                                     onClick={handleStart}
                                     disabled={!isValidTime}
-                                    className={`w-full rounded-lg py-2.5 text-sm font-medium transition-colors ${
-                                        isValidTime
+                                    className={`w-full rounded-lg py-2.5 text-sm font-medium transition-colors ${isValidTime
                                             ? 'bg-[#4A3728] text-white hover:bg-[#5A5248]'
                                             : 'bg-[#C8C2BB] text-[#8C847C] cursor-not-allowed'
-                                    }`}
+                                        }`}
                                 >
                                     <span className="flex items-center justify-center gap-2">
                                         <Play className="h-3.5 w-3.5" /> 開始專注

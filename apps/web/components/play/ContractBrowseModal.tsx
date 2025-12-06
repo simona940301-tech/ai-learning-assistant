@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/ui/empty-states'
 import { usePlay } from '@/lib/play-context'
 import { Sparkles, List, Coins, Clock, User, Trophy } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { toast } from 'sonner'
 
 interface ContractBrowseModalProps {
   onClose: () => void
@@ -82,10 +83,10 @@ export function ContractBrowseModal({ onClose }: ContractBrowseModalProps) {
         throw new Error(data.message || '承接失敗')
       }
 
-      alert('成功承接合約！')
+      toast.success('成功承接合約！')
       loadContracts()
     } catch (error: any) {
-      alert(error.message || '承接合約失敗')
+      toast.error(error.message || '承接合約失敗')
     } finally {
       setIsAccepting(null)
     }
@@ -197,8 +198,8 @@ export function ContractBrowseModal({ onClose }: ContractBrowseModalProps) {
                           {contract.contract_type === 'PVP_BATTLE'
                             ? 'PVP 對戰'
                             : contract.contract_type === 'CHALLENGE'
-                            ? '挑戰'
-                            : '錦標賽'}
+                              ? '挑戰'
+                              : '錦標賽'}
                         </span>
                       </div>
 
@@ -243,11 +244,11 @@ export function ContractBrowseModal({ onClose }: ContractBrowseModalProps) {
                       {contract.expires_at && (
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <Clock className="h-3 w-3" />
-                      <span>
-                        {contract.expires_at
-                          ? `過期：${new Date(contract.expires_at).toLocaleDateString('zh-TW')}`
-                          : '無過期時間'}
-                      </span>
+                          <span>
+                            {contract.expires_at
+                              ? `過期：${new Date(contract.expires_at).toLocaleDateString('zh-TW')}`
+                              : '無過期時間'}
+                          </span>
                         </div>
                       )}
                     </div>
