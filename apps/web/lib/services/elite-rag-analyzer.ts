@@ -50,15 +50,15 @@ const google = createGoogleGenerativeAI({
  * @param subject - Optional subject hint from classification
  * @returns Streaming response with structured analysis
  */
-export async function generateStreamedAnalysis(
+/**
+ * Raw version of generateStreamedAnalysis that returns the StreamObjectResult directly
+ * This allows API routes to implement custom streaming protocols (like NDJSON)
+ */
+export async function generateAnalysisStream(
     fullDocumentContext: string,
     subject?: string
 ) {
-    console.log('[StreamAnalysis] 🚀 Starting structured analysis...')
-    console.log('[StreamAnalysis] Context length:', fullDocumentContext.length, 'chars')
-    if (subject) {
-        console.log('[StreamAnalysis] Subject hint:', subject)
-    }
+    console.log('[StreamAnalysis] 🚀 Starting structured analysis (RAW stream)...')
 
     // Use smart chunking to avoid context limits
     const contextText = fullDocumentContext.substring(0, 100000)
@@ -81,9 +81,14 @@ export async function generateStreamedAnalysis(
    - 如果輸入文件很長且細節豐富，請生成**更長、更詳細**的摘要與概念解析，不要受限於簡短的格式。
    - 確保所有重要細節都被涵蓋，不要過度簡化。
 
-3. **目標受眾**: 台灣高中生 (學測/分科測驗標準)。
-4. **語言**: 繁體中文 (英文科除外)。
-5. **格式**: 嚴格遵守 Markdown 格式。
+3. **內容長度 (Length Requirement)**:
+   - **禁止生成簡短的摘要**。
+   - 每個核心概念的解釋必須**詳盡**，包含例子與脈絡。
+   - 目標是讓學生讀完後能夠完全理解該概念，而不僅僅是看到定義。
+
+4. **目標受眾**: 台灣高中生 (學測/分科測驗標準)。
+5. **語言**: 繁體中文 (英文科除外)。
+6. **格式**: 嚴格遵守 Markdown 格式。
 
 ## 輸出結構 (Output Structure)
 
@@ -138,21 +143,30 @@ export async function generateStreamedAnalysis(
 ## 待分析文件 (DOCUMENTS TO ANALYZE)
 ${contextText}`
 
+    console.log('[StreamAnalysis] 🎯 Model config:', {
+        model: modelParams.model,
+        temperature: modelParams.temperature,
+        maxTokens: modelParams.maxTokens
+    })
+
+    // Use streamObject for structured streaming
+    return streamObject({
+        model: google(modelParams.model),
+        temperature: modelParams.temperature,
+        schema: GSATAnalysisSchema,
+        prompt: prompt,
+    })
+}
+
+/**
+ * Legacy wrapper for backward compatibility
+ */
+export async function generateStreamedAnalysis(
+    fullDocumentContext: string,
+    subject?: string
+) {
     try {
-        console.log('[StreamAnalysis] 🎯 Model config:', {
-            model: modelParams.model,
-            temperature: modelParams.temperature,
-            maxTokens: modelParams.maxTokens
-        })
-
-        // Use streamObject for structured streaming
-        const result = await streamObject({
-            model: google(modelParams.model),
-            temperature: modelParams.temperature,
-            schema: GSATAnalysisSchema,
-            prompt: prompt,
-        })
-
+        const result = await generateAnalysisStream(fullDocumentContext, subject)
         console.log('[StreamAnalysis] ✅ Streaming started')
 
         // Return AI stream response
@@ -163,7 +177,6 @@ ${contextText}`
 
     } catch (error) {
         console.error('[StreamAnalysis] ❌ Error:', error)
-
         // Return error response
         return new Response(
             JSON.stringify({

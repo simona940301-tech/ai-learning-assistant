@@ -168,12 +168,16 @@ export function SummaryWorkbench() {
     const [showExpertQA, setShowExpertQA] = useState(false)
 
     const handleClassificationSuccess = (groups: DocumentGroup[], originalIds: string[]) => {
+        console.log('[SummaryWorkbench] 🎯 Classification success, transitioning to ANALYSIS')
         classifyComplete(groups)
         setPendingAnalysisIds(originalIds)
         setUploadProgress(100)
         stopClassificationPolling()
         setClassificationJob(prev => prev ? { ...prev, status: 'completed' } : prev)
-        clearAll()
+
+        // 🚀 FIX: Don't clearAll() - this causes UI to reset and get stuck
+        // Instead, keep files for display but mark upload as complete
+        console.log('[SummaryWorkbench] ✅ Ready for analysis, files:', originalIds)
     }
 
     const handleClassificationFailure = (message: string, originalIds: string[]) => {
@@ -386,9 +390,9 @@ export function SummaryWorkbench() {
                         setFileProgress(prev => {
                             const updated = { ...prev, [fileId]: progress }
 
-                            // Calculate overall progress (0-90% for upload phase)
+                            // Calculate overall progress
                             const totalProgress = Object.values(updated).reduce((sum, p) => sum + p, 0) / totalFiles
-                            setUploadProgress(Math.floor(totalProgress * 0.9))
+                            setUploadProgress(Math.floor(totalProgress))
 
                             return updated
                         })
@@ -426,49 +430,50 @@ export function SummaryWorkbench() {
             currentUploadedIds = validIds
             console.log(`[SummaryWorkbench] 🎉 All ${validIds.length} files uploaded in parallel!`)
 
-            setUploadProgress(90)
+            // 🚀 ELITE FIX: Force 100% progress immediately to prevent "stuck at 90%"
+            setUploadProgress(100)
             uploadComplete(currentUploadedIds)
 
-            console.log('[SummaryWorkbench] 🎉 All files uploaded:', currentUploadedIds)
+            console.log('[SummaryWorkbench] 🎉 All files uploaded, ready for next step:', currentUploadedIds)
 
             // ========================================
             // Step 2: Classify Documents (if multiple)
             // ========================================
-                if (currentUploadedIds.length > 1) {
-                    startClassify()
-                    setUploadProgress(95)
-                    console.log('[SummaryWorkbench] 🔍 Classifying', currentUploadedIds.length, 'documents...')
+            if (currentUploadedIds.length > 1) {
+                startClassify()
+                setUploadProgress(95)
+                console.log('[SummaryWorkbench] 🔍 Classifying', currentUploadedIds.length, 'documents...')
 
-                    const classifyResponse = await fetch('/api/rag/router-classify', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${accessToken}`
-                        },
-                        body: JSON.stringify({ documentIds: currentUploadedIds }),
-                    })
+                const classifyResponse = await fetch('/api/rag/router-classify', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${accessToken}`
+                    },
+                    body: JSON.stringify({ documentIds: currentUploadedIds }),
+                })
 
-                    const classifyData = await classifyResponse.json().catch(() => ({}))
+                const classifyData = await classifyResponse.json().catch(() => ({}))
 
-                    if (!classifyResponse.ok) {
-                        throw new ClassificationError(classifyData.message || '文件分類失敗')
-                    }
+                if (!classifyResponse.ok) {
+                    throw new ClassificationError(classifyData.message || '文件分類失敗')
+                }
 
-                    console.log('[SummaryWorkbench] 🧠 Classification job queued:', classifyData.jobId)
-                    setClassificationJob({
-                        jobId: classifyData.jobId,
-                        status: classifyData.status,
-                        etaMs: classifyData.etaMs
-                    })
-                    startClassificationPolling(
-                        classifyData.jobId,
-                        accessToken,
-                        currentUploadedIds
-                    )
-                } else {
-                    // ========================================
-                    // Single Document: Set Single Group
-                    // ========================================
+                console.log('[SummaryWorkbench] 🧠 Classification job queued:', classifyData.jobId)
+                setClassificationJob({
+                    jobId: classifyData.jobId,
+                    status: classifyData.status,
+                    etaMs: classifyData.etaMs
+                })
+                startClassificationPolling(
+                    classifyData.jobId,
+                    accessToken,
+                    currentUploadedIds
+                )
+            } else {
+                // ========================================
+                // Single Document: Set Single Group
+                // ========================================
                 console.log('[SummaryWorkbench] ℹ️ Single document, skipping classification')
 
                 // Set documentGroups for consistent rendering
@@ -480,7 +485,10 @@ export function SummaryWorkbench() {
 
                 setPendingAnalysisIds(currentUploadedIds)
                 setUploadProgress(100)
-                clearAll()
+
+                // 🚀 FIX: Don't clearAll() immediately - causes UI stuck
+                // Let the analysis component handle display
+                console.log('[SummaryWorkbench] ✅ Ready for analysis')
             }
 
         } catch (err) {
@@ -493,12 +501,12 @@ export function SummaryWorkbench() {
                 setError(err.message, 'CLASSIFICATION')
                 // Fallback: treat all docs as single group
                 if (currentUploadedIds.length > 0) {
-                classifyComplete([{
-                    subject: '其他',
-                    documentIds: currentUploadedIds,
-                    confidence: 0.5,
-                    reasoning: '分類失敗，已合併為單一群組'
-                }])
+                    classifyComplete([{
+                        subject: '其他',
+                        documentIds: currentUploadedIds,
+                        confidence: 0.5,
+                        reasoning: '分類失敗，已合併為單一群組'
+                    }])
                 }
             } else {
                 // Unknown error
@@ -671,9 +679,10 @@ export function SummaryWorkbench() {
                     </div>
                 )}
 
-                {/* Main Action Area */}
-                {!isAnalysisReady ? (
-                    <div className="space-y-8">
+                {/* ⚡ NEW LAYOUT: Upload area always visible, analysis results appear below */}
+                <div className="space-y-8">
+                    {/* 1. UPLOAD AREA - Always visible */}
+                    <div className="space-y-6">
                         {/* File Uploader */}
                         <FileUploader />
 
@@ -690,7 +699,9 @@ export function SummaryWorkbench() {
                                 {isUploading ? (
                                     <div className="flex items-center gap-3">
                                         <Loader2 className="h-5 w-5 animate-spin" />
-                                        <span>上傳中 {state.uploadProgress}%</span>
+                                        <span>
+                                            {state.uploadProgress >= 100 ? '正在處理文件...' : `上傳中 ${state.uploadProgress}%`}
+                                        </span>
                                     </div>
                                 ) : isClassifying ? (
                                     <div className="flex items-center gap-3">
@@ -700,7 +711,7 @@ export function SummaryWorkbench() {
                                 ) : (
                                     <div className="flex items-center gap-2">
                                         <Sparkles className="h-5 w-5" />
-                                        <span>開始分析</span>
+                                        <span>{isAnalysisReady ? '重新分析' : '開始分析'}</span>
                                     </div>
                                 )}
                             </Button>
@@ -804,150 +815,168 @@ export function SummaryWorkbench() {
                             </AnimatePresence>
 
                             {/* Helper Text */}
-                            {attachedFiles.length === 0 && !hasError && (
+                            {attachedFiles.length === 0 && !hasError && !isAnalysisReady && (
                                 <p className="text-sm text-muted-foreground/60">
                                     支援 PDF、TXT、JPG、PNG、WEBP、HEIC 等格式，總大小不超過 50MB
                                 </p>
                             )}
                         </div>
                     </div>
-                ) : (
-                    /* ⚡ CHUNK 2: Multi-Group Analysis Display */
-                    <div className="space-y-12">
-                        {/* ⚡ NEW: Use pendingAnalysisIds to determine what to analyze */}
-                        <div className="relative">
-                            {/* Analysis Card - Component manages its own state */}
-                            <div className="relative bg-gradient-to-b from-background via-background/95 to-background/90 rounded-lg">
-                                <ProgressiveAnalysisCard
-                                    key={pendingAnalysisIds.join(',')} // Force re-mount when selection changes
-                                    documentId={pendingAnalysisIds[0]}
-                                    relatedDocIds={pendingAnalysisIds.slice(1)}
-                                    subject={state.documentGroups[0]?.subject}
-                                    selectedDocIds={pendingAnalysisIds} // ⚡ NEW: Pass all selected IDs
-                                    onAnalysisUpdate={(analysis) => {
-                                        if ((analysis.examPredictions?.length ?? 0) > 0) {
-                                            setExamPredictionReady(true)
-                                        }
-                                    }}
-                                    onAnalysisComplete={(analysis) => {
-                                        console.log('[SummaryWorkbench] ✅ Analysis complete:', analysis)
-                                        console.log('[DEBUG] 📊 structuredNotes length:', analysis.structuredNotes?.length)
-                                        console.log('[DEBUG] 📊 structuredNotes preview:', analysis.structuredNotes?.substring(0, 200))
-                                        console.log('[DEBUG] 📊 quickSummary length:', analysis.quickSummary?.length)
-                                        console.log('[DEBUG] 📊 quickSummary preview:', analysis.quickSummary?.substring(0, 200))
 
-                                        // Capture analysis content for saving
-                                        const capturedContent = analysis.structuredNotes || analysis.quickSummary || ''
-                                        console.log('[DEBUG] 💾 Final captured content length:', capturedContent.length)
-                                        console.log('[DEBUG] 💾 Final captured content preview:', capturedContent.substring(0, 300))
-                                        console.log('[DEBUG] 💾 Full captured content:', capturedContent)
-
-                                        setAnalysisContent(capturedContent)
-                                        setDetectedSubject(analysis.detectedSubject || state.documentGroups[0]?.subject || '')
-                                        setExamPredictionReady((analysis.examPredictions?.length ?? 0) > 0)
-                                        if (analysis.showExpertQA) {
-                                            setShowExpertQA(true)
-                                        }
-                                    }}
-                                    hideSaveButton={true} // Hide individual save button, use bottom CTA instead
-                                />
-                            </div>
-                        </div>
-
-                        {/* Chat Interface - Re-enabled! */}
-                        {state.uploadedDocIds.length > 0 && (
-                            <div className="mt-8">
-                                <div className="flex justify-center mb-6">
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => setShowChat(!showChat)}
-                                        className="rounded-full gap-2 shadow-sm hover:shadow-md transition-all"
-                                    >
-                                        <MessageSquare className="w-4 h-4" />
-                                        {showChat ? '隱藏 AI 助手' : '向 AI 提問'}
-                                    </Button>
-                                </div>
-
-                                <AnimatePresence>
-                                    {showChat && (
-                                        <motion.div
-                                            initial={{ opacity: 0, height: 0 }}
-                                            animate={{ opacity: 1, height: 'auto' }}
-                                            exit={{ opacity: 0, height: 0 }}
-                                            className="overflow-hidden"
-                                        >
-                                            <div className="bg-card rounded-3xl border border-border shadow-sm p-1">
-                                                <RAGChatInterface
-                                                    refreshKey={state.uploadedDocIds[0]}
-                                                    contextFileIds={selectedFileIds}
-                                                    onChatReady={() => console.log('[SummaryWorkbench] Chat ready')}
-                                                    onMessagesUpdate={(messages) => {
-                                                        // Capture conversation history for saving
-                                                        setConversationHistory(messages)
-                                                    }}
-                                                />
-                                            </div>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                            </div>
-                        )}
-
-                        {/* Save to Backpack CTA - Sticky at bottom */}
-                        {analysisContent && (
+                    {/* 2. ANALYSIS RESULTS - Appears below when ready */}
+                    <AnimatePresence>
+                        {isAnalysisReady && (
                             <motion.div
+                                key="analysis-results"
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                className="sticky bottom-8 flex justify-center pt-12 pb-4 z-50"
+                                exit={{ opacity: 0, y: -20 }}
+                                transition={{ duration: 0.5, ease: [0.32, 0.72, 0, 1] }}
+                                className="space-y-8"
                             >
-                                <div className="relative">
-                                    {/* Backdrop blur effect */}
-                                    <div className="absolute inset-0 bg-background/80 backdrop-blur-lg rounded-full -z-10" />
+                                {/* Section Title */}
+                                <div className="text-center space-y-2 pt-8 border-t border-border">
+                                    <h2 className="text-xl font-semibold text-foreground">
+                                        AI Analysis
+                                    </h2>
+                                </div>
 
-                                    <Button
-                                        onClick={() => {
-                                            console.log('[Bottom CTA] 🔘 Save button clicked')
-                                            console.log('[Bottom CTA] 📊 Current analysisContent length:', analysisContent.length)
-                                            console.log('[Bottom CTA] 📊 Current analysisContent preview:', analysisContent.substring(0, 300))
-                                            console.log('[Bottom CTA] 📊 Full analysisContent:', analysisContent)
-                                            setShowSaveDialog(true)
-                                        }}
-                                        size="lg"
-                                        className={cn(
-                                            "h-14 px-8 rounded-full text-base font-semibold shadow-xl",
-                                            "bg-gradient-to-r from-primary to-primary/90",
-                                            "hover:scale-105 active:scale-95 transition-all duration-300",
-                                            saveSuccess && "bg-green-600 hover:bg-green-600"
-                                        )}
+                                {/* ⚡ NEW: Use pendingAnalysisIds to determine what to analyze */}
+                                <div className="relative">
+                                    {/* Analysis Card - Component manages its own state */}
+                                    <div className="relative bg-gradient-to-b from-background via-background/95 to-background/90 rounded-lg">
+                                        <ProgressiveAnalysisCard
+                                            key={pendingAnalysisIds.join(',')} // Force re-mount when selection changes
+                                            documentId={pendingAnalysisIds[0]}
+                                            relatedDocIds={pendingAnalysisIds.slice(1)}
+                                            subject={state.documentGroups[0]?.subject}
+                                            selectedDocIds={pendingAnalysisIds} // ⚡ NEW: Pass all selected IDs
+                                            onAnalysisUpdate={(analysis) => {
+                                                if ((analysis.examPredictions?.length ?? 0) > 0) {
+                                                    setExamPredictionReady(true)
+                                                }
+                                            }}
+                                            onAnalysisComplete={(analysis) => {
+                                                console.log('[SummaryWorkbench] ✅ Analysis complete:', analysis)
+                                                console.log('[DEBUG] 📊 structuredNotes length:', analysis.structuredNotes?.length)
+                                                console.log('[DEBUG] 📊 structuredNotes preview:', analysis.structuredNotes?.substring(0, 200))
+                                                console.log('[DEBUG] 📊 quickSummary length:', analysis.quickSummary?.length)
+                                                console.log('[DEBUG] 📊 quickSummary preview:', analysis.quickSummary?.substring(0, 200))
+
+                                                // Capture analysis content for saving
+                                                const capturedContent = analysis.structuredNotes || analysis.quickSummary || ''
+                                                console.log('[DEBUG] 💾 Final captured content length:', capturedContent.length)
+                                                console.log('[DEBUG] 💾 Final captured content preview:', capturedContent.substring(0, 300))
+                                                console.log('[DEBUG] 💾 Full captured content:', capturedContent)
+
+                                                setAnalysisContent(capturedContent)
+                                                setDetectedSubject(analysis.detectedSubject || state.documentGroups[0]?.subject || '')
+                                                setExamPredictionReady((analysis.examPredictions?.length ?? 0) > 0)
+                                                if (analysis.showExpertQA) {
+                                                    setShowExpertQA(true)
+                                                }
+                                            }}
+                                            hideSaveButton={true} // Hide individual save button, use bottom CTA instead
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Chat Interface - Re-enabled! */}
+                                {state.uploadedDocIds.length > 0 && (
+                                    <div className="mt-8">
+                                        <div className="flex justify-center mb-6">
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => setShowChat(!showChat)}
+                                                className="rounded-full gap-2 shadow-sm hover:shadow-md transition-all"
+                                            >
+                                                <MessageSquare className="w-4 h-4" />
+                                                {showChat ? '隱藏 AI 助手' : '向 AI 提問'}
+                                            </Button>
+                                        </div>
+
+                                        <AnimatePresence>
+                                            {showChat && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, height: 0 }}
+                                                    animate={{ opacity: 1, height: 'auto' }}
+                                                    exit={{ opacity: 0, height: 0 }}
+                                                    className="overflow-hidden"
+                                                >
+                                                    <div className="bg-card rounded-3xl border border-border shadow-sm p-1">
+                                                        <RAGChatInterface
+                                                            refreshKey={state.uploadedDocIds[0]}
+                                                            contextFileIds={selectedFileIds}
+                                                            onChatReady={() => console.log('[SummaryWorkbench] Chat ready')}
+                                                            onMessagesUpdate={(messages) => {
+                                                                // Capture conversation history for saving
+                                                                setConversationHistory(messages)
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+                                )}
+
+                                {/* Save to Backpack CTA - Sticky at bottom */}
+                                {analysisContent && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="sticky bottom-8 flex justify-center pt-12 pb-4 z-50"
                                     >
-                                        {saveSuccess ? (
-                                            <>
-                                                <Check className="w-5 h-5 mr-2" />
-                                                <span>已儲存到書包</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Sparkles className="w-5 h-5 mr-2" />
-                                                <span>存到書包</span>
-                                            </>
-                                        )}
+                                        <div className="relative">
+                                            {/* Backdrop blur effect */}
+                                            <div className="absolute inset-0 bg-background/80 backdrop-blur-lg rounded-full -z-10" />
+
+                                            <Button
+                                                onClick={() => {
+                                                    console.log('[Bottom CTA] 🔘 Save button clicked')
+                                                    console.log('[Bottom CTA] 📊 Current analysisContent length:', analysisContent.length)
+                                                    console.log('[Bottom CTA] 📊 Current analysisContent preview:', analysisContent.substring(0, 300))
+                                                    console.log('[Bottom CTA] 📊 Full analysisContent:', analysisContent)
+                                                    setShowSaveDialog(true)
+                                                }}
+                                                size="lg"
+                                                className={cn(
+                                                    "h-14 px-8 rounded-full text-base font-semibold shadow-xl",
+                                                    "bg-gradient-to-r from-primary to-primary/90",
+                                                    "hover:scale-105 active:scale-95 transition-all duration-300",
+                                                    saveSuccess && "bg-green-600 hover:bg-green-600"
+                                                )}
+                                            >
+                                                {saveSuccess ? (
+                                                    <>
+                                                        <Check className="w-5 h-5 mr-2" />
+                                                        <span>已儲存到書包</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Sparkles className="w-5 h-5 mr-2" />
+                                                        <span>存到書包</span>
+                                                    </>
+                                                )}
+                                            </Button>
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {/* Clear Results Button */}
+                                <div className="flex justify-center pt-6">
+                                    <Button
+                                        onClick={handleReset}
+                                        variant="outline"
+                                        className="rounded-full px-6 border-border bg-card hover:bg-secondary/20 text-muted-foreground hover:text-foreground"
+                                    >
+                                        清除結果
                                     </Button>
                                 </div>
                             </motion.div>
                         )}
-
-                        {/* Reset Button */}
-                        <div className="flex justify-center pt-6">
-                            <Button
-                                onClick={handleReset}
-                                variant="outline"
-                                className="rounded-full px-6 border-border bg-card hover:bg-secondary/20 text-muted-foreground hover:text-foreground"
-                            >
-                                分析新文件
-                            </Button>
-                        </div>
-                    </div>
-                )}
+                    </AnimatePresence>
+                </div>
             </div>
 
             {/* Save Dialog */}
@@ -964,3 +993,4 @@ export function SummaryWorkbench() {
         </div>
     )
 }
+

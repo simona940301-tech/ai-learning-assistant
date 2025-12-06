@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { usePlay } from '@/lib/play-context'
 import { Sparkles, Loader2 } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { toast } from 'sonner'
 
 interface ContractCreateModalProps {
   onClose: () => void
@@ -26,14 +27,14 @@ export function ContractCreateModal({ onClose, onCreateSuccess }: ContractCreate
 
   const handleCreate = async () => {
     const amount = parseFloat(formData.amount)
-    if (!amount || amount <= 0) {
-      alert('請輸入有效的金額')
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('請輸入有效的金額')
       return
     }
 
-    const result = await consumeEnergy()
+    const result = await consumeEnergy() // Assuming checkEnergy() was a typo and consumeEnergy() is intended
     if (!result.success) {
-      alert('羽毛不足！')
+      toast.error('羽毛不足！')
       return
     }
 
@@ -58,11 +59,11 @@ export function ContractCreateModal({ onClose, onCreateSuccess }: ContractCreate
         throw new Error(data.message || '創建失敗')
       }
 
-      alert('合約創建成功！')
+      toast.success('合約創建成功！')
       onCreateSuccess?.()
       onClose()
     } catch (error: any) {
-      alert(error.message || '創建合約失敗')
+      toast.error(error.message || '創建合約失敗')
     } finally {
       setIsCreating(false)
     }

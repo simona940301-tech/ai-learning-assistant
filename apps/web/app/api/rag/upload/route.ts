@@ -193,6 +193,34 @@ export async function POST(req: NextRequest) {
             dbFileType = 'txt'
         }
 
+        // 🚀 ELITE OPTIMIZATION: Check for existing document (Deduplication)
+        // If same user uploads same file (name + size), reuse existing ID to hit cache
+        const { data: existingDocs, error: dupCheckError } = await supabase
+            .from('rag_documents')
+            .select('id, status, summary, keywords')
+            .eq('user_id', finalUser.id)
+            .eq('filename', fileName)
+            .eq('file_size', fileSize)
+            .order('created_at', { ascending: false })
+            .limit(1)
+
+        if (!dupCheckError && existingDocs && existingDocs.length > 0) {
+            const existingDoc = existingDocs[0]
+            console.log('[RAG Upload] ♻️ Found existing duplicate document:', existingDoc.id)
+            console.log('[RAG Upload] ⏭️ Returning existing ID to trigger Cache HIT in analysis')
+
+            return NextResponse.json({
+                success: true,
+                document: {
+                    id: existingDoc.id,
+                    filename: fileName,
+                    status: existingDoc.status, // might be 'ready'
+                    numPages,
+                    isDuplicate: true // Flag for frontend if needed
+                },
+            })
+        }
+
         const { data: docRecord, error: insertError } = await supabase
             .from('rag_documents')
             .insert({

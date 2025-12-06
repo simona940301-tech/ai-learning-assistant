@@ -85,6 +85,16 @@ export default function ProgressiveAnalysisCard({
     const [showSubjectDialog, setShowSubjectDialog] = useState(false)
     const predictionsReady = (analysis?.examPredictions?.length ?? 0) > 0
 
+    // 🚀 NEW: Progressive Rendering State (10x UX Boost)
+    const [quickSummaryReady, setQuickSummaryReady] = useState(false)
+    const [conceptsReady, setConceptsReady] = useState(false)
+    const [examPredictionsReady, setExamPredictionsReady] = useState(false)
+    const [progressiveTimestamps, setProgressiveTimestamps] = useState({
+        summaryAt: 0,
+        conceptsAt: 0,
+        predictionsAt: 0
+    })
+
     const { object, error: streamError, isLoading, submit } = useObject({
         api: '/api/rag/analyze-object',
         schema: GSATAnalysisSchema,
@@ -134,7 +144,7 @@ export default function ProgressiveAnalysisCard({
         fetchDocumentNames()
     }, [selectedDocIds, documentId, relatedDocIds])
 
-    // Kick off analysis via AI SDK hook (Vercel streamObject protocol)
+    // 🚀 Ultra-Fast Analysis - bypasses Vercel AI SDK for instant cache response
     useEffect(() => {
         if (hasStartedRef.current) return
 
@@ -150,24 +160,122 @@ export default function ProgressiveAnalysisCard({
         hasStartedRef.current = true
         setError(null)
         setAnalysis(null)
+        setQuickSummaryReady(false)
+        setConceptsReady(false)
+        setExamPredictionsReady(false)
 
+        console.log('[ProgressiveAnalysisCard] 🚀 Starting ultra-fast analysis...')
+
+        // Use ultra-fast direct fetch instead of slow useObject hook
         if (allDocIds.length > 0) {
-            submit({
-                documentId: allDocIds[0],
-                relatedDocIds: allDocIds.slice(1),
-                subject,
+            import('@/lib/streaming/ultra-fast-stream').then(({ UltraFastStream }) => {
+                UltraFastStream.analyzeWithCache(
+                    allDocIds[0],
+                    allDocIds.slice(1),
+                    subject,
+                    (chunk) => {
+                        const now = performance.now()
+
+                        if (chunk.type === 'summary') {
+                            setQuickSummaryReady(true)
+                            setProgressiveTimestamps(prev => ({ ...prev, summaryAt: now }))
+                            setAnalysis(prev => ({
+                                ...prev,
+                                id: documentId || 'analysis',
+                                status: 'analysis_ready',
+                                processingTimeMs: 0,
+                                quickSummary: chunk.data,
+                                structuredNotes: chunk.data
+                            }) as FileAnalysis)
+                        } else if (chunk.type === 'concepts') {
+                            setConceptsReady(true)
+                            setProgressiveTimestamps(prev => ({ ...prev, conceptsAt: now }))
+                            setAnalysis(prev => ({ ...prev!, coreConcepts: chunk.data as unknown as CoreConcept[] }))
+                        } else if (chunk.type === 'predictions') {
+                            setExamPredictionsReady(true)
+                            setProgressiveTimestamps(prev => ({ ...prev, predictionsAt: now }))
+                            setAnalysis(prev => ({
+                                ...prev!,
+                                examPredictions: chunk.data as unknown as ExamQuestion[],
+                                status: 'prediction_ready'
+                            }))
+                        } else if (chunk.type === 'complete') {
+                            const finalAnalysis: FileAnalysis = {
+                                id: chunk.data.analysisID || documentId || 'analysis',
+                                status: 'prediction_ready',
+                                processingTimeMs: 0,
+                                quickSummary: chunk.data.summary,
+                                detectedSubject: chunk.data.subject,
+                                detectedTopics: chunk.data.topics?.filter((t): t is string => Boolean(t)),
+                                coreConcepts: chunk.data.keyConcepts?.filter(Boolean) as unknown as CoreConcept[],
+                                structuredNotes: chunk.data.summary,
+                                examPredictions: chunk.data.examPrediction?.filter(Boolean) as unknown as ExamQuestion[]
+                            }
+                            setAnalysis(finalAnalysis)
+                            completionFiredRef.current = true
+                            onAnalysisComplete?.(finalAnalysis)
+                        }
+                    },
+                    () => console.log('[Progressive] 🏁 Complete'),
+                    (error) => {
+                        console.error('[Progressive] ❌ Error:', error)
+                        setError(error.message || '分析失敗，請稍後再試')
+                    }
+                )
             })
         } else if (initialText) {
-            submit({
-                text: initialText,
-                subject,
-            })
+            submit({ text: initialText, subject })
         }
-    }, [documentId, relatedDocIds, selectedDocIds, subject, initialText, submit])
+    }, [documentId, relatedDocIds, selectedDocIds, subject, initialText, submit, onAnalysisComplete])
 
-    // Bridge streamed object into FileAnalysis shape
+    // Bridge streamed object into FileAnalysis shape + Progressive Rendering Triggers
     useEffect(() => {
         if (!object) return
+
+        const now = performance.now()
+
+        // 🚀 Layer 1: Quick Summary (Target: 1-3s)
+        if (object.summary && object.summary.length > 50 && !quickSummaryReady) {
+            setQuickSummaryReady(true)
+            setProgressiveTimestamps(prev => ({ ...prev, summaryAt: now }))
+            console.log('[Progressive] 🎯 Layer 1: Quick Summary ready at', (now / 1000).toFixed(1), 's')
+
+            // Track UX metric
+            if (typeof window !== 'undefined' && window.gtag) {
+                window.gtag('event', 'progressive_summary_ready', {
+                    time_ms: now,
+                    char_length: object.summary.length
+                })
+            }
+        }
+
+        // 🚀 Layer 2: Key Concepts (Target: 5-10s)
+        if (object.keyConcepts && object.keyConcepts.length > 0 && !conceptsReady) {
+            setConceptsReady(true)
+            setProgressiveTimestamps(prev => ({ ...prev, conceptsAt: now }))
+            console.log('[Progressive] 🎯 Layer 2: Key Concepts ready at', (now / 1000).toFixed(1), 's')
+
+            if (typeof window !== 'undefined' && window.gtag) {
+                window.gtag('event', 'progressive_concepts_ready', {
+                    time_ms: now,
+                    concept_count: object.keyConcepts.length
+                })
+            }
+        }
+
+        // 🚀 Layer 3: Exam Predictions (Target: 15-30s)
+        if (object.examPrediction && object.examPrediction.length > 0 && !examPredictionsReady) {
+            setExamPredictionsReady(true)
+            setProgressiveTimestamps(prev => ({ ...prev, predictionsAt: now }))
+            console.log('[Progressive] 🎯 Layer 3: Exam Predictions ready at', (now / 1000).toFixed(1), 's')
+
+            if (typeof window !== 'undefined' && window.gtag) {
+                window.gtag('event', 'progressive_predictions_ready', {
+                    time_ms: now,
+                    prediction_count: object.examPrediction.length
+                })
+            }
+        }
 
         // ✅ 修復：使用類型斷言處理 streaming 數據的不完整類型
         const transformed: FileAnalysis = {
@@ -194,8 +302,17 @@ export default function ProgressiveAnalysisCard({
             console.log('[ProgressiveAnalysisCard] 📄 完整內容長度:', transformed.structuredNotes?.length)
             completionFiredRef.current = true
             onAnalysisComplete?.(transformed)
+
+            // 🚀 Log progressive rendering performance
+            const totalTime = performance.now()
+            console.log('[Progressive] 🏁 Complete rendering timeline:', {
+                summary: `${(progressiveTimestamps.summaryAt / 1000).toFixed(1)}s`,
+                concepts: `${(progressiveTimestamps.conceptsAt / 1000).toFixed(1)}s`,
+                predictions: `${(progressiveTimestamps.predictionsAt / 1000).toFixed(1)}s`,
+                total: `${(totalTime / 1000).toFixed(1)}s`
+            })
         }
-    }, [object, documentId, isLoading, onAnalysisComplete, onAnalysisUpdate])
+    }, [object, documentId, isLoading, onAnalysisComplete, onAnalysisUpdate, quickSummaryReady, conceptsReady, examPredictionsReady, progressiveTimestamps])
 
     // Surface stream errors
     useEffect(() => {
@@ -203,6 +320,24 @@ export default function ProgressiveAnalysisCard({
         console.error('[ProgressiveAnalysisCard] Stream error:', streamError)
         setError(streamError.message || '分析失敗，請稍後再試')
     }, [streamError])
+
+    // 🚀 Auto-scroll to analysis content when ready
+    useEffect(() => {
+        if (examPredictionsReady) {
+            // Wait a bit for rendering to complete
+            setTimeout(() => {
+                const predictionsElement = document.querySelector('[data-section="exam-predictions"]')
+                if (predictionsElement) {
+                    predictionsElement.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start',
+                        inline: 'nearest'
+                    })
+                    console.log('[ProgressiveAnalysisCard] 📜 Auto-scrolled to exam predictions')
+                }
+            }, 300)
+        }
+    }, [examPredictionsReady])
 
     // Handle save to backpack - show subject selection dialog
     const handleSaveToNotebook = async () => {
@@ -343,83 +478,136 @@ export default function ProgressiveAnalysisCard({
                 )}
             </div>
 
-            {/* Content Area - Minimalist & Unified */}
-            <AnimatePresence mode="wait">
-                {analysis?.structuredNotes ? (
+            {/* 🚀 Content Area - Progressive Rendering (3-Layer Display) */}
+            <div className="space-y-6">
+                {/* Layer 1: Quick Summary (1-3s) */}
+                {quickSummaryReady && analysis?.quickSummary ? (
                     <motion.div
-                        key="full-analysis"
-                        initial={{ opacity: 0, y: 20 }}
+                        initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        transition={{ duration: 0.5 }}
-                        className="bg-card/50 backdrop-blur-sm rounded-3xl p-8 md:p-12 shadow-sm border border-border/50"
-                    >
-                        <RAGMarkdownRenderer
-                            content={analysis.structuredNotes}
-                            subject={analysis.detectedSubject || subject}
-                        />
-                    </motion.div>
-                ) : analysis?.quickSummary ? (
-                    <motion.div
-                        key="preview"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
+                        transition={{ duration: 0.4 }}
                         className="bg-card/50 backdrop-blur-sm rounded-3xl p-8 md:p-12 shadow-sm border border-border/50"
                     >
                         <div className="flex items-center gap-2 mb-6 text-muted-foreground">
                             <Sparkles className="w-4 h-4" />
-                            <span className="text-sm font-medium">快速預覽</span>
+                            <span className="text-sm font-medium">核心摘要</span>
+                            <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                                {(progressiveTimestamps.summaryAt / 1000).toFixed(1)}s
+                            </span>
                         </div>
                         <RAGMarkdownRenderer
                             content={analysis.quickSummary}
                             subject={analysis.detectedSubject || subject}
                         />
-                        <div className="mt-8 flex items-center justify-center gap-2 text-sm text-muted-foreground animate-pulse">
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>正在生成完整重點統整與考題...</span>
-                        </div>
+                        {!conceptsReady && (
+                            <div className="mt-8 flex items-center justify-center gap-2 text-sm text-muted-foreground animate-pulse">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>正在提取關鍵概念...</span>
+                            </div>
+                        )}
                     </motion.div>
-                ) : (
-                    <motion.div
-                        key="loading"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="flex flex-col items-center justify-center py-24 space-y-6 text-center"
-                    >
-                        <div className="relative">
-                            <div className="absolute inset-0 rounded-full bg-[#6C4A2D]/20 blur-xl animate-pulse" />
-                            <Loader2 className="relative z-10 h-12 w-12 text-[#6C4A2D] animate-spin" />
+                ) : isLoading ? (
+                    <div className="bg-card/50 backdrop-blur-sm rounded-3xl p-8 md:p-12 shadow-sm border border-border/50 space-y-4">
+                        <div className="flex items-center gap-2 mb-4">
+                            <div className="h-4 w-4 bg-muted/50 animate-pulse rounded" />
+                            <div className="h-4 w-24 bg-muted/50 animate-pulse rounded" />
                         </div>
-                        <div className="space-y-2">
-                            <h3 className="text-lg font-medium text-foreground">正在深入分析文件</h3>
-                            <p className="text-sm text-muted-foreground">
-                                {displayDocuments.length > 1
-                                    ? `AI 正在整合 ${displayDocuments.length} 個文件的內容...`
-                                    : 'AI 正在閱讀並整理重點，請稍候...'}
-                            </p>
+                        <div className="space-y-3">
+                            <div className="h-6 bg-muted/50 animate-pulse rounded w-3/4" />
+                            <div className="h-4 bg-muted/40 animate-pulse rounded w-full" />
+                            <div className="h-4 bg-muted/40 animate-pulse rounded w-full" />
+                            <div className="h-4 bg-muted/40 animate-pulse rounded w-2/3" />
                         </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                    </div>
+                ) : null}
 
-            <div className="rounded-2xl border border-[#E8DCC9] bg-[#FCF6EE] px-4 py-3 flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                <div className="flex items-center gap-2 text-sm font-semibold text-[#6C4A2D]">
-                    <Sparkles className="w-4 h-4" />
-                    <span>{predictionsReady ? '考題預測完成' : '考題預測生成中'}</span>
-                </div>
-                <span className="text-xs text-[#8C6B4A]">
-                    {predictionsReady ? '可以開始練習 AI 命題' : 'AI 正在推演命題趨勢'}
-                </span>
+                {/* Layer 2: Key Concepts (5-10s) */}
+                {conceptsReady && analysis?.coreConcepts && analysis.coreConcepts.length > 0 ? (
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.4, delay: 0.1 }}
+                        className="space-y-3"
+                    >
+                        <div className="flex items-center gap-2">
+                            <h3 className="text-lg font-semibold text-[#6C4A2D]">關鍵概念</h3>
+                            <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                                {(progressiveTimestamps.conceptsAt / 1000).toFixed(1)}s
+                            </span>
+                        </div>
+                        <div className="grid gap-3">
+                            {analysis.coreConcepts.slice(0, 5).map((concept, idx) => (
+                                <div
+                                    key={idx}
+                                    className="rounded-xl bg-[#F8F1E7] p-4 border border-[#E8DCC9]"
+                                >
+                                    <div className="flex items-start justify-between gap-2 mb-2">
+                                        <h4 className="font-semibold text-[#6C4A2D]">{concept.concept}</h4>
+                                        {concept.importance && (
+                                            <span className={cn(
+                                                "text-xs px-2 py-0.5 rounded-full font-medium",
+                                                concept.importance === '高' && "bg-red-100 text-red-700",
+                                                concept.importance === '中' && "bg-yellow-100 text-yellow-700",
+                                                concept.importance === '低' && "bg-green-100 text-green-700"
+                                            )}>
+                                                {concept.importance}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-sm text-[#6C4A2F] leading-relaxed">{concept.explanation}</p>
+                                </div>
+                            ))}
+                        </div>
+                        {!examPredictionsReady && (
+                            <div className="mt-4 flex items-center justify-center gap-2 text-sm text-muted-foreground animate-pulse">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>正在生成考題預測...</span>
+                            </div>
+                        )}
+                    </motion.div>
+                ) : quickSummaryReady && !conceptsReady ? (
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                            <div className="h-5 w-32 bg-muted/50 animate-pulse rounded" />
+                        </div>
+                        <div className="grid gap-3">
+                            {[1, 2, 3].map((i) => (
+                                <div key={i} className="rounded-xl bg-muted/20 p-4 space-y-2">
+                                    <div className="h-4 bg-muted/40 animate-pulse rounded w-1/3" />
+                                    <div className="h-3 bg-muted/30 animate-pulse rounded w-full" />
+                                    <div className="h-3 bg-muted/30 animate-pulse rounded w-4/5" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ) : null}
             </div>
 
-            {/* Exam Predictions */}
-            {(analysis?.examPredictions?.length ?? 0) > 0 && (
+            {/* Layer 3: Exam Predictions Status Banner */}
+            {conceptsReady && (
+                <div className="rounded-2xl border border-[#E8DCC9] bg-[#FCF6EE] px-4 py-3 flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-[#6C4A2D]">
+                        <Sparkles className="w-4 h-4" />
+                        <span>{examPredictionsReady ? '考題預測完成' : '考題預測生成中'}</span>
+                        {examPredictionsReady && (
+                            <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
+                                {(progressiveTimestamps.predictionsAt / 1000).toFixed(1)}s
+                            </span>
+                        )}
+                    </div>
+                    <span className="text-xs text-[#8C6B4A]">
+                        {examPredictionsReady ? '可以開始練習 AI 命題' : 'AI 正在推演命題趨勢'}
+                    </span>
+                </div>
+            )}
+
+            {/* Layer 3: Exam Predictions (15-30s) */}
+            {examPredictionsReady && (analysis?.examPredictions?.length ?? 0) > 0 && (
                 <motion.div
-                    initial={{ opacity: 0, y: 20 }}
+                    data-section="exam-predictions"
+                    initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4 }}
+                    transition={{ duration: 0.4, delay: 0.2 }}
                     className="space-y-4"
                 >
                     <div className="flex items-center gap-2">
