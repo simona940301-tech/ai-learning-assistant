@@ -330,18 +330,11 @@ export default function AuthCallbackPage() {
           // Get session to check progress (after migration)
           const { data: session } = await supabaseBrowserClient
             .from('onboarding_sessions')
-            .select('challenge_completed_at, scorecard_submitted_at, id')
+            .select('challenge_completed_at, scorecard_submitted_at, current_step, id')
             .eq('user_id', user.id)
             .eq('status', 'in_progress')
             .order('created_at', { ascending: false })
             .limit(1)
-            .maybeSingle()
-
-          // Check profile for avatar
-          const { data: profile } = await supabaseBrowserClient
-            .from('profiles')
-            .select('avatar_url')
-            .eq('id', user.id)
             .maybeSingle()
 
           // Smart routing based on progress
@@ -352,14 +345,17 @@ export default function AuthCallbackPage() {
           } else if (session?.challenge_completed_at) {
             // Completed challenge, go to reward page
             router.push('/onboarding/reward')
-          } else if (profile?.avatar_url) {
-            // Has avatar, go to challenge
+          } else if (session?.current_step && session.current_step >= 3) {
+            // Started or completed challenge step, go to challenge
             router.push('/onboarding/challenge')
-          } else if (session?.id) {
-            // Has session (completed goal), go to avatar selection
+          } else if (session?.current_step && session.current_step >= 2) {
+            // Completed avatar selection, go to challenge
+            router.push('/onboarding/challenge')
+          } else if (session?.current_step && session.current_step >= 1) {
+            // Completed goal setting, go to avatar selection
             router.push('/onboarding/avatar')
           } else {
-            // New user or no progress, start from beginning
+            // New user or no progress, start from beginning (goal → avatar → challenge)
             router.push('/onboarding/goal')
           }
         } catch (error) {

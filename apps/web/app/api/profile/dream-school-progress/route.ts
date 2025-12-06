@@ -24,40 +24,16 @@ export async function GET(request: NextRequest) {
     }
 
     // 1. Fetch User Profile Data
-    // Try fetching with extended columns first. If it fails (migration not run), fallback to basic columns.
-    let profile: any = {}
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('mock_exam_level, streak, elo_rank, target_university, target_department')
+      .eq('id', user.id)
+      .single()
 
-    try {
-      const { data: fullProfile, error: fullProfileError } = await supabase
-        .from('profiles')
-        .select('mock_exam_level, streak, elo_rank, dream_school_id, dream_department_id')
-        .eq('id', user.id)
-        .single()
-
-      if (fullProfileError) throw fullProfileError
-      profile = fullProfile
-    } catch (err: any) {
-      console.warn(
-        'Failed to fetch full profile (likely missing columns), falling back to basic profile:',
-        err.message,
-      )
-
-      const { data: basicProfile, error: basicProfileError } = await supabase
-        .from('profiles')
-        .select('streak, elo_rank')
-        .eq('id', user.id)
-        .single()
-
-      if (basicProfileError) {
-        console.error('Error fetching basic profile:', basicProfileError)
-        return NextResponse.json({ error: 'Failed to fetch profile' }, { status: 500 })
-      }
-      profile = basicProfile
+    if (profileError || !profile) {
+      console.error('Error fetching profile:', profileError)
+      return NextResponse.json({ error: 'Failed to fetch profile' }, { status: 500 })
     }
-
-    profile.mock_exam_level = profile.mock_exam_level ?? 0
-    profile.dream_school_id = profile.dream_school_id ?? null
-    profile.dream_department_id = profile.dream_department_id ?? null
 
     // 2. Calculate Weighted Accuracy (Vocabulary)
     let weightedAccuracy = 0

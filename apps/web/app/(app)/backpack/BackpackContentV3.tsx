@@ -96,17 +96,31 @@ export function BackpackContentV3() {
   // 🎯 Phase 3: 多選模式（用於匯入到重點統整）
   // Merged into isEditMode and selectedNoteIds
 
-  // Load data based on content type
-  const loadData = useCallback(async () => {
+  // 🚀 NEW: State for cursor-based pagination
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(true)
+
+  // Load data based on content type with cursor-based pagination
+  const loadData = useCallback(async (cursor?: string | null) => {
     try {
       setLoading(true)
       setError(null)
 
       if (contentType === 'note') {
-        const response = await fetch('/api/backpack', { credentials: 'include' })
+        const params = new URLSearchParams()
+        params.set('limit', '20')
+        if (cursor) params.set('cursor', cursor)
+
+        const response = await fetch(`/api/backpack?${params.toString()}`, {
+          credentials: 'include'
+        })
         const data = await response.json().catch(() => ({}))
+
         if (response.ok && data.items) {
-          setItems(data.items || [])
+          // 🚀 Append to existing items if loading more, otherwise replace
+          setItems(prev => cursor ? [...prev, ...data.items] : data.items)
+          setNextCursor(data.nextCursor || null)
+          setHasMore(data.hasMore || false)
         }
       } else if (contentType === 'wrong') {
         const response = await fetch('/api/error-book', { credentials: 'include' })
@@ -115,14 +129,11 @@ export function BackpackContentV3() {
           setErrorBookItems(data.items || [])
         }
       } else if (contentType === 'book') {
-        // 🎯 修復：使用正確的 API 路徑 /api/user/question-sets
         const response = await fetch('/api/user/question-sets', { credentials: 'include' })
         const data = await response.json().catch(() => ({}))
         if (response.ok && data.data?.sets) {
-          // API 使用 Api.success() 格式，數據在 data.data 中
           setQuestionSetItems(data.data.sets || [])
         } else if (response.ok && data.sets) {
-          // 兼容舊格式
           setQuestionSetItems(data.sets || [])
         }
       }
@@ -133,6 +144,13 @@ export function BackpackContentV3() {
       setLoading(false)
     }
   }, [contentType])
+
+  // 🚀 NEW: Load more function for infinite scroll
+  const loadMore = useCallback(() => {
+    if (!loading && hasMore && nextCursor) {
+      loadData(nextCursor)
+    }
+  }, [loading, hasMore, nextCursor, loadData])
 
   useEffect(() => {
     loadData()
@@ -605,6 +623,20 @@ export function BackpackContentV3() {
                   subjectName={subjectInfo?.name || ''}
                 />
               ))}
+
+            {/* 🚀 Load More Button for cursor-based pagination */}
+            {contentType === 'note' && hasMore && !loading && (
+              <div className="flex justify-center pt-4 pb-2">
+                <Button
+                  variant="outline"
+                  onClick={loadMore}
+                  disabled={loading}
+                  className="w-full max-w-xs"
+                >
+                  {loading ? '載入中...' : '載入更多'}
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>

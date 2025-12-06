@@ -4,7 +4,14 @@ const QuestionSchema = z.object({
     id: z.string().optional(),
     questionType: z.enum(['單選', '多選', '填充', '簡答', '作圖', '混合題']).describe('學測題型分類'),
     question: z.string(),
-    options: z.array(z.string()).optional(),
+    options: z.union([
+        z.array(z.string()),
+        z.array(z.object({
+            label: z.string(),
+            text: z.string(),
+            isCorrect: z.boolean().optional()
+        }))
+    ]).optional(),
     answer: z.string(),
     analysis: z.string().describe('詳解，包含觀念連結'),
     difficulty: z.enum(['Easy', 'Medium', 'Hard']).describe('難度分級'),

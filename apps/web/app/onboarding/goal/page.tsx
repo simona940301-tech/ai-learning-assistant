@@ -9,11 +9,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { motion } from 'framer-motion'
 import { Search, ChevronDown, X } from 'lucide-react'
-import { universities, searchUniversities, searchDepartments, type University, type Department } from '@/lib/taiwan-universities'
 import { supabaseBrowserClient } from '@/lib/supabase'
 
 /**
  * STEP 1 — 目標設定 (極簡單頁表單)
+ * 改用 department_requirements 表作為資料來源
  */
 
 const GRADES = [
@@ -22,6 +22,14 @@ const GRADES = [
   { value: '高三', label: '高三' },
 ]
 
+interface DepartmentRequirement {
+  id: string
+  university_name: string
+  department_name: string
+  score_english: number | null
+  requirement_english: string | null
+}
+
 export default function OnboardingGoalPage() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
@@ -29,12 +37,17 @@ export default function OnboardingGoalPage() {
   // University & Department
   const [universitySearch, setUniversitySearch] = useState('')
   const [departmentSearch, setDepartmentSearch] = useState('')
-  const [selectedUniversity, setSelectedUniversity] = useState<University | null>(null)
-  const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null)
-  const [customDepartment, setCustomDepartment] = useState('')
+  const [selectedUniversity, setSelectedUniversity] = useState<string>('')
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('')
   const [isExploring, setIsExploring] = useState(false)
   const [showUniversityDropdown, setShowUniversityDropdown] = useState(true)
   const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false)
+
+  // Data from department_requirements table
+  const [universities, setUniversities] = useState<string[]>([])
+  const [departments, setDepartments] = useState<DepartmentRequirement[]>([])
+  const [allDepartments, setAllDepartments] = useState<DepartmentRequirement[]>([])
+  const [loadingData, setLoadingData] = useState(true)
 
   // Grade & Proficiency
   const [selectedGrade, setSelectedGrade] = useState<string | null>(null)
@@ -44,6 +57,39 @@ export default function OnboardingGoalPage() {
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
+
+  // 載入大學與科系資料從 department_requirements
+  useEffect(() => {
+    const loadDepartmentData = async () => {
+      try {
+        const { data, error } = await supabaseBrowserClient
+          .from('department_requirements')
+          .select('id, university_name, department_name, score_english, requirement_english')
+          .order('university_name', { ascending: true })
+
+        if (error) {
+          console.error('[OnboardingGoal] Failed to load department requirements:', error)
+          return
+        }
+
+        if (data && data.length > 0) {
+          // 提取唯一的大學名稱
+          const uniqueUniversities = Array.from(
+            new Set(data.map((d: DepartmentRequirement) => d.university_name))
+          ).sort()
+
+          setUniversities(uniqueUniversities)
+          setAllDepartments(data)
+        }
+      } catch (err) {
+        console.error('[OnboardingGoal] Error loading department data:', err)
+      } finally {
+        setLoadingData(false)
+      }
+    }
+
+    loadDepartmentData()
+  }, [])
 
   useEffect(() => {
     // 🎯 修復：不等待 authLoading，允許匿名訪問
@@ -105,40 +151,55 @@ export default function OnboardingGoalPage() {
     // 如果沒有 user，允許匿名模式繼續
   }, [user, authLoading])
 
-  const filteredUniversities = useMemo(
-    () => (universitySearch ? searchUniversities(universitySearch) : universities.slice(0, 10)),
-    [universitySearch],
-  )
+  // 當選擇大學時，更新該大學的科系列表
+  useEffect(() => {
+    if (selectedUniversity) {
+      const depts = allDepartments.filter(d => d.university_name === selectedUniversity)
+      setDepartments(depts)
+    } else {
+      setDepartments([])
+    }
+  }, [selectedUniversity, allDepartments])
+
+  const filteredUniversities = useMemo(() => {
+    if (universitySearch) {
+      return universities.filter(uni =>
+        uni.toLowerCase().includes(universitySearch.toLowerCase())
+      )
+    }
+    return universities.slice(0, 10)
+  }, [universitySearch, universities])
 
   const filteredDepartments = useMemo(() => {
     if (!selectedUniversity) return []
-    return departmentSearch
-      ? searchDepartments(selectedUniversity.id, departmentSearch)
-      : selectedUniversity.departments.slice(0, 10)
-  }, [selectedUniversity, departmentSearch])
+    if (departmentSearch) {
+      return departments.filter(dept =>
+        dept.department_name.toLowerCase().includes(departmentSearch.toLowerCase())
+      )
+    }
+    return departments.slice(0, 10)
+  }, [selectedUniversity, departmentSearch, departments])
 
-  const handleUniversitySelect = (university: University) => {
+  const handleUniversitySelect = (university: string) => {
     setSelectedUniversity(university)
-    setSelectedDepartment(null)
+    setSelectedDepartment('')
     setDepartmentSearch('')
-    setCustomDepartment('')
     setIsExploring(false)
     setShowUniversityDropdown(false)
     setShowDepartmentDropdown(true)
     setFormError(null)
   }
 
-  const handleDepartmentSelect = (department: Department) => {
+  const handleDepartmentSelect = (department: string) => {
     setSelectedDepartment(department)
-    setCustomDepartment('')
     setShowDepartmentDropdown(false)
     setFormError(null)
   }
 
   const handleExploring = () => {
     setIsExploring(true)
-    setSelectedUniversity(null)
-    setSelectedDepartment(null)
+    setSelectedUniversity('')
+    setSelectedDepartment('')
     setShowUniversityDropdown(false)
     setShowDepartmentDropdown(false)
     setFormError(null)
@@ -147,8 +208,8 @@ export default function OnboardingGoalPage() {
   const handleContinue = async () => {
     // 允許匿名模式：將資料儲存到 localStorage
     const goalData = {
-      target_university: isExploring ? '摸索中' : (selectedUniversity?.name || ''),
-      target_department: isExploring ? '摸索中' : (customDepartment.trim() || selectedDepartment?.name || ''),
+      target_university: isExploring ? '摸索中' : selectedUniversity,
+      target_department: isExploring ? '摸索中' : selectedDepartment,
       is_exploring: isExploring,
       current_grade: selectedGrade,
       mock_exam_level: mockExamLevel,
@@ -158,7 +219,7 @@ export default function OnboardingGoalPage() {
       // 匿名模式：儲存到 localStorage
       const stored = localStorage.getItem('onboarding_anonymous_data')
       let anonymousData: any = {}
-      
+
       if (stored) {
         try {
           anonymousData = JSON.parse(stored)
@@ -166,10 +227,10 @@ export default function OnboardingGoalPage() {
           console.error('[OnboardingGoal] Failed to parse stored data:', e)
         }
       }
-      
+
       anonymousData.goalData = goalData
       localStorage.setItem('onboarding_anonymous_data', JSON.stringify(anonymousData))
-      
+
       // 匿名模式：導向 avatar 頁面
       router.push('/onboarding/avatar')
       return
@@ -184,8 +245,8 @@ export default function OnboardingGoalPage() {
       setFormError('請選擇大學或點選「我還在摸索方向」')
       return
     }
-    if (!isExploring && !selectedDepartment && !customDepartment) {
-      setFormError('請選擇或輸入科系')
+    if (!isExploring && !selectedDepartment) {
+      setFormError('請選擇科系')
       return
     }
 
@@ -197,8 +258,8 @@ export default function OnboardingGoalPage() {
         await supabaseBrowserClient
           .from('onboarding_sessions')
           .update({
-            target_university: isExploring ? '摸索中' : (selectedUniversity?.name || ''),
-            target_department: isExploring ? '摸索中' : (customDepartment.trim() || selectedDepartment?.name || ''),
+            target_university: isExploring ? '摸索中' : selectedUniversity,
+            target_department: isExploring ? '摸索中' : selectedDepartment,
             is_exploring: isExploring,
             current_grade: selectedGrade,
             mock_exam_level: mockExamLevel,
@@ -207,11 +268,13 @@ export default function OnboardingGoalPage() {
           .eq('id', sessionId)
       }
 
+      // 🎯 核心改動：儲存大學和科系名稱到 profiles
       await supabaseBrowserClient
         .from('profiles')
         .update({
-          target_university: isExploring ? '摸索中' : (selectedUniversity?.name || ''),
-          target_department: isExploring ? '摸索中' : (customDepartment.trim() || selectedDepartment?.name || ''),
+          target_university: isExploring ? '摸索中' : selectedUniversity,
+          target_department: isExploring ? '摸索中' : selectedDepartment,
+          mock_exam_level: mockExamLevel,
           updated_at: new Date().toISOString(),
         })
         .eq('id', user.id)
@@ -232,19 +295,15 @@ export default function OnboardingGoalPage() {
     return '優秀'
   }
 
-  // 🎯 修復：onboarding 頁面不應該等待認證狀態，允許匿名訪問
-  // 即使 authLoading 為 true，也顯示表單內容，讓用戶可以先開始填寫
-  // if (authLoading) {
-  //   return (
-  //     <div className="flex min-h-screen items-center justify-center bg-background">
-  //       <div className="text-sm text-muted-foreground">載入中...</div>
-  //     </div>
-  //   )
-  // }
+  const canContinue = selectedGrade && (isExploring || (selectedUniversity && selectedDepartment))
 
-  // 允許匿名訪問，不需要檢查 user
-
-  const canContinue = selectedGrade && (isExploring || (selectedUniversity && (selectedDepartment || customDepartment)))
+  if (loadingData) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-sm text-muted-foreground">載入中...</div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -280,7 +339,7 @@ export default function OnboardingGoalPage() {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-foreground">
-                      {selectedUniversity?.name || '選擇大學'}
+                      {selectedUniversity || '選擇大學'}
                     </span>
                     <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${showUniversityDropdown ? 'rotate-180' : ''}`} />
                   </div>
@@ -296,7 +355,8 @@ export default function OnboardingGoalPage() {
                           placeholder="搜尋..."
                           value={universitySearch}
                           onChange={(e) => setUniversitySearch(e.target.value)}
-                          className="h-9 border-border pl-9 text-sm"
+                          className="h-10 border-border pl-9 text-base"
+                          style={{ fontSize: '16px' }}
                           autoFocus
                         />
                       </div>
@@ -304,11 +364,11 @@ export default function OnboardingGoalPage() {
                     <div className="max-h-60 overflow-y-auto">
                       {filteredUniversities.map((uni) => (
                         <button
-                          key={uni.id}
+                          key={uni}
                           onClick={() => handleUniversitySelect(uni)}
                           className="w-full px-4 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted"
                         >
-                          {uni.name}
+                          {uni}
                         </button>
                       ))}
                     </div>
@@ -327,7 +387,7 @@ export default function OnboardingGoalPage() {
               {/* Department */}
               {selectedUniversity && (
                 <div className="relative">
-                  {!selectedDepartment && !customDepartment ? (
+                  {!selectedDepartment ? (
                     <>
                       <button
                         onClick={() => setShowDepartmentDropdown(!showDepartmentDropdown)}
@@ -342,36 +402,32 @@ export default function OnboardingGoalPage() {
                       {showDepartmentDropdown && (
                         <div className="absolute z-10 mt-1 w-full rounded-lg border border-border bg-card shadow-lg">
                           <div className="p-2">
-                            <div className="relative mb-2">
+                            <div className="relative">
                               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                               <Input
                                 type="text"
                                 placeholder="搜尋科系..."
                                 value={departmentSearch}
                                 onChange={(e) => setDepartmentSearch(e.target.value)}
-                                className="h-9 border-border pl-9 text-sm"
+                                className="h-10 border-border pl-9 text-base"
+                                style={{ fontSize: '16px' }}
                                 autoFocus
                               />
                             </div>
-                            <Input
-                              type="text"
-                              placeholder="或輸入自訂科系"
-                              value={customDepartment}
-                              onChange={(e) => {
-                                setCustomDepartment(e.target.value)
-                                if (e.target.value) setShowDepartmentDropdown(false)
-                              }}
-                              className="h-9 border-border text-sm"
-                            />
                           </div>
                           <div className="max-h-48 overflow-y-auto">
                             {filteredDepartments.map((dept) => (
                               <button
                                 key={dept.id}
-                                onClick={() => handleDepartmentSelect(dept)}
+                                onClick={() => handleDepartmentSelect(dept.department_name)}
                                 className="w-full px-4 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted"
                               >
-                                {dept.name}
+                                {dept.department_name}
+                                {dept.score_english && (
+                                  <span className="ml-2 text-xs text-muted-foreground">
+                                    (英文: {dept.requirement_english || dept.score_english})
+                                  </span>
+                                )}
                               </button>
                             ))}
                           </div>
@@ -381,12 +437,11 @@ export default function OnboardingGoalPage() {
                   ) : (
                     <div className="flex items-center justify-between rounded-lg border border-border bg-muted px-4 py-3">
                       <span className="text-sm text-foreground">
-                        {customDepartment || selectedDepartment?.name}
+                        {selectedDepartment}
                       </span>
                       <button
                         onClick={() => {
-                          setSelectedDepartment(null)
-                          setCustomDepartment('')
+                          setSelectedDepartment('')
                           setShowDepartmentDropdown(true)
                         }}
                         className="text-muted-foreground hover:text-foreground"

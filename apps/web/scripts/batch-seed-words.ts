@@ -112,7 +112,20 @@ async function processLevel(levelName: string, levelNumber: number) {
         const batch = words.slice(i, i + BATCH_SIZE);
         console.log(`  Batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(words.length / BATCH_SIZE)}: ${batch.join(', ')}`);
 
-        const enrichedData = await generateWordData(batch, levelNumber);
+        const { data: existing } = await supabase
+            .from('words')
+            .select('text')
+            .in('text', batch);
+
+        const existingTexts = new Set(existing?.map(e => e.text) || []);
+        const wordsToProcess = batch.filter(w => !existingTexts.has(w));
+
+        if (wordsToProcess.length === 0) {
+            console.log(`  ⏩ Batch ${Math.floor(i / BATCH_SIZE) + 1} skipped (all words exist)`);
+            continue;
+        }
+
+        const enrichedData = await generateWordData(wordsToProcess, levelNumber);
 
         if (enrichedData.length === 0) {
             console.warn("  ⚠️ No valid data generated for this batch. Skipping.");

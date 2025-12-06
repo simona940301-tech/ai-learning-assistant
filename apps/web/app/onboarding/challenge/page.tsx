@@ -631,7 +631,10 @@ export default function OnboardingChallengePage() {
       .filter(({ result }) => !result.isCorrect)
 
     return (
-      <div className="min-h-screen bg-[#FAF6E9] px-4 py-8 font-sans">
+      <div className="min-h-screen bg-[#FAF6E9] px-4 font-sans" style={{
+        paddingTop: 'max(2rem, env(safe-area-inset-top))',
+        paddingBottom: 'max(2rem, env(safe-area-inset-bottom))'
+      }}>
         <div className="max-w-2xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -676,10 +679,10 @@ export default function OnboardingChallengePage() {
                               <div
                                 key={label}
                                 className={`px-4 py-3 rounded-xl border transition-colors ${isCorrect
-                                    ? 'bg-[#E8F5E9] border-[#528555]'
-                                    : isUserAnswer
-                                      ? 'bg-[#FFEBEE] border-[#DC2626]'
-                                      : 'bg-[#F8F5E8] border-[#E0D0B8]'
+                                  ? 'bg-[#E8F5E9] border-[#528555]'
+                                  : isUserAnswer
+                                    ? 'bg-[#FFEBEE] border-[#DC2626]'
+                                    : 'bg-[#F8F5E8] border-[#E0D0B8]'
                                   }`}
                               >
                                 <div className="flex items-center justify-between">
@@ -739,7 +742,10 @@ export default function OnboardingChallengePage() {
 
   return (
     <PlayMockProvider>
-      <div className="min-h-screen bg-[#FAF6E9]">
+      <div className="min-h-screen bg-[#FAF6E9]" style={{
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)'
+      }}>
         <BattleQuestionV3
           question={currentQuestion}
           questionIndex={currentIndex}

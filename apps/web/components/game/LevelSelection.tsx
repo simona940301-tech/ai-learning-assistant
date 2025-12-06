@@ -8,48 +8,80 @@ interface LevelSelectionProps {
 
 const LEVELS = [
     {
-        id: 'Level 2',
+        id: '1',
+        title: 'Starter',
+        range: 'Level 1',
+        desc: 'Essential daily vocabulary.',
+        icon: SignalLow,
+        color: 'bg-emerald-400'
+    },
+    {
+        id: '2',
         title: 'Beginner Flow',
-        range: '1000-2000 Words',
-        desc: 'Perfect for building a solid foundation.',
+        range: 'Level 2',
+        desc: 'Build your foundation.',
         icon: SignalLow,
         color: 'bg-emerald-500'
     },
     {
-        id: 'Level 3',
+        id: '3',
         title: 'Chart Topper',
-        range: '2000-3000 Words',
-        desc: 'Most common pop song lyrics found here.',
+        range: 'Level 3',
+        desc: 'Common pop lyrics.',
         icon: SignalMedium,
         color: 'bg-sky-500'
     },
     {
-        id: 'Level 4',
+        id: '4',
         title: 'Lyrical Genius',
-        range: '3000-4000 Words',
-        desc: 'Deep, emotional, and expressive vocabulary.',
+        range: 'Level 4',
+        desc: 'Deep and expressive.',
         icon: SignalHigh,
         color: 'bg-purple-500'
+    },
+    {
+        id: '5',
+        title: 'Advanced',
+        range: 'Level 5',
+        desc: 'Sophisticated usage.',
+        icon: BrainCircuit,
+        color: 'bg-indigo-500'
+    },
+    {
+        id: '6',
+        title: 'Expert',
+        range: 'Level 6',
+        desc: 'Mastery level.',
+        icon: BrainCircuit,
+        color: 'bg-rose-500'
     },
 ];
 
 export const LevelSelection: React.FC<LevelSelectionProps> = ({ onConfirm }) => {
-    const [selected, setSelected] = React.useState<string | null>(null);
+    const [selected, setSelected] = React.useState<string[]>([]);
+
+    const toggleLevel = (id: string) => {
+        if (selected.includes(id)) {
+            setSelected(selected.filter(l => l !== id));
+        } else {
+            setSelected([...selected, id]);
+        }
+    };
 
     return (
-        <div className="w-full h-full flex flex-col items-center justify-center p-6 space-y-8">
-            <div className="text-center space-y-2">
+        <div className="w-full h-full flex flex-col items-center justify-center p-6 space-y-8 overflow-y-auto">
+            <div className="text-center space-y-2 mt-4">
                 <h2 className="text-3xl font-bold text-zinc-900 dark:text-white">
                     Select Your Range
                 </h2>
                 <p className="text-zinc-500 max-w-xs mx-auto">
-                    Choose a difficulty that challenges you but keeps the flow going.
+                    Choose one or more difficulty levels.
                 </p>
             </div>
 
-            <div className="grid gap-4 w-full max-w-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl">
                 {LEVELS.map((level, index) => {
-                    const isSelected = selected === level.id;
+                    const isSelected = selected.includes(level.id);
                     const Icon = level.icon;
 
                     return (
@@ -58,7 +90,7 @@ export const LevelSelection: React.FC<LevelSelectionProps> = ({ onConfirm }) => 
                             initial={{ x: -20, opacity: 0 }}
                             animate={{ x: 0, opacity: 1 }}
                             transition={{ delay: index * 0.1 }}
-                            onClick={() => setSelected(level.id)}
+                            onClick={() => toggleLevel(level.id)}
                             className={`
                 relative p-4 rounded-2xl text-left border-2 transition-all duration-300 flex items-center gap-4 group
                 ${isSelected
@@ -74,10 +106,13 @@ export const LevelSelection: React.FC<LevelSelectionProps> = ({ onConfirm }) => 
                             <div className="flex-1">
                                 <h3 className="font-bold text-zinc-900 dark:text-zinc-100">{level.title}</h3>
                                 <div className="text-xs font-mono text-zinc-400 mt-1">{level.range}</div>
+                                <div className="text-xs text-zinc-500 mt-0.5">{level.desc}</div>
                             </div>
 
                             {isSelected && (
-                                <div className="absolute right-4 w-3 h-3 bg-green-500 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.5)]" />
+                                <div className="absolute right-4 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center text-white shadow-[0_0_10px_rgba(34,197,94,0.5)]">
+                                    ✓
+                                </div>
                             )}
                         </motion.button>
                     );
@@ -85,17 +120,17 @@ export const LevelSelection: React.FC<LevelSelectionProps> = ({ onConfirm }) => 
             </div>
 
             <button
-                onClick={() => selected && onConfirm([selected])}
-                disabled={!selected}
-                className={`w-full max-w-xs py-4 rounded-2xl font-bold text-lg transition-all flex items-center justify-center gap-2
-          ${selected
+                onClick={() => selected.length > 0 && onConfirm(selected)}
+                disabled={selected.length === 0}
+                className={`w-full max-w-xs py-4 rounded-2xl font-bold text-lg transition-all flex items-center justify-center gap-2 mb-4
+          ${selected.length > 0
                         ? 'bg-zinc-900 text-white shadow-xl hover:shadow-2xl hover:-translate-y-1'
                         : 'bg-zinc-100 text-zinc-300 cursor-not-allowed'
                     }
         `}
             >
                 <BrainCircuit size={20} />
-                Start Flow
+                Start Flow ({selected.length})
             </button>
         </div>
     );

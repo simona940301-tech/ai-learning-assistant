@@ -12,7 +12,6 @@ import { SkeletonProfile } from '@/components/ui/skeleton'
 import { useAuth } from '@/lib/auth-context'
 import { supabaseBrowserClient } from '@/lib/supabase'
 import { ProfileAvatarModal } from '@/components/profile/ProfileAvatarModal'
-import { universities } from '@/lib/taiwan-universities'
 
 interface ProfileRow {
   username: string | null
@@ -24,6 +23,14 @@ interface ProfileRow {
   bio: string | null
   email_notifications: boolean | null
   push_notifications: boolean | null
+}
+
+interface DepartmentRequirement {
+  id: string
+  university_name: string
+  department_name: string
+  score_english: number | null
+  requirement_english: string | null
 }
 
 export default function ProfileSettingsPage() {
@@ -39,8 +46,8 @@ export default function ProfileSettingsPage() {
   const [bio, setBio] = useState('')
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
 
-  const [selectedUniversityId, setSelectedUniversityId] = useState<string>('')
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('')
+  const [selectedUniversity, setSelectedUniversity] = useState<string>('')
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('')
 
   const [emailNotifications, setEmailNotifications] = useState(true)
   const [pushNotifications, setPushNotifications] = useState(true)
@@ -48,6 +55,52 @@ export default function ProfileSettingsPage() {
   const [avatarModalOpen, setAvatarModalOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+
+  // Data from department_requirements table
+  const [universities, setUniversities] = useState<string[]>([])
+  const [departments, setDepartments] = useState<DepartmentRequirement[]>([])
+  const [allDepartments, setAllDepartments] = useState<DepartmentRequirement[]>([])
+
+  // 載入大學與科系資料從 department_requirements
+  useEffect(() => {
+    const loadDepartmentData = async () => {
+      try {
+        const { data, error } = await supabaseBrowserClient
+          .from('department_requirements')
+          .select('id, university_name, department_name, score_english, requirement_english')
+          .order('university_name', { ascending: true })
+
+        if (error) {
+          console.error('[ProfileSettings] Failed to load department requirements:', error)
+          return
+        }
+
+        if (data && data.length > 0) {
+          // 提取唯一的大學名稱
+          const uniqueUniversities = Array.from(
+            new Set(data.map((d: DepartmentRequirement) => d.university_name))
+          ).sort()
+
+          setUniversities(uniqueUniversities)
+          setAllDepartments(data)
+        }
+      } catch (err) {
+        console.error('[ProfileSettings] Error loading department data:', err)
+      }
+    }
+
+    loadDepartmentData()
+  }, [])
+
+  // 當選擇大學時，更新該大學的科系列表
+  useEffect(() => {
+    if (selectedUniversity) {
+      const depts = allDepartments.filter(d => d.university_name === selectedUniversity)
+      setDepartments(depts)
+    } else {
+      setDepartments([])
+    }
+  }, [selectedUniversity, allDepartments])
 
   useEffect(() => {
     if (!authUser?.id) return
@@ -77,17 +130,12 @@ export default function ProfileSettingsPage() {
         setEmailNotifications(row.email_notifications ?? true)
         setPushNotifications(row.push_notifications ?? true)
 
+        // 設定大學和科系
         if (row.target_university) {
-          const uni = universities.find(u => u.name === row.target_university)
-          if (uni) {
-            setSelectedUniversityId(uni.id)
-            if (row.target_department) {
-              const dept = uni.departments.find(d => d.name === row.target_department)
-              if (dept) {
-                setSelectedDepartmentId(dept.id)
-              }
-            }
-          }
+          setSelectedUniversity(row.target_university)
+        }
+        if (row.target_department) {
+          setSelectedDepartment(row.target_department)
         }
       } catch (err) {
         console.error('[ProfileSettings] Unexpected error:', err)
@@ -112,12 +160,6 @@ export default function ProfileSettingsPage() {
       const trimmedFullName = fullName.trim()
       const trimmedBio = bio.trim()
 
-      const uni = universities.find(u => u.id === selectedUniversityId)
-      const dept =
-        uni && selectedDepartmentId
-          ? uni.departments.find(d => d.id === selectedDepartmentId)
-          : null
-
       const updatePayload: Record<string, any> = {
         updated_at: new Date().toISOString(),
         email_notifications: emailNotifications,
@@ -138,15 +180,15 @@ export default function ProfileSettingsPage() {
         updatePayload.bio = trimmedBio
       }
 
-      if (uni) {
-        updatePayload.target_university = uni.name
+      if (selectedUniversity) {
+        updatePayload.target_university = selectedUniversity
+      } else {
+        updatePayload.target_university = null
       }
 
-      if (dept) {
-        updatePayload.target_department = dept.name
-      } else if (!uni) {
-        // 如果未選擇大學，清空目標設定
-        updatePayload.target_university = null
+      if (selectedDepartment) {
+        updatePayload.target_department = selectedDepartment
+      } else {
         updatePayload.target_department = null
       }
 
@@ -180,8 +222,7 @@ export default function ProfileSettingsPage() {
     setAvatarUrl(url)
   }
 
-  const selectedUniversity = universities.find(u => u.id === selectedUniversityId) || null
-  const departments = selectedUniversity?.departments ?? []
+  const availableDepartments = selectedUniversity ? departments : []
 
   return (
     <>
@@ -299,17 +340,17 @@ export default function ProfileSettingsPage() {
                     理想大學
                   </label>
                   <select
-                    value={selectedUniversityId}
+                    value={selectedUniversity}
                     onChange={e => {
-                      setSelectedUniversityId(e.target.value)
-                      setSelectedDepartmentId('')
+                      setSelectedUniversity(e.target.value)
+                      setSelectedDepartment('')
                     }}
                     className="w-full h-9 rounded-lg border border-[#4A3728]/15 bg-[#FFFBF5] px-3 text-sm text-[#4A3728]"
                   >
                     <option value="">尚未設定</option>
                     {universities.map(uni => (
-                      <option key={uni.id} value={uni.id}>
-                        {uni.name}
+                      <option key={uni} value={uni}>
+                        {uni}
                       </option>
                     ))}
                   </select>
@@ -320,15 +361,16 @@ export default function ProfileSettingsPage() {
                     目標科系
                   </label>
                   <select
-                    value={selectedDepartmentId}
-                    onChange={e => setSelectedDepartmentId(e.target.value)}
+                    value={selectedDepartment}
+                    onChange={e => setSelectedDepartment(e.target.value)}
                     disabled={!selectedUniversity}
                     className="w-full h-9 rounded-lg border border-[#4A3728]/15 bg-[#FFFBF5] px-3 text-sm text-[#4A3728] disabled:opacity-50"
                   >
                     <option value="">尚未設定</option>
-                    {departments.map(dept => (
-                      <option key={dept.id} value={dept.id}>
-                        {dept.name}
+                    {availableDepartments.map(dept => (
+                      <option key={dept.id} value={dept.department_name}>
+                        {dept.department_name}
+                        {dept.score_english ? ` (英文: ${dept.requirement_english || dept.score_english})` : ''}
                       </option>
                     ))}
                   </select>
@@ -416,4 +458,3 @@ export default function ProfileSettingsPage() {
     </>
   )
 }
-

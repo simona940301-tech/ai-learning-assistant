@@ -88,16 +88,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       let redirectTo = undefined
       if (typeof window !== 'undefined') {
-        // 優先使用當前 origin
-        redirectTo = `${window.location.origin}/auth/callback`
-
-        // 如果有設定 NEXT_PUBLIC_SITE_URL 且不是 localhost，則優先使用（適用於生產環境覆蓋）
+        // 優先使用 NEXT_PUBLIC_SITE_URL（如果有設定）
         const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
-        if (siteUrl && !siteUrl.includes('localhost') && !window.location.origin.includes('localhost')) {
+        if (siteUrl) {
           redirectTo = `${siteUrl}/auth/callback`
+          console.log('🔗 [AuthProvider] Using NEXT_PUBLIC_SITE_URL for OAuth redirect:', redirectTo)
+        } else {
+          // 如果沒有設定 NEXT_PUBLIC_SITE_URL，則使用當前 origin
+          redirectTo = `${window.location.origin}/auth/callback`
+          console.log('🔗 [AuthProvider] Using window.location.origin for OAuth redirect:', redirectTo)
         }
-
-        console.log('🔗 [AuthProvider] OAuth Redirect URL:', redirectTo)
       }
 
       const { error } = await supabaseBrowser.auth.signInWithOAuth({

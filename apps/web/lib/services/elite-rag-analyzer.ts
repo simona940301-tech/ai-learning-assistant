@@ -171,6 +171,8 @@ export async function generateAnalysisStream(
   * type: "question_set"
   * context: 跨章節的情境引文
   * questions: 2-3 子題
+  * type: "multiple_choice"
+  * options: [{"label": "A", "text": "...", "isCorrect": false}, ...] (必須是物件陣列)
   * difficulty: Easy/Medium/Hard
 
 ## 範例 (Example Output)

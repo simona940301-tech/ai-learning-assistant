@@ -84,9 +84,9 @@ export const Deck: React.FC = () => {
     const visibleCards = words.slice(currentIndex, currentIndex + 3).reverse();
 
     return (
-        <div className="relative w-full h-[70vh] flex items-center justify-center overflow-hidden">
+        <div className="relative w-full h-[70vh] flex items-center justify-center px-4">
             {/* Card Stack */}
-            <div className="relative w-full max-w-sm h-full flex items-center justify-center">
+            <div className="relative w-full h-full flex items-center justify-center">
                 <AnimatePresence>
                     {visibleCards.map((word, index) => {
                         const isTop = word.id === words[currentIndex].id;
@@ -96,8 +96,8 @@ export const Deck: React.FC = () => {
                                 className="absolute top-0 left-0 right-0 bottom-0 flex items-center justify-center"
                                 style={{
                                     zIndex: index, // Reverse order: 0 is bottom
-                                    scale: isTop ? 1 : 0.95 - (visibleCards.length - 1 - index) * 0.05,
-                                    y: isTop ? 0 : (visibleCards.length - 1 - index) * 10,
+                                    scale: isTop ? 1 : 0.92 - (visibleCards.length - 1 - index) * 0.04,
+                                    y: isTop ? 0 : (visibleCards.length - 1 - index) * 12,
                                 }}
                             >
                                 <Card

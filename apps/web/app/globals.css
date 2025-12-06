@@ -91,8 +91,9 @@
   html,
   body {
     height: 100%;
-    /* overflow: hidden; */
-    /* ❌ 移除全域鎖定 - 阻止所有頁面滾動 */
+    overflow: hidden; /* ✅ 修復：禁止整個頁面滑動,只允許內容區滑動 */
+    position: fixed; /* ✅ 修復：鎖定頁面位置,防止彈跳效果 */
+    width: 100%;
     /* Optimize for touch devices */
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;

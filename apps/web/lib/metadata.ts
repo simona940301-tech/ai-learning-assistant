@@ -112,8 +112,8 @@ export const defaultMetadata: Metadata = {
 export const defaultViewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 5,
-  userScalable: true,
+  maximumScale: 1, // ✅ 修復：防止選擇表單時頁面放大
+  userScalable: false, // ✅ 修復：禁用縮放,保持頁面穩定
   viewportFit: 'cover',
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#FAF6E9' },

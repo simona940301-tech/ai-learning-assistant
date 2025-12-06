@@ -48,15 +48,25 @@ function cleanQuestionContent(raw?: string): string {
 }
 
 // Strip leading option label like "A. ", "B、", "C)" from option text
-function normalizeOptionText(raw?: string): string {
+function normalizeOptionText(raw: any): string {
     if (!raw) return ''
-    return raw.replace(/^\s*[A-D][\.\、\)]\s+/i, '').trim()
+    if (typeof raw === 'string') {
+        return raw.replace(/^\s*[A-D][\.\、\)]\s+/i, '').trim()
+    }
+    if (typeof raw === 'object' && raw.text) {
+        return raw.text
+    }
+    return ''
 }
 
 // Normalize options: remove empty ones, optionally cap at 5 for multi-select
-function normalizeOptions(options: string[] = [], isMulti: boolean): string[] {
+function normalizeOptions(options: any[] = [], isMulti: boolean): any[] {
     // Filter out empty options
-    const validOptions = options.filter(opt => opt && opt.trim())
+    const validOptions = options.filter(opt => {
+        if (!opt) return false
+        if (typeof opt === 'string') return !!opt.trim()
+        return !!opt.text
+    })
 
     if (!isMulti) return validOptions
 
@@ -655,16 +665,20 @@ export default function ProgressiveAnalysisCard({
                                                             </div>
                                                             {Array.isArray(q.options) && q.options.length > 0 && (
                                                                 <div className="space-y-2.5 pt-1">
-                                                                    {normalizeOptions(q.options, q.questionType === '多選').map((opt: string, oIdx: number) => {
-                                                                        const label = String.fromCharCode(65 + oIdx)
+                                                                    {normalizeOptions(q.options, q.questionType === '多選').map((opt: any, oIdx: number) => {
+                                                                        const label = typeof opt === 'object' && opt.label ? opt.label : String.fromCharCode(65 + oIdx)
                                                                         const optionText = normalizeOptionText(opt)
+                                                                        const isCorrect = typeof opt === 'object' && opt.isCorrect
                                                                         return (
                                                                             <div
                                                                                 key={oIdx}
-                                                                                className="flex items-center gap-3 rounded-lg px-3 py-2 bg-[#F1E8DB]"
+                                                                                className={cn(
+                                                                                    "flex items-center gap-3 rounded-lg px-3 py-2 transition-colors",
+                                                                                    isCorrect ? "bg-green-100 border border-green-200" : "bg-[#F1E8DB]"
+                                                                                )}
                                                                             >
-                                                                                <span className="font-bold text-[#8C6B4A]">{label}</span>
-                                                                                <span className="text-[15px] leading-[1.5] tracking-[0.2px] text-[#6C4A2D]">
+                                                                                <span className={cn("font-bold", isCorrect ? "text-green-700" : "text-[#8C6B4A]")}>{label}</span>
+                                                                                <span className={cn("text-[15px] leading-[1.5] tracking-[0.2px] text-[#6C4A2D]", isCorrect && "text-green-800 font-medium")}>
                                                                                     {optionText}
                                                                                 </span>
                                                                             </div>
@@ -709,16 +723,20 @@ export default function ProgressiveAnalysisCard({
                                                 )}
                                                 {'options' in item && Array.isArray((item as any).options) && (
                                                     <div className="space-y-2.5 pt-1">
-                                                        {normalizeOptions((item as any).options, (item as any).questionType === '多選').map((opt: string, oIdx: number) => {
-                                                            const label = String.fromCharCode(65 + oIdx)
+                                                        {normalizeOptions((item as any).options, (item as any).questionType === '多選').map((opt: any, oIdx: number) => {
+                                                            const label = typeof opt === 'object' && opt.label ? opt.label : String.fromCharCode(65 + oIdx)
                                                             const optionText = normalizeOptionText(opt)
+                                                            const isCorrect = typeof opt === 'object' && opt.isCorrect
                                                             return (
                                                                 <div
                                                                     key={oIdx}
-                                                                    className="flex items-center gap-3 rounded-lg px-3 py-2 bg-[#F1E8DB]"
+                                                                    className={cn(
+                                                                        "flex items-center gap-3 rounded-lg px-3 py-2 transition-colors",
+                                                                        isCorrect ? "bg-green-100 border border-green-200" : "bg-[#F1E8DB]"
+                                                                    )}
                                                                 >
-                                                                    <span className="font-bold text-[#8C6B4A]">{label}</span>
-                                                                    <span className="text-[15px] leading-[1.5] tracking-[0.2px] text-[#6C4A2D]">
+                                                                    <span className={cn("font-bold", isCorrect ? "text-green-700" : "text-[#8C6B4A]")}>{label}</span>
+                                                                    <span className={cn("text-[15px] leading-[1.5] tracking-[0.2px] text-[#6C4A2D]", isCorrect && "text-green-800 font-medium")}>
                                                                         {optionText}
                                                                     </span>
                                                                 </div>

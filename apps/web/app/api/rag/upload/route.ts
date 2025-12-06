@@ -5,12 +5,19 @@ import { extractTextSmart } from '@/lib/services/smart-text-extractor'
 import { generateSummary, extractKeywords } from '@/lib/services/rag-summary'
 import { createContextCache } from '@/lib/services/context-cache-service'
 import { createClient } from '@supabase/supabase-js'
+import { createOptionsHandler, corsJsonResponse, addCorsHeaders } from '@/lib/api/cors'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 // 最大文件大小：10MB
 const MAX_FILE_SIZE = 10 * 1024 * 1024
+
+/**
+ * OPTIONS handler for CORS preflight requests
+ * Critical for mobile browsers which always send preflight requests
+ */
+export const OPTIONS = createOptionsHandler()
 
 /**
  * POST /api/rag/upload
@@ -25,15 +32,29 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024
  */
 export async function POST(req: NextRequest) {
     try {
+        // 🔍 DIAGNOSTIC: Log request details for mobile debugging
+        console.log('[RAG Upload] ==================== REQUEST START ====================')
+        console.log('[RAG Upload] Method:', req.method)
+        console.log('[RAG Upload] URL:', req.url)
+        console.log('[RAG Upload] User-Agent:', req.headers.get('user-agent'))
+        console.log('[RAG Upload] Content-Type:', req.headers.get('content-type'))
+        console.log('[RAG Upload] Has Authorization:', !!req.headers.get('authorization'))
+        console.log('[RAG Upload] Origin:', req.headers.get('origin'))
+        console.log('[RAG Upload] Referer:', req.headers.get('referer'))
+
         // 1. 驗證用戶身份
         const { supabase, user, errorType } = await getApiUser(req)
 
+        console.log('[RAG Upload] Auth Result:', {
+            hasUser: !!user,
+            userId: user?.id,
+            errorType
+        })
 
         // 檢查是否為 mock mode
         const { isMockModeEnabled } = await import('@/lib/api/auth')
         const isMockMode = isMockModeEnabled()
         console.log('[RAG Upload] Mock Mode Enabled:', isMockMode)
-        console.log('[RAG Upload] ====================')
 
         // 在 mock mode 下，如果沒有 user，使用 mock user ID
         let finalUser = user
@@ -44,7 +65,7 @@ export async function POST(req: NextRequest) {
         }
 
         if (!finalUser) {
-            return NextResponse.json(
+            const response = NextResponse.json(
                 {
                     error: 'UNAUTHORIZED',
                     message: errorType === 'invalid-jwt'
@@ -52,10 +73,13 @@ export async function POST(req: NextRequest) {
                         : '需要登入',
                     debug: {
                         errorType,
+                        userAgent: req.headers.get('user-agent'),
+                        origin: req.headers.get('origin'),
                     }
                 },
                 { status: 401 }
             )
+            return addCorsHeaders(response)
         }
 
         // 2. 解析 FormData

@@ -5,7 +5,8 @@ import { trackAPICall, trackError } from '@/lib/heartbeat'
 import type { ContractV2Response } from '@/lib/contract-v2'
 export const dynamic = 'force-dynamic'
 
-import { getSupabaseClient, getApiUser } from '@/lib/api/auth'
+import { getSupabaseClient, isMockModeEnabled, getApiUser } from '@/lib/api/auth'
+import { backpackCache } from '@/lib/cache/backpack-cache'
 
 // Schema for saving from Contract v2 response
 const SaveFromContractSchema = z.object({
@@ -130,6 +131,9 @@ export async function POST(request: NextRequest) {
       const latency = Date.now() - startTime
       trackAPICall('/api/backpack/save', latency, true)
 
+      // 🚀 P1: Invalidate cache after mutation
+      await backpackCache.invalidate(finalUserId)
+
       return NextResponse.json({ data, saved: true })
     }
 
@@ -175,6 +179,9 @@ export async function POST(request: NextRequest) {
       const latency = Date.now() - startTime
       trackAPICall('/api/backpack/save', latency, true)
 
+      // 🚀 P1: Invalidate cache after mutation
+      await backpackCache.invalidate(finalUserId)
+
       return NextResponse.json({ data, saved: true })
     }
 
@@ -211,6 +218,9 @@ export async function POST(request: NextRequest) {
 
       const latency = Date.now() - startTime
       trackAPICall('/api/backpack/save', latency, true)
+
+      // 🚀 P1: Invalidate cache after mutation
+      await backpackCache.invalidate(finalUserId)
 
       return NextResponse.json({ data, saved: true })
     }
