@@ -5,7 +5,7 @@ import { getAvatarPreset } from '@/lib/avatar/presets'
 
 export async function POST(request: NextRequest) {
   try {
-    const { presetId } = await request.json()
+    const { presetId, avatarTier } = await request.json()
 
     if (!presetId) {
       return NextResponse.json(
@@ -37,11 +37,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Update the user's avatar_url with the preset image URL
+    // Update the user's avatar with preset information
+    // Support both avatar_url (legacy) and avatar_preset (new) fields
     const { error: updateError } = await supabase
       .from('profiles')
       .update({
         avatar_url: preset.imageUrl,
+        avatar_preset: presetId,
+        avatar_tier: avatarTier ?? 1,
         updated_at: new Date().toISOString()
       })
       .eq('id', user.id)
@@ -58,6 +61,7 @@ export async function POST(request: NextRequest) {
       success: true,
       avatarUrl: preset.imageUrl,
       presetId,
+      avatarTier: avatarTier ?? 1,
     })
 
   } catch (error) {

@@ -8,7 +8,6 @@ import { Grid3x3, Upload, Sparkles } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { AvatarSelector, AvatarDisplay } from '@/components/avatar/AvatarSelector'
 import { getDefaultAvatar, type AvatarPreset } from '@/lib/avatar/presets'
-import { supabaseBrowserClient } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 
 interface ProfileEditModalV2Props {
@@ -54,17 +53,20 @@ export function ProfileEditModalV2({
     setError(null)
 
     try {
-      const { error: updateError } = await supabaseBrowserClient
-        .from('profiles')
-        .update({
-          avatar_preset: selectedPreset.id,
-          avatar_tier: 1,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', user.id)
+      // ✅ 使用安全的 API 端點替代直接數據庫訪問
+      const response = await fetch('/api/profile/update-avatar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          presetId: selectedPreset.id,
+          avatarTier: 1,
+        }),
+      })
 
-      if (updateError) {
-        throw new Error('更新頭像失敗')
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || '更新頭像失敗')
       }
 
       // Notify parent

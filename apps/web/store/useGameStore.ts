@@ -1,6 +1,12 @@
 import { create } from 'zustand';
+import { createClient } from '@supabase/supabase-js';
 import { MOCK_WORDS } from '../lib/mockData';
 import { Word } from '../lib/types/game';
+
+// ✅ 單例 Supabase client - 避免每次 loadWords 都重新創建
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 interface GameState {
     words: Word[];
@@ -27,6 +33,19 @@ interface GameState {
 
 const SESSION_LIMIT = 20;
 
+/**
+ * ✅ 正確的 Fisher-Yates shuffle 算法
+ * Math.random() - 0.5 不是均勻分布，會導致某些排列永遠不會出現
+ */
+function fisherYatesShuffle<T>(array: T[]): T[] {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+}
+
 export const useGameStore = create<GameState>((set, get) => ({
     words: [],
     currentIndex: 0,
@@ -34,7 +53,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     favorites: [],
     swipeHistory: [],
     sessionCounter: 0,
-    gameStatus: 'playing', // SKIP SELECTION: Start directly in playing mode
+    gameStatus: 'level-selection',
     selectedArtists: [],
     selectedLevels: [],
 
@@ -46,38 +65,82 @@ export const useGameStore = create<GameState>((set, get) => ({
         set({ gameStatus: 'playing' });
     },
 
-    loadWords: () => {
+    loadWords: async () => {
         const { selectedLevels } = get();
-        // In a real implementation with API:
-        // const words = await api.fetchWords({ levels: selectedLevels, artists: selectedArtists });
+        console.log('Fetching words for levels:', selectedLevels);
 
-        console.log('Loading words for levels:', selectedLevels);
+        try {
+            // Map string levels "1","2" to numbers 1,2
+            // If no levels selected, default to Level 1
+            const levels = selectedLevels.length > 0
+                ? selectedLevels.map(Number)
+                : [1];
 
-        // INFINITE SCROLL SIMULATION:
-        // Duplicate the MOCK_WORDS to create a larger deck (e.g., 100+ items).
-        // giving them unique IDs to prevent React key issues.
-        const baseWords = MOCK_WORDS;
-        const multipliedWords: Word[] = [];
+            // Fetch words from Supabase (using singleton client)
+            // Limit to 100 random words (using random sorting RPC would be better, but for MVP fetch and shuffle locally)
+            const { data, error } = await supabase
+                .from('words')
+                .select('*')
+                .in('level', levels)
+                .limit(100);
 
-        // Create enough words for at least 5 sessions (100 cards)
-        // or just a very large number for "infinite" feel.
-        for (let i = 0; i < 20; i++) {
-            baseWords.forEach(w => {
-                multipliedWords.push({
-                    ...w,
-                    id: `${w.id}-${i}` // Unique ID: originalID-iteration
+            if (error) throw error;
+
+            if (!data || data.length === 0) {
+                console.warn('No words found for selected levels');
+                set({
+                    words: [],
+                    gameStatus: 'playing',
+                    currentIndex: 0,
+                    mistakeQueue: [],
+                    sessionCounter: 0
                 });
-            });
-        }
+                return;
+            }
 
-        set({
-            words: multipliedWords,
-            currentIndex: 0,
-            mistakeQueue: [],
-            swipeHistory: [],
-            sessionCounter: 0,
-            gameStatus: 'playing'
-        });
+            // ✅ 使用正確的 Fisher-Yates shuffle
+            const shuffled = fisherYatesShuffle(data);
+
+            // ✅ 優化：使用 map 直接轉換，避免不必要的中間變量
+            const mappedWords: Word[] = shuffled.map(w => ({
+                id: w.id || crypto.randomUUID(), // Ensure ID
+                text: w.text,
+                pos: w.pos,
+                level: `Level ${w.level}`,
+                definition_zh: w.definition_zh,
+                example_en: w.example_sentence,
+                lyric_snippet: w.lyric_match ? {
+                    artist: w.lyric_match.artist,
+                    song: w.lyric_match.song_title,
+                    line: w.lyric_match.lyric_snippet
+                } : undefined
+            }));
+
+            // ✅ 優化：使用 flatMap 減少迭代次數
+            let finalWords = mappedWords;
+            if (mappedWords.length < 20) {
+                // 重複 3 次，但使用更高效的方式
+                finalWords = Array(3).fill(null).flatMap((_, repeatIdx) =>
+                    mappedWords.map((w, idx) => ({
+                        ...w,
+                        id: `${w.id}-${repeatIdx}-${idx}`
+                    }))
+                );
+            }
+
+            set({
+                words: finalWords,
+                currentIndex: 0,
+                mistakeQueue: [],
+                swipeHistory: [],
+                sessionCounter: 0,
+                gameStatus: 'playing'
+            });
+
+        } catch (err) {
+            console.error('Failed to load words:', err);
+            // Fallback to empty or error state handling could go here
+        }
     },
 
     swipe: (direction) => {

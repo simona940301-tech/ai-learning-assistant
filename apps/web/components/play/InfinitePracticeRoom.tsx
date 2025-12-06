@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { Loader2, CheckCircle2, XCircle, Share2, Users, ArrowLeft, BookOpen, Flame, Trophy, Copy, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { supabaseBrowserClient } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth-context'
 import { useRouter } from 'next/navigation'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -37,7 +37,7 @@ interface InfinitePracticeRoomProps {
 }
 
 // 🏎️ Live Race Track Component
-function LiveRaceTrack({ participants, currentUserId }: { participants: Participant[], currentUserId: string }) {
+function LiveRaceTrack({ participants, currentUserId }: { participants: Participant[], currentUserId: string | undefined }) {
     // Sort by net_progress desc
     const sorted = useMemo(() => {
         return [...participants].sort((a, b) => b.net_progress - a.net_progress).slice(0, 3)
@@ -105,6 +105,8 @@ function LiveRaceTrack({ participants, currentUserId }: { participants: Particip
 }
 
 export function InfinitePracticeRoom({ roomCode }: InfinitePracticeRoomProps) {
+    // ✅ 使用 useAuth context 獲取用戶信息
+    const { user } = useAuth()
     const router = useRouter()
     const [questions, setQuestions] = useState<Question[]>([])
     const [answers, setAnswers] = useState<Record<string, string>>({})
@@ -114,21 +116,16 @@ export function InfinitePracticeRoom({ roomCode }: InfinitePracticeRoomProps) {
     const [expandedExplanation, setExpandedExplanation] = useState<string | null>(null)
     const [loadingExplanation, setLoadingExplanation] = useState<string | null>(null)
     const [roomId, setRoomId] = useState<string | null>(null)
-    const [currentUserId, setCurrentUserId] = useState<string>('')
     const [showStreakFire, setShowStreakFire] = useState(false)
     const [streakCount, setStreakCount] = useState(0)
     const [showLeaderboard, setShowLeaderboard] = useState(false)
     const [showRoomInfo, setShowRoomInfo] = useState(false)
 
-    const supabase = supabaseBrowserClient
     const streakAudioRef = useRef<HTMLAudioElement | null>(null)
 
     // Initial load
     useEffect(() => {
         const init = async () => {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (user) setCurrentUserId(user.id)
-
             await fetchQuestions(0)
             setupRealtimeSubscription()
         }
@@ -240,14 +237,14 @@ export function InfinitePracticeRoom({ roomCode }: InfinitePracticeRoomProps) {
         }
 
         // Update progress in database
-        if (roomId && currentUserId) {
+        if (roomId && user?.id) {
             const index = questions.findIndex(q => q.id === questionId)
             try {
                 // Get current progress first to be safe, or use atomic update if possible
                 // For simplicity/speed in this MVP, we calculate locally based on assumption
                 // Ideally we use an RPC for atomic updates
 
-                const currentParticipant = participants.find(p => p.user_id === currentUserId)
+                const currentParticipant = participants.find(p => p.user_id === user?.id)
                 const currentNet = currentParticipant?.net_progress || 0
                 const currentStreakDb = currentParticipant?.current_streak || 0
 
@@ -283,7 +280,7 @@ export function InfinitePracticeRoom({ roomCode }: InfinitePracticeRoomProps) {
                         last_active_at: new Date().toISOString()
                     })
                     .eq('room_id', roomId)
-                    .eq('user_id', currentUserId)
+                    .eq('user_id', user?.id)
 
             } catch (error) {
                 console.error('Failed to update progress:', error)
@@ -372,7 +369,7 @@ export function InfinitePracticeRoom({ roomCode }: InfinitePracticeRoomProps) {
     return (
         <div className="fixed inset-0 bg-black z-50 flex flex-col">
             {/* 🏎️ Live Race Track */}
-            <LiveRaceTrack participants={participants} currentUserId={currentUserId} />
+            <LiveRaceTrack participants={participants} currentUserId={user?.id} />
 
             {/* Header */}
             <div className="h-14 border-b border-white/10 flex items-center justify-between px-4 bg-black/50 backdrop-blur-md z-10">
@@ -581,7 +578,7 @@ export function InfinitePracticeRoom({ roomCode }: InfinitePracticeRoomProps) {
                                 .map((p, idx) => (
                                     <div key={p.user_id} className={cn(
                                         "flex items-center justify-between p-4 rounded-xl border",
-                                        p.user_id === currentUserId ? "bg-white/10 border-white/20" : "bg-transparent border-white/5"
+                                        p.user_id === user?.id ? "bg-white/10 border-white/20" : "bg-transparent border-white/5"
                                     )}>
                                         <div className="flex items-center gap-3">
                                             <div className="font-mono text-white/40 w-6">#{idx + 1}</div>
@@ -656,7 +653,7 @@ export function InfinitePracticeRoom({ roomCode }: InfinitePracticeRoomProps) {
                                             <p className="text-sm text-white truncate">{p.username || 'Unknown'}</p>
                                             <p className="text-xs text-white/40">進度: {p.net_progress} pts</p>
                                         </div>
-                                        {p.user_id === currentUserId && (
+                                        {p.user_id === user?.id && (
                                             <span className="text-xs text-yellow-400">你</span>
                                         )}
                                     </div>

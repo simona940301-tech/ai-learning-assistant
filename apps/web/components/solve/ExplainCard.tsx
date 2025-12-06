@@ -69,6 +69,7 @@ import { TranslationExplain } from './explain/TranslationExplain'
 import { ContextualCompletionExplain } from './explain/ContextualCompletionExplain'
 // Removed: All format detection and question set imports (no longer needed)
 import { useFeatureFlag } from '@/lib/feature-flags'
+import { useAuth } from '@/lib/auth-context'
 import { MarkdownExplain } from './MarkdownExplain'
 import ExplainCardContent from './ExplainCardContent'
 import ExplainSheet from './ExplainSheet'
@@ -539,6 +540,9 @@ function GenericExplain({ view }: { view: GenericVM }) {
  * 容器組件：負責 API 調用、狀態管理、渲染決策
  */
 export default function ExplainCard({ inputText, conservative = false, onFollowUp, onLoadingChange }: ExplainCardProps) {
+  // ✅ 使用 useAuth context 獲取用戶信息（零延遲，架構標準）
+  const { user } = useAuth()
+
   const [vm, setVm] = useState<ExplainViewModel | null>(null)
   const [markdown, setMarkdown] = useState<string | null>(null) // New: Markdown response
   const [structured, setStructured] = useState<ExplainCardContentData | null>(null) // Old format (backward compatible)
@@ -904,19 +908,8 @@ export default function ExplainCard({ inputText, conservative = false, onFollowU
       const canonicalSkill = 'english' // Simplified: always english
       const questionTitle = explainView?.stem?.en ?? inputText.slice(0, 60)
 
-      let userId: string | null = null
-      try {
-        const { supabaseBrowserClient } = await import('@/lib/supabase')
-        const { data, error } = await supabaseBrowserClient.auth.getUser()
-        if (error) {
-          console.warn('[ExplainCard] supabase auth getUser error:', error.message)
-        }
-        userId = data?.user?.id ?? null
-      } catch (err) {
-        console.warn('[ExplainCard] Unable to retrieve Supabase user:', err)
-      }
-
-      if (!userId) {
+      // ✅ 使用 useAuth context 的 user（已在組件頂部調用）
+      if (!user?.id) {
         throw new Error('請先登入以收藏錯題')
       }
 
@@ -926,7 +919,7 @@ export default function ExplainCard({ inputText, conservative = false, onFollowU
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user_id: userId,
+          user_id: user.id,
           question: questionTitle,
           canonical_skill: canonicalSkill ?? 'english',
           note_md,
