@@ -21,27 +21,26 @@ export default function AppLayout({
 
   return (
     <SimpleErrorBoundary>
-      {/* 🎯 vConsole Mobile Debugger - 只在 ?debug=true 時啟用 */}
-      {process.env.NODE_ENV !== 'production' && (
-        <>
-          <Script
-            src="https://unpkg.com/vconsole@latest/dist/vconsole.min.js"
-            strategy="afterInteractive"
-          />
-          <Script id="init-vconsole" strategy="afterInteractive">
-            {`
-              if (typeof window !== 'undefined' && window.location.search.includes('debug=true')) {
-                window.addEventListener('load', function() {
-                  if (window.VConsole) {
-                    new window.VConsole();
-                    console.log('📱 vConsole activated - check bottom-right corner');
-                  }
-                });
+      {/* 🚀 SOTA FIX: vConsole Mobile Debugger - 解鎖生產環境調試 */}
+      {/* 移除 NODE_ENV 限制，只依賴 URL 參數 ?debug=true */}
+      {/* 這是業界標準的「線上除錯後門」*/}
+      <Script
+        src="https://unpkg.com/vconsole@latest/dist/vconsole.min.js"
+        strategy="afterInteractive"
+      />
+      <Script id="init-vconsole" strategy="afterInteractive">
+        {`
+          // SOTA FIX: 只依賴 URL 參數，無視環境
+          if (typeof window !== 'undefined' && window.location.search.includes('debug=true')) {
+            window.addEventListener('load', function() {
+              if (window.VConsole) {
+                new window.VConsole();
+                console.log('📱 vConsole activated for mobile debugging');
               }
-            `}
-          </Script>
-        </>
-      )}
+            });
+          }
+        `}
+      </Script>
 
       {/* 🎯 Full-Screen App: 吃滿整個視窗，使用 100dvh 處理動態視口 */}
       <div className="flex h-[100dvh] w-full flex-col bg-background text-foreground">

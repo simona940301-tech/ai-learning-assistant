@@ -119,12 +119,6 @@ function isMockModeEnabled(): boolean {
 // ============================================================================
 
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
-
-  // Skip middleware for non-API routes
-  if (!pathname.startsWith('/api/')) {
-    return NextResponse.next()
-  }
 
   // Allow CORS preflight requests to pass without auth
   if (request.method === 'OPTIONS') {
