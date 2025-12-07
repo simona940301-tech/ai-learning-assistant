@@ -119,13 +119,26 @@ function isMockModeEnabled(): boolean {
 // ============================================================================
 
 export async function middleware(request: NextRequest) {
-
-  // Allow CORS preflight requests to pass without auth
+  // 🚀 SOTA FIX: Middleware 層級的 CORS 逃生艙 (Plan C - Nuclear Option)
+  // ⚠️ 必須放在所有邏輯的最前面！在任何 auth 檢查之前
+  // 這確保 OPTIONS 預檢請求永遠返回 200，不會被 auth 攔截
   if (request.method === 'OPTIONS') {
     return new NextResponse(null, {
       status: 200,
-      headers: CORS_HEADERS,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, PATCH',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Date, X-Api-Version, X-API-Key, X-Internal-API-Key',
+        'Access-Control-Max-Age': '86400', // 24 hours
+      },
     })
+  }
+
+  const { pathname } = request.nextUrl
+
+  // Skip middleware for non-API routes
+  if (!pathname.startsWith('/api/')) {
+    return NextResponse.next()
   }
 
   // Skip authentication in development/preview mock mode
