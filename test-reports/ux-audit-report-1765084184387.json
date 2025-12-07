@@ -1,0 +1,254 @@
+{
+  "testStartTime": "2025-12-07T05:08:15.857Z",
+  "testDuration": 88523,
+  "results": [
+    {
+      "step": "Onboarding - Goal 設定",
+      "url": "/onboarding/goal",
+      "loadTime": 782,
+      "metrics": {
+        "fcp": 55,
+        "cls": 0,
+        "domContentLoaded": 0,
+        "loadComplete": 0,
+        "totalLoadTime": 285.00000000000006,
+        "resourceCount": 11,
+        "resourceSize": 2043977,
+        "apiCalls": []
+      },
+      "performanceScore": "good",
+      "issues": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "step": "Onboarding - Avatar 選擇",
+      "url": "/onboarding/avatar",
+      "loadTime": 831,
+      "metrics": {
+        "cls": 0,
+        "domContentLoaded": 0,
+        "loadComplete": 0,
+        "totalLoadTime": 409.00000000000006,
+        "resourceCount": 11,
+        "resourceSize": 3094029,
+        "apiCalls": []
+      },
+      "performanceScore": "good",
+      "issues": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "step": "Onboarding - Challenge 測驗",
+      "url": "/onboarding/challenge",
+      "loadTime": 1376,
+      "metrics": {
+        "cls": 0,
+        "domContentLoaded": 0,
+        "loadComplete": 0,
+        "totalLoadTime": 881,
+        "resourceCount": 11,
+        "resourceSize": 2671188,
+        "apiCalls": []
+      },
+      "performanceScore": "good",
+      "issues": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "step": "Onboarding - Reward 查看",
+      "url": "/onboarding/reward",
+      "loadTime": 867,
+      "metrics": {
+        "cls": 0,
+        "domContentLoaded": 0,
+        "loadComplete": 0,
+        "totalLoadTime": 365,
+        "resourceCount": 11,
+        "resourceSize": 2377742,
+        "apiCalls": []
+      },
+      "performanceScore": "good",
+      "issues": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "step": "Onboarding - Habits 設定",
+      "url": "/onboarding/habits",
+      "loadTime": 795,
+      "metrics": {
+        "cls": 0,
+        "domContentLoaded": 0,
+        "loadComplete": 0,
+        "totalLoadTime": 298,
+        "resourceCount": 11,
+        "resourceSize": 2363028,
+        "apiCalls": []
+      },
+      "performanceScore": "good",
+      "issues": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "step": "Onboarding - Complete",
+      "url": "/onboarding/complete",
+      "loadTime": 851,
+      "metrics": {
+        "cls": 0,
+        "domContentLoaded": 0,
+        "loadComplete": 0,
+        "totalLoadTime": 351.00000000000006,
+        "resourceCount": 11,
+        "resourceSize": 2373449,
+        "apiCalls": []
+      },
+      "performanceScore": "good",
+      "issues": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "step": "Home - 首頁",
+      "url": "/home",
+      "loadTime": 1176,
+      "metrics": {
+        "cls": 0,
+        "domContentLoaded": 0,
+        "loadComplete": 0,
+        "totalLoadTime": 688,
+        "resourceCount": 11,
+        "resourceSize": 3899721,
+        "apiCalls": []
+      },
+      "performanceScore": "good",
+      "issues": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "step": "Community - 社群",
+      "url": "/community",
+      "loadTime": 912,
+      "metrics": {
+        "cls": 0,
+        "domContentLoaded": 0,
+        "loadComplete": 0,
+        "totalLoadTime": 412.00000000000006,
+        "resourceCount": 11,
+        "resourceSize": 3361434,
+        "apiCalls": []
+      },
+      "performanceScore": "good",
+      "issues": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "step": "Play - 練習",
+      "url": "/play",
+      "loadTime": 2004,
+      "metrics": {
+        "cls": 0,
+        "domContentLoaded": 0,
+        "loadComplete": 0,
+        "totalLoadTime": 1518,
+        "resourceCount": 11,
+        "resourceSize": 5695583,
+        "apiCalls": []
+      },
+      "performanceScore": "good",
+      "issues": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "step": "Ask - 提問",
+      "url": "/ask",
+      "loadTime": 1926,
+      "metrics": {
+        "cls": 0,
+        "domContentLoaded": 0,
+        "loadComplete": 0,
+        "totalLoadTime": 1441,
+        "resourceCount": 11,
+        "resourceSize": 5753577,
+        "apiCalls": []
+      },
+      "performanceScore": "good",
+      "issues": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "step": "Backpack - 書包",
+      "url": "/backpack",
+      "loadTime": 2004,
+      "metrics": {
+        "cls": 0,
+        "domContentLoaded": 0,
+        "loadComplete": 0,
+        "totalLoadTime": 1508.0000000000002,
+        "resourceCount": 11,
+        "resourceSize": 4784792,
+        "apiCalls": []
+      },
+      "performanceScore": "good",
+      "issues": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "step": "Store - 商店",
+      "url": "/store",
+      "loadTime": 1064,
+      "metrics": {
+        "cls": 0,
+        "domContentLoaded": 0,
+        "loadComplete": 0,
+        "totalLoadTime": 567.0000000000001,
+        "resourceCount": 11,
+        "resourceSize": 4131455,
+        "apiCalls": []
+      },
+      "performanceScore": "good",
+      "issues": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "step": "Profile - 個人資料",
+      "url": "/profile",
+      "loadTime": 984,
+      "metrics": {
+        "cls": 0,
+        "domContentLoaded": 0,
+        "loadComplete": 0,
+        "totalLoadTime": 487,
+        "resourceCount": 10,
+        "resourceSize": 2633909,
+        "apiCalls": []
+      },
+      "performanceScore": "good",
+      "issues": [],
+      "errors": [],
+      "warnings": []
+    }
+  ],
+  "summary": {
+    "totalSteps": 13,
+    "passedSteps": 13,
+    "failedSteps": 0,
+    "performanceIssues": 0,
+    "criticalIssues": 0
+  },
+  "apiPerformance": {
+    "average": 0,
+    "p95": 0,
+    "p99": 0,
+    "slowest": []
+  }
+}

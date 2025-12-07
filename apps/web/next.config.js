@@ -36,6 +36,16 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  // 🚀 SOTA: Compiler Optimizations
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production',
+  },
+  // 🚀 SOTA: Modular Imports (減少 bundle 大小)
+  modularizeImports: {
+    'lucide-react': {
+      transform: 'lucide-react/dist/esm/icons/{{member}}',
+    },
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: '2mb',
@@ -90,9 +100,10 @@ const nextConfig = {
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
   },
+  // 🚀 SOTA: 優化頁面緩存（提升開發體驗和性能）
   onDemandEntries: {
-    maxInactiveAge: 25 * 1000,
-    pagesBufferLength: 2,
+    maxInactiveAge: 60 * 1000, // 60 秒（從 25 秒提升）
+    pagesBufferLength: 5, // 緩存 5 個頁面（從 2 個提升）
   },
 }
 
@@ -176,16 +187,23 @@ const pwaConfig = withPWA({
         },
       },
     },
-    // HTML Pages - Network First
+    // 🚀 SOTA: HTML Pages - Stale While Revalidate (二次訪問 0ms)
     {
       urlPattern: /^https?:\/\/.*/i,
-      handler: 'NetworkFirst',
+      handler: 'StaleWhileRevalidate', // 從 NetworkFirst 升級
       options: {
-        cacheName: 'plms-pages-v1',
-        networkTimeoutSeconds: 10,
+        cacheName: 'plms-pages-v2', // 版本升級
+        plugins: [
+          {
+            cacheWillUpdate: async ({ response }) => {
+              // 只緩存成功的響應
+              return response.status === 200 ? response : null
+            },
+          },
+        ],
         expiration: {
-          maxEntries: 30,
-          maxAgeSeconds: 60 * 60, // 1 hour
+          maxEntries: 50, // 增加緩存數量
+          maxAgeSeconds: 24 * 60 * 60, // 24 小時
         },
       },
     },

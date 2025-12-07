@@ -18,12 +18,15 @@ export function TabBar() {
 
   return (
     <nav
-      className="flex items-center justify-around border-t border-border bg-background/98 px-4 pt-2 pb-1 backdrop-blur-xl"
+      className="flex-shrink-0 border-t border-border bg-background/98 backdrop-blur-xl"
       style={{
-        paddingBottom: 'env(safe-area-inset-bottom, 8px)',
+        // 🎯 頂尖修復：使用 calc 確保 TabBar 緊貼底部
+        // safe-area-inset-bottom 僅在有 Home Indicator 的設備上生效
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       }}
     >
-      <div className="mx-auto flex h-14 sm:h-16 w-full items-center justify-around sm:max-w-2xl lg:max-w-3xl">
+      {/* 🎯 內部容器：固定高度，確保在所有設備上一致 */}
+      <div className="mx-auto flex h-14 w-full items-center justify-around px-4 sm:h-16 sm:max-w-2xl lg:max-w-3xl">
         {tabs.map((tab) => {
           const isActive = pathname?.startsWith(tab.href)
           const Icon = tab.icon

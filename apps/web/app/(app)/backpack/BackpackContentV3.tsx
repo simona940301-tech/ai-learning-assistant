@@ -334,7 +334,7 @@ export function BackpackContentV3() {
   // Folder View (Second Layer)
   if (!selectedSubject) {
     return (
-      <div className="mx-auto max-w-lg pb-24 min-h-screen bg-background">
+      <div className="mx-auto max-w-lg min-h-full bg-background">
         {/* Header with Title */}
 
 
@@ -378,7 +378,7 @@ export function BackpackContentV3() {
   const subjectInfo = subjects.find((s) => s.id === selectedSubject)
 
   return (
-    <div className="mx-auto max-w-lg pb-24 min-h-screen bg-background">
+    <div className="mx-auto max-w-lg min-h-full bg-background">
       {/* Header with Title */}
 
 

@@ -79,7 +79,7 @@
     /* 🎯 Phase A: 極簡設計 56px → 40px */
     --tab-bar-height: 64px;
 
-    /* Safe Area Insets */
+    /* Safe-area insets for mobile devices (notch, home indicator) */
     --safe-area-inset-top: env(safe-area-inset-top, 0px);
     --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
     --safe-area-inset-left: env(safe-area-inset-left, 0px);
@@ -156,6 +156,47 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  /* 🎯 SOTA Mobile Optimizations */
+
+  /* Prevent iOS Safari zoom on input focus (font-size < 16px triggers zoom) */
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1em) !important;
+  }
+
+  /* Prevent overscroll bounce on iOS */
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+
+  /* Disable text selection on UI elements (prevents long-press selection) */
+  button,
+  [role="button"],
+  [role="tab"],
+  .no-select {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* Ensure minimum touch target size (44x44px iOS HIG standard) */
+  @media (hover: none) and (pointer: coarse) {
+
+    button:not(.no-min-size),
+    a:not(.no-min-size),
+    [role="button"]:not(.no-min-size) {
+      min-height: 44px;
+      min-width: 44px;
+    }
+  }
+
+  /* Optimize tap highlighting */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
 }
 
 @layer utilities {
@@ -169,6 +210,21 @@
 
   .pb-input-dock {
     padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--tab-bar-height, 64px) + var(--ask-input-dock-height, 56px) + 8px);
+  }
+
+  /* 🎯 SOTA: Dynamic Viewport Height (自動扣除 Safari 底部網址列) */
+  .h-screen-mobile {
+    height: 100vh;
+    /* Fallback for older browsers */
+    height: 100dvh;
+    /* SOTA: Dynamic viewport height */
+  }
+
+  .min-h-screen-mobile {
+    min-height: 100vh;
+    /* Fallback */
+    min-height: 100dvh;
+    /* SOTA */
   }
 }
 
@@ -286,4 +342,63 @@
 
 .textLayer ::selection {
   background: rgba(0, 0, 255, 0.2);
+}
+
+/* ============================================
+   🚀 SOTA CSS Performance Optimizations
+   ============================================ */
+
+/* Content Visibility - 跳過不可見元素的渲染 */
+.content-visibility-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 500px;
+  /* 預估高度，避免滾動條跳動 */
+}
+
+/* Contain - 隔離渲染範圍 */
+.contain-layout {
+  contain: layout;
+}
+
+.contain-paint {
+  contain: paint;
+}
+
+.contain-strict {
+  contain: strict;
+}
+
+/* 列表項優化 - 隔離渲染 + 自動跳過不可見項 */
+.list-item-optimized {
+  contain: layout paint;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 100px;
+}
+
+/* 模態框優化 - 隱藏時完全跳過渲染 */
+.modal-optimized {
+  content-visibility: auto;
+  contain: layout style paint;
+}
+
+/* GPU 加速動畫 - 只在動畫期間使用 */
+.gpu-accelerated {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* 禁用 GPU 加速 - 動畫結束後移除 will-change */
+.gpu-accelerated-off {
+  will-change: auto;
+}
+
+/* 圖片異步解碼優化 - 在 HTML 中使用 decoding="async" */
+img[decoding="async"] {
+  /* 瀏覽器會在背景線程解碼圖片，不阻塞主線程 */
+}
+
+/* 虛擬化列表容器優化 */
+.virtualized-list {
+  contain: strict;
+  overflow: auto;
 }

@@ -334,7 +334,7 @@ export function BackpackContent() {
   }, [handleFileSelect]);
 
   return (
-    <div className="mx-auto max-w-lg pb-24">
+    <div className="mx-auto max-w-lg min-h-full">
       {/* Sticky Header - First Layer: Data Type Tabs */}
       <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-xl border-b">
         <div className="px-4 pt-3 pb-2 flex items-center justify-between">

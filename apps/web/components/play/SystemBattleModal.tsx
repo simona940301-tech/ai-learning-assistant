@@ -7,7 +7,7 @@ import { usePlay } from '@/lib/play-context'
 import { User, Bot, Trophy } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { MatchmakingModal } from './MatchmakingModal'
 
 interface SystemBattleModalProps {
@@ -23,31 +23,34 @@ export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
   const [quickTimeLimit, setQuickTimeLimit] = useState<20 | 30 | 45 | 60>(20)
   const hasStartedRef = useRef(false)
 
+  // 🎯 MVP 階段：只保留 AI 訓練模式
   const modes = [
     {
       id: 'PVE_TRAINING' as const,
-      title: '個人訓練模式',
-      description: 'AI 驅動的個人錯題訓練',
+      title: 'AI 訓練',
+      description: '與 AI 對戰，個人化題目練習',
       icon: Bot,
       requiresEnergy: true,
       requiresSubject: false,
     },
-    {
-      id: 'WEAKNESS_BATTLE' as const,
-      title: '弱點會戰',
-      description: '針對弱點知識點的對戰',
-      icon: User,
-      requiresEnergy: true,
-      requiresSubject: false,
-    },
-    {
-      id: 'RANKED' as const,
-      title: '學科排位賽',
-      description: '選擇學科後進入排隊',
-      icon: Trophy,
-      requiresEnergy: true,
-      requiresSubject: true,
-    },
+    // ⏸️ 暫時關閉：弱點會戰
+    // {
+    //   id: 'WEAKNESS_BATTLE' as const,
+    //   title: '弱點會戰',
+    //   description: '針對弱點知識點的對戰',
+    //   icon: User,
+    //   requiresEnergy: true,
+    //   requiresSubject: false,
+    // },
+    // ⏸️ 暫時關閉：排位賽
+    // {
+    //   id: 'RANKED' as const,
+    //   title: '學科排位賽',
+    //   description: '選擇學科後進入排隊',
+    //   icon: Trophy,
+    //   requiresEnergy: true,
+    //   requiresSubject: true,
+    // },
   ]
 
   const subjects = [
@@ -329,12 +332,24 @@ export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
     )
   }
 
+  // 🎯 MVP 階段：只有一個模式時，直接進入 PVE 設定畫面
+  useEffect(() => {
+    if (modes.length === 1 && !systemMode) {
+      setSystemMode('PVE_TRAINING')
+    }
+  }, [modes.length, systemMode, setSystemMode])
+
+  // 如果只有一個模式且已設定，等待 PVE 設定畫面渲染
+  if (modes.length === 1 && systemMode === 'PVE_TRAINING') {
+    return null // 會觸發上面的 PVE_TRAINING 分支
+  }
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>系統對戰</DialogTitle>
-          <DialogDescription>選擇系統對戰模式：個人訓練、弱點會戰或排位賽</DialogDescription>
+          <DialogDescription>選擇對戰模式</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3 py-4">

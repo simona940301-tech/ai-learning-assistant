@@ -151,7 +151,19 @@ function uploadWithProgress(
                 })
                 resolve(response)
             } else {
-                reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`))
+                // 🎯 Mobile-friendly error messages
+                const errorMsg = xhr.status === 401
+                    ? '登入已過期，請重新登入'
+                    : xhr.status === 413
+                        ? '檔案過大，請選擇小於 10MB 的檔案'
+                        : xhr.status === 415
+                            ? '不支援的檔案格式，請上傳 PDF、TXT 或圖片'
+                            : xhr.status === 405
+                                ? '上傳失敗，請重新整理頁面後再試'
+                                : xhr.status >= 500
+                                    ? '伺服器暫時無法使用，請稍後再試'
+                                    : `上傳失敗 (${xhr.status})，請重試`
+                reject(new Error(errorMsg))
             }
         })
 
@@ -763,7 +775,10 @@ export function SummaryWorkbench({ onMenuOpen }: SummaryWorkbenchProps = {}) {
             setTimeout(() => setSaveSuccess(false), 3000)
         } catch (error) {
             console.error('[SummaryWorkbench] ❌ Save error:', error)
-            alert('保存失敗，請稍後再試')
+            // Error will be displayed in the UI state, no need for alert()
+            const errorMessage = error instanceof Error ? error.message : '保存失敗，請稍後再試'
+            // TODO: Add toast notification here instead of alert
+            console.error('[SummaryWorkbench] Error message for user:', errorMessage)
         } finally {
             setIsSaving(false)
         }

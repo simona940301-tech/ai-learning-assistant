@@ -24,7 +24,7 @@ export default function BackpackPage() {
       : '請登入後再使用背包功能。'
 
     return (
-      <main className="min-h-screen bg-background pb-20">
+      <main className="min-h-full bg-background">
         <div className="mx-auto max-w-2xl px-4 pt-16">
           <div
             className={`rounded-2xl border p-6 text-sm ${!hasValidSession
@@ -41,7 +41,7 @@ export default function BackpackPage() {
 
   // 已登入，顯示背包內容
   return (
-    <main className="min-h-screen bg-background pb-20">
+    <main className="min-h-full bg-background">
       <BackpackContentV3 />
     </main>
   )

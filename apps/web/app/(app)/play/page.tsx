@@ -5,16 +5,85 @@ import { usePlay, type BattleState } from '@/lib/play-context'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Users, Sparkles, Sword, Music } from 'lucide-react'
+import { Users, Sparkles, Sword, Music, FileText, Brain } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { SystemBattleModal } from '@/components/play/SystemBattleModal'
-import { CustomBattleModal } from '@/components/play/CustomBattleModal'
-import { UGCContractModal } from '@/components/play/UGCContractModal'
+
+// 🚀 SOTA: 智能預取工具
+import { preloadOnInteraction, preloadOnIdle } from '@/lib/preloadable-dynamic'
+import { modalOptimization } from '@/lib/utils/css-optimization'
+import { cn } from '@/lib/utils'
+
+// 🚀 SOTA: 模態框 - 交互預取（觸摸/懸停時預加載）
+const SystemBattleModal = preloadOnInteraction(
+  () => import('@/components/play/SystemBattleModal').then(m => ({ default: m.SystemBattleModal })),
+  { ssr: false }
+)
+
+const CustomBattleModal = preloadOnInteraction(
+  () => import('@/components/play/CustomBattleModal').then(m => ({ default: m.CustomBattleModal })),
+  { ssr: false }
+)
+
+const UGCContractModal = preloadOnInteraction(
+  () => import('@/components/play/UGCContractModal').then(m => ({ default: m.UGCContractModal })),
+  { ssr: false }
+)
+
+const EditorGameModal = preloadOnInteraction(
+  () => import('@/components/play/EditorGameModal').then(m => ({ default: m.EditorGameModal })),
+  { ssr: false }
+)
+
+const PracticeSourceModal = preloadOnInteraction(
+  () => import('@/components/play/PracticeSourceModal').then(m => ({ default: m.PracticeSourceModal })),
+  { ssr: false }
+)
+
+const BattleResultModal = preloadOnInteraction(
+  () => import('@/components/play/BattleResultModal').then(m => ({ default: m.BattleResultModal })),
+  { ssr: false }
+)
+
+const GamifiedMatchResultModal = preloadOnInteraction(
+  () => import('@/components/play/GamifiedMatchResultModal').then(m => ({ default: m.GamifiedMatchResultModal })),
+  { ssr: false }
+)
+
+const FocusModeModal = preloadOnInteraction(
+  () => import('@/components/play/FocusModeModal').then(m => ({ default: m.FocusModeModal })),
+  { ssr: false }
+)
+
+const PracticeRoomSetupModal = preloadOnInteraction(
+  () => import('@/components/play/PracticeRoomSetupModal').then(m => ({ default: m.PracticeRoomSetupModal })),
+  { ssr: false }
+)
+
+// 🚀 SOTA: 非關鍵組件 - 空閒預取
+const DailyMissionWidgetV2 = preloadOnIdle(
+  () => import('@/components/play/DailyMissionWidgetV2').then(m => ({ default: m.DailyMissionWidgetV2 })),
+  { ssr: false }
+)
+
+const TamagotchiWidget = preloadOnIdle(
+  () => import('@/components/companion/tamagotchi-widget').then(m => ({ default: m.TamagotchiWidget })),
+  { ssr: false }
+)
+
+const WsStatusIndicator = preloadOnIdle(
+  () => import('@/components/status/WsStatusIndicator').then(m => ({ default: m.WsStatusIndicator })),
+  { ssr: false }
+)
+
+// 靜態導入（不需要預取）
 import { BattleQuestionV3 } from '@/components/play/BattleQuestionV3'
 import { BattleTransitionOverlay } from '@/components/play/BattleTransitionOverlay'
-import { EditorGameModal } from '@/components/play/EditorGameModal'
-import { PracticeSourceModal } from '@/components/play/PracticeSourceModal'
-import { FileText } from 'lucide-react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { normalizeBattleOptions, normalizeBattleText } from '@/lib/battle-text'
+import { useGuidance, useErrorCorrection } from '@/lib/guidance/useGuidance'
+import { AppBar } from '@/components/layout/app-bar'
+import { isGameModeEnabled } from '@/lib/feature-flags'
+
 import {
   calculateBaseScore,
   calculateSpeedCoefficient,
@@ -22,19 +91,6 @@ import {
   calculateComboMilestoneBonus,
   generateRNGBonus,
 } from '@/components/play/BattleQuestionV3'
-import { BattleResultModal } from '@/components/play/BattleResultModal'
-import { GamifiedMatchResultModal } from '@/components/play/GamifiedMatchResultModal'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { normalizeBattleOptions, normalizeBattleText } from '@/lib/battle-text'
-import { DailyMissionWidgetV2 } from '@/components/play/DailyMissionWidgetV2'
-import { TamagotchiWidget } from '@/components/companion/tamagotchi-widget'
-import { FocusModeModal } from '@/components/play/FocusModeModal'
-import { Brain } from 'lucide-react'
-import { useGuidance, useErrorCorrection } from '@/lib/guidance/useGuidance'
-import { AppBar } from '@/components/layout/app-bar'
-import { PracticeRoomSetupModal } from '@/components/play/PracticeRoomSetupModal'
-import { isGameModeEnabled } from '@/lib/feature-flags'
-
 
 // ============================================
 // Shared Design Components
@@ -526,18 +582,42 @@ function PlayPageContent() {
   }
 
   // Define all available mode cards
+  // 🎯 MVP 階段：只保留三個核心入口
   const allModeCards = [
     {
       id: 'system',
       flagId: 'SYSTEM_BATTLE' as const,
-      label: '系統對戰',
-      description: 'AI 訓練、弱點會戰、排位賽',
+      label: 'AI 對戰',
+      description: '與 AI 進行知識挑戰',
       icon: Sword,
       onClick: openSystemModal,
       accent: 'bg-gradient-to-br from-blue-500/70 to-indigo-500/70 text-white',
       energyCost: 1,
-      estimatedTime: '5-8 分鐘',
+      estimatedTime: '3-5 分鐘',
     },
+    {
+      id: 'lyrical-flow',
+      flagId: 'LYRICAL_FLOW' as const,
+      label: '單字滑卡',
+      description: '跟著音樂節奏，沈浸式單字記憶',
+      icon: Music,
+      onClick: () => router.push('/play/lyrical-flow'),
+      accent: 'bg-gradient-to-br from-pink-500/70 to-rose-500/70 text-white',
+      energyCost: 0,
+      estimatedTime: '無限',
+    },
+    {
+      id: 'focus',
+      flagId: 'FOCUS_MODE' as const,
+      label: '專注模式',
+      description: '番茄鐘冥想，提升學習定力',
+      icon: Brain,
+      onClick: () => setFocusModalOpen(true),
+      accent: 'bg-gradient-to-br from-emerald-400/60 to-teal-500/60 text-white',
+      energyCost: 0,
+      estimatedTime: '25 分鐘',
+    },
+    // ⏸️ 以下功能暫時關閉（由 feature flags 控制）
     {
       id: 'custom',
       flagId: 'CUSTOM_BATTLE' as const,
@@ -548,39 +628,6 @@ function PlayPageContent() {
       accent: 'bg-gradient-to-br from-fuchsia-500/60 to-pink-500/60 text-white',
       energyCost: 2,
       estimatedTime: '8-12 分鐘',
-    },
-    {
-      id: 'lyrical-flow',
-      flagId: 'LYRICAL_FLOW' as const,
-      label: '歌詞流動 (Beta)',
-      description: '跟著音樂節奏，沈浸式單字記憶',
-      icon: Music, // Ensure Music is imported
-      onClick: () => router.push('/play/lyrical-flow'),
-      accent: 'bg-gradient-to-br from-pink-500/70 to-rose-500/70 text-white',
-      energyCost: 0,
-      estimatedTime: '無限',
-    },
-    {
-      id: 'detective',
-      flagId: 'DETECTIVE_MODE' as const,
-      label: '偵探檔案：真相拼圖',
-      description: '碎片閱讀、證據判讀、邏輯推理',
-      icon: FileText, // Using FileText as placeholder, ideally a Search or Eye icon
-      onClick: () => router.push('/play/detective/case-001'),
-      accent: 'bg-gradient-to-br from-slate-700 to-slate-900 text-amber-400 border border-amber-500/30',
-      energyCost: 2,
-      estimatedTime: '15-20 分鐘',
-    },
-    {
-      id: 'editor',
-      flagId: 'EDITOR_MODE' as const,
-      label: '實習編輯',
-      description: '找錯、修稿、主旨判斷',
-      icon: FileText,
-      onClick: () => setEditorModalOpen(true),
-      accent: 'bg-gradient-to-br from-purple-400/60 to-indigo-500/60 text-white',
-      energyCost: 1,
-      estimatedTime: '5 分鐘',
     },
     {
       id: 'ugc',
@@ -605,15 +652,26 @@ function PlayPageContent() {
       estimatedTime: '無限制',
     },
     {
-      id: 'focus',
-      flagId: 'FOCUS_MODE' as const,
-      label: '專注修煉',
-      description: '番茄鐘冥想，提升學習定力',
-      icon: Brain,
-      onClick: () => setFocusModalOpen(true),
-      accent: 'bg-gradient-to-br from-emerald-400/60 to-teal-500/60 text-white',
-      energyCost: 0,
-      estimatedTime: '25 分鐘',
+      id: 'detective',
+      flagId: 'DETECTIVE_MODE' as const,
+      label: '偵探檔案',
+      description: '碎片閱讀、證據判讀、邏輯推理',
+      icon: FileText,
+      onClick: () => router.push('/play/detective/case-001'),
+      accent: 'bg-gradient-to-br from-slate-700 to-slate-900 text-amber-400 border border-amber-500/30',
+      energyCost: 2,
+      estimatedTime: '15-20 分鐘',
+    },
+    {
+      id: 'editor',
+      flagId: 'EDITOR_MODE' as const,
+      label: '實習編輯',
+      description: '找錯、修稿、主旨判斷',
+      icon: FileText,
+      onClick: () => setEditorModalOpen(true),
+      accent: 'bg-gradient-to-br from-purple-400/60 to-indigo-500/60 text-white',
+      energyCost: 1,
+      estimatedTime: '5 分鐘',
     },
   ]
 
@@ -626,7 +684,8 @@ function PlayPageContent() {
   return (
     <>
       {/* Mobile-first: 減少 padding，確保在 360×800、390×844 等尺寸下完整顯示 */}
-      <div className="mx-auto max-w-3xl px-4 py-4 pb-20 md:py-10 md:pb-24">
+      {/* 🎯 頂尖修復：移除重複 pb-20/pb-24，由 Layout 統一處理 */}
+      <div className="mx-auto max-w-3xl px-4 py-4 md:py-10">
         <div className="space-y-4 md:space-y-6">
           {/* 主標題區 - 極簡主義，保留大量留白 */}
           <div className="space-y-2 pt-4 text-center">
@@ -645,6 +704,16 @@ function PlayPageContent() {
             >
               選擇你的對戰模式，開始挑戰
             </motion.p>
+
+            {/* WS 連線狀態指示器 - 顯示在標題下方 */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              className="flex justify-center pt-2"
+            >
+              <WsStatusIndicator showDetails compact />
+            </motion.div>
           </div>
 
 

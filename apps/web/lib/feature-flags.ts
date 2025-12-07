@@ -50,19 +50,24 @@ export type GameModeFlag =
  * Game mode defaults
  * Production-ready features are enabled by default.
  * Incomplete features are disabled by default.
+ * 
+ * 🎯 MVP 階段：只開放三個核心入口
+ * - SYSTEM_BATTLE: 系統對戰（只有 AI 訓練）
+ * - LYRICAL_FLOW: 單字滑卡
+ * - FOCUS_MODE: 專注模式
  */
 const GAME_MODE_DEFAULTS: Record<GameModeFlag, boolean> = {
-  // ✅ Production-ready features (enabled by default)
-  SYSTEM_BATTLE: true,
-  CUSTOM_BATTLE: true,
-  UGC_MODE: true,
-  PRACTICE_MODE: true,
-  FOCUS_MODE: true,
-  LYRICAL_FLOW: true,
+  // ✅ MVP 核心功能 (enabled)
+  SYSTEM_BATTLE: true,   // 系統對戰（只有 AI 訓練，無排位/弱點會戰）
+  LYRICAL_FLOW: true,    // 單字滑卡
+  FOCUS_MODE: true,      // 專注模式
 
-  // ❌ Incomplete features (disabled by default)
-  DETECTIVE_MODE: false,
-  EDITOR_MODE: false,
+  // ⏸️ 暫時關閉的功能 (disabled for MVP)
+  CUSTOM_BATTLE: false,  // 自訂對戰（PVP）
+  UGC_MODE: false,       // 內容貢獻
+  PRACTICE_MODE: false,  // 無限練習
+  DETECTIVE_MODE: false, // 偵探模式
+  EDITOR_MODE: false,    // 編輯模式
 }
 
 /**

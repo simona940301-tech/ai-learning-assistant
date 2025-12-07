@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { createClientWithAccessToken } from '@/lib/supabase/server'
+import { CORS_HEADERS } from '@/lib/api/cors'
 
 /**
  * API Security Middleware
@@ -123,6 +124,14 @@ export async function middleware(request: NextRequest) {
   // Skip middleware for non-API routes
   if (!pathname.startsWith('/api/')) {
     return NextResponse.next()
+  }
+
+  // Allow CORS preflight requests to pass without auth
+  if (request.method === 'OPTIONS') {
+    return new NextResponse(null, {
+      status: 200,
+      headers: CORS_HEADERS,
+    })
   }
 
   // Skip authentication in development/preview mock mode

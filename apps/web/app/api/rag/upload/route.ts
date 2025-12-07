@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { getApiUser } from '@/lib/api/auth'
 import { cleanText } from '@/lib/utils/text-extraction'
 import { extractTextSmart } from '@/lib/services/smart-text-extractor'
 import { generateSummary, extractKeywords } from '@/lib/services/rag-summary'
 import { createContextCache } from '@/lib/services/context-cache-service'
 import { createClient } from '@supabase/supabase-js'
-import { createOptionsHandler, corsJsonResponse, addCorsHeaders } from '@/lib/api/cors'
+import { createOptionsHandler, corsJsonResponse } from '@/lib/api/cors'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
         }
 
         if (!finalUser) {
-            const response = NextResponse.json(
+            return corsJsonResponse(
                 {
                     error: 'UNAUTHORIZED',
                     message: errorType === 'invalid-jwt'
@@ -79,7 +79,6 @@ export async function POST(req: NextRequest) {
                 },
                 { status: 401 }
             )
-            return addCorsHeaders(response)
         }
 
         // 2. 解析 FormData
@@ -92,7 +91,7 @@ export async function POST(req: NextRequest) {
         const fileHash = formData.get('file_hash') as string | null
 
         if (!file) {
-            return NextResponse.json(
+            return corsJsonResponse(
                 { error: 'VALIDATION_ERROR', message: '請上傳文件' },
                 { status: 400 }
             )
@@ -104,7 +103,7 @@ export async function POST(req: NextRequest) {
         const fileSize = file.size
 
         if (fileSize > MAX_FILE_SIZE) {
-            return NextResponse.json(
+            return corsJsonResponse(
                 { error: 'FILE_TOO_LARGE', message: '文件大小不能超過 10MB' },
                 { status: 400 }
             )
@@ -119,7 +118,7 @@ export async function POST(req: NextRequest) {
             fileName.match(/\.(jpg|jpeg|png|gif|webp|heic|heif)$/i)
 
         if (!isValidType) {
-            return NextResponse.json(
+            return corsJsonResponse(
                 { error: 'INVALID_FILE_TYPE', message: '僅支援 PDF、TXT 和圖片文件 (JPG, PNG, WEBP, HEIC 等)' },
                 { status: 400 }
             )
@@ -156,7 +155,7 @@ export async function POST(req: NextRequest) {
                 const fileTypeLabel = fileName.endsWith('.pdf') ? 'PDF' :
                     fileType.startsWith('image/') ? '圖片' : '文件'
 
-                return NextResponse.json(
+                return corsJsonResponse(
                     {
                         error: 'EXTRACTION_ERROR',
                         message: `${fileTypeLabel}處理失敗: ${errorMsg}`,
@@ -188,7 +187,7 @@ export async function POST(req: NextRequest) {
         // 降低門檻從 100 到 50 字元，更寬容
         if (cleanedText.length < 50) {
             console.warn(`[RAG Upload] Text too short: ${cleanedText.length} characters`)
-            return NextResponse.json(
+            return corsJsonResponse(
                 {
                     error: 'TEXT_TOO_SHORT',
                     message: `文件內容太少（僅 ${cleanedText.length} 字元），無法生成摘要。請確認 PDF 包含可提取的文字內容，而非純圖片掃描檔。`,
@@ -235,7 +234,7 @@ export async function POST(req: NextRequest) {
             console.log('[RAG Upload] ♻️ Found existing duplicate document:', existingDoc.id)
             console.log('[RAG Upload] ⏭️ Returning existing ID to trigger Cache HIT in analysis')
 
-            return NextResponse.json({
+            return corsJsonResponse({
                 success: true,
                 document: {
                     id: existingDoc.id,
@@ -271,7 +270,7 @@ export async function POST(req: NextRequest) {
 
             // 如果是 RLS 相關錯誤，提供更詳細的訊息
             if (insertError.code === '42501' || insertError.message?.includes('policy')) {
-                return NextResponse.json(
+                return corsJsonResponse(
                     {
                         error: 'RLS_POLICY_ERROR',
                         message: '權限錯誤：RLS 政策拒絕了此操作',
@@ -286,7 +285,7 @@ export async function POST(req: NextRequest) {
                 )
             }
 
-            return NextResponse.json(
+            return corsJsonResponse(
                 {
                     error: 'DATABASE_ERROR',
                     message: '資料庫錯誤',
@@ -454,7 +453,7 @@ export async function POST(req: NextRequest) {
             : null
 
         // 🚀 立即返回（不等待摘要生成和 Cache 創建）
-        return NextResponse.json({
+        return corsJsonResponse({
             success: true,
             document: {
                 id: documentId,
@@ -470,7 +469,7 @@ export async function POST(req: NextRequest) {
         })
     } catch (error) {
         console.error('[RAG Upload] Unexpected error:', error)
-        return NextResponse.json(
+        return corsJsonResponse(
             {
                 error: 'INTERNAL_ERROR',
                 message: error instanceof Error ? error.message : '未知錯誤',
@@ -490,7 +489,7 @@ export async function GET(req: NextRequest) {
         const { supabase, user, errorType } = await getApiUser(req)
 
         if (!user) {
-            return NextResponse.json(
+            return corsJsonResponse(
                 { error: 'UNAUTHORIZED', message: '需要登入' },
                 { status: 401 }
             )
@@ -529,19 +528,19 @@ export async function GET(req: NextRequest) {
 
         if (error) {
             console.error('[RAG Upload] Database query error:', error)
-            return NextResponse.json(
+            return corsJsonResponse(
                 { error: 'DATABASE_ERROR', message: '資料庫錯誤' },
                 { status: 500 }
             )
         }
 
-        return NextResponse.json({
+        return corsJsonResponse({
             success: true,
             documents: data,
         })
     } catch (error) {
         console.error('[RAG Upload] Unexpected error:', error)
-        return NextResponse.json(
+        return corsJsonResponse(
             { error: 'INTERNAL_ERROR', message: '未知錯誤' },
             { status: 500 }
         )

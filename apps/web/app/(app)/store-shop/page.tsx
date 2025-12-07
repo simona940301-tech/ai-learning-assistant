@@ -82,7 +82,7 @@ export default function StoreShopPage() {
   return (
     <>
 
-      <main className="mx-auto max-w-lg pb-20">
+      <main className="mx-auto max-w-lg">
         {/* Subject Filter */}
         <div className="sticky top-14 z-30 border-b bg-background/80 px-4 py-3 backdrop-blur-xl">
           <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
@@ -184,6 +184,7 @@ export default function StoreShopPage() {
     </>
   )
 }
+
 
 
 

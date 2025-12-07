@@ -235,7 +235,7 @@ export default function ProfileSettingsPage() {
         }
       />
 
-      <main className="mx-auto max-w-lg px-7 pt-4 pb-20 bg-[#FFFBF0] min-h-screen">
+      <main className="mx-auto max-w-lg px-7 py-4 bg-[#FFFBF0] min-h-full">
         {loading ? (
           <SkeletonProfile />
         ) : (

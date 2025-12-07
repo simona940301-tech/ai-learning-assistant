@@ -42,7 +42,7 @@ export default function SubjectDetailPage({
         }
       />
 
-      <main className="mx-auto max-w-lg px-4 pt-6 pb-24">
+      <main className="mx-auto max-w-lg px-4 py-6">
         {/* 🎯 Phase A: Tab 切換 - 錯題 / 題本 */}
         <Tabs defaultValue="mistakes" className="w-full">
           <TabsList className="w-full grid grid-cols-2 mb-6">

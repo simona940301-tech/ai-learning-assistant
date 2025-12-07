@@ -208,8 +208,23 @@ const PlayContext = createContext<PlayContextType | undefined>(undefined)
 // WebSocket URL
 // ============================================
 
-const WS_URL = process.env.NEXT_PUBLIC_BATTLE_WS_URL || 'ws://localhost:8080/ws/battle'
-const WS_ENABLED = process.env.NEXT_PUBLIC_BATTLE_WS_ENABLED !== 'false' // Default to true, set to 'false' to disable
+// Support legacy env name NEXT_PUBLIC_WS_URL to avoid silent misconfig on prod
+// ⚠️ 請使用 NEXT_PUBLIC_BATTLE_WS_URL，NEXT_PUBLIC_WS_URL 已棄用
+const WS_URL =
+  process.env.NEXT_PUBLIC_BATTLE_WS_URL ||
+  process.env.NEXT_PUBLIC_WS_URL ||
+  'ws://localhost:8080/ws/battle'
+const WS_ENABLED =
+  (process.env.NEXT_PUBLIC_BATTLE_WS_ENABLED ?? process.env.NEXT_PUBLIC_WS_ENABLED) !== 'false' // Default to true, set to 'false' to disable
+
+// 開發環境警告：檢測到舊的環境變數
+if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_WS_URL && !process.env.NEXT_PUBLIC_BATTLE_WS_URL) {
+  console.warn(
+    '[PlayProvider] ⚠️ NEXT_PUBLIC_WS_URL is deprecated. Please use NEXT_PUBLIC_BATTLE_WS_URL instead.',
+    '\n  Current: NEXT_PUBLIC_WS_URL =', process.env.NEXT_PUBLIC_WS_URL,
+    '\n  Recommended: NEXT_PUBLIC_BATTLE_WS_URL = wss://battle-ws.fly.dev/ws/battle'
+  )
+}
 
 // ============================================
 // Play Provider
