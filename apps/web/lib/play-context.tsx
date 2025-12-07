@@ -205,17 +205,19 @@ export type BattleFlowState = 'IDLE' | 'QUEUEING' | 'MATCHED' | 'IN_BATTLE' | 'R
 const PlayContext = createContext<PlayContextType | undefined>(undefined)
 
 // ============================================
-// WebSocket URL
+// WebSocket URL - Environment-Aware Configuration
 // ============================================
 
-// Support legacy env name NEXT_PUBLIC_WS_URL to avoid silent misconfig on prod
-// ⚠️ 請使用 NEXT_PUBLIC_BATTLE_WS_URL，NEXT_PUBLIC_WS_URL 已棄用
-const WS_URL =
-  process.env.NEXT_PUBLIC_BATTLE_WS_URL ||
-  process.env.NEXT_PUBLIC_WS_URL ||
-  'ws://localhost:8080/ws/battle'
-const WS_ENABLED =
-  (process.env.NEXT_PUBLIC_BATTLE_WS_ENABLED ?? process.env.NEXT_PUBLIC_WS_ENABLED) !== 'false' // Default to true, set to 'false' to disable
+// 🎯 SOTA FIX: Environment-aware WebSocket URL
+// Production (mobile/Vercel): Use remote wss:// server
+// Development (localhost): Use local ws:// server
+const WS_URL = process.env.NODE_ENV === 'production'
+  ? (process.env.NEXT_PUBLIC_BATTLE_WS_URL || process.env.NEXT_PUBLIC_WS_URL || '')
+  : (process.env.NEXT_PUBLIC_BATTLE_WS_URL || process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080/ws/battle')
+
+// WebSocket is disabled if URL is empty or explicitly set to 'false'
+const WS_ENABLED = WS_URL !== '' &&
+  (process.env.NEXT_PUBLIC_BATTLE_WS_ENABLED ?? process.env.NEXT_PUBLIC_WS_ENABLED) !== 'false'
 
 // 開發環境警告：檢測到舊的環境變數
 if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_WS_URL && !process.env.NEXT_PUBLIC_BATTLE_WS_URL) {
@@ -223,6 +225,16 @@ if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_WS_URL && !process.
     '[PlayProvider] ⚠️ NEXT_PUBLIC_WS_URL is deprecated. Please use NEXT_PUBLIC_BATTLE_WS_URL instead.',
     '\n  Current: NEXT_PUBLIC_WS_URL =', process.env.NEXT_PUBLIC_WS_URL,
     '\n  Recommended: NEXT_PUBLIC_BATTLE_WS_URL = wss://battle-ws.fly.dev/ws/battle'
+  )
+}
+
+// 生產環境警告：WebSocket URL 未配置
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production' && !WS_URL) {
+  console.warn(
+    '[PlayProvider] ⚠️ WebSocket URL not configured for production.',
+    '\n  Please set NEXT_PUBLIC_BATTLE_WS_URL in Vercel environment variables.',
+    '\n  Example: wss://your-battle-ws.fly.dev/ws/battle',
+    '\n  WebSocket features will be disabled.'
   )
 }
 

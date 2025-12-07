@@ -100,11 +100,9 @@ export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
 
     hasStartedRef.current = true
     try {
-      if (!wsConnected) {
-        toast.error('尚未連線，請稍後再試')
-        hasStartedRef.current = false
-        return
-      }
+      // 🎯 PVE 不需要 WebSocket - 使用 HTTP API
+      // startMatch() 內部調用 /api/play/start-match (HTTP POST)
+      // WebSocket 只用於 PVP 即時匹配
 
       // 🎯 關鍵修改：啟動過渡動畫
       console.log('[SystemBattleModal] 🚀 Starting PVE transition overlay')
@@ -188,7 +186,6 @@ export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
               <Button
                 className="flex-1 bg-[#5B7CFF] text-white hover:bg-[#4a63d7]"
                 onClick={startQuickPVEBattle}
-                disabled={!wsConnected}
               >
                 立即開始
               </Button>
