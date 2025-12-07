@@ -704,16 +704,6 @@ function PlayPageContent() {
             >
               選擇你的對戰模式，開始挑戰
             </motion.p>
-
-            {/* WS 連線狀態指示器 - 顯示在標題下方 */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.1 }}
-              className="flex justify-center pt-2"
-            >
-              <WsStatusIndicator showDetails compact />
-            </motion.div>
           </div>
 
 
