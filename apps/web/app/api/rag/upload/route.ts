@@ -14,10 +14,31 @@ export const runtime = 'nodejs'
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 
 /**
- * OPTIONS handler for CORS preflight requests
- * Critical for mobile browsers which always send preflight requests
+ * 🚀 SOTA FIX: Explicit Route-Level OPTIONS Handler
+ * This is the LAST LINE OF DEFENSE against 405 errors
+ * 
+ * Why this is necessary:
+ * - Middleware handles OPTIONS globally (Plan C)
+ * - createOptionsHandler() provides dynamic origin reflection (Plan B)
+ * - This explicit handler ensures OPTIONS ALWAYS returns 200 (Plan A)
+ * 
+ * Critical for mobile browsers which ALWAYS send CORS preflight requests
  */
-export const OPTIONS = createOptionsHandler()
+export async function OPTIONS(request: Request) {
+    // Dynamic origin reflection - spec-compliant with credentials
+    const origin = request.headers.get('origin') || '*'
+
+    return new Response(null, {
+        status: 200,
+        headers: {
+            'Access-Control-Allow-Origin': origin,
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Date, X-Api-Version, X-API-Key',
+            'Access-Control-Allow-Credentials': 'true',
+            'Access-Control-Max-Age': '86400', // 24 hours
+        },
+    })
+}
 
 /**
  * POST /api/rag/upload
@@ -77,7 +98,8 @@ export async function POST(req: NextRequest) {
                         origin: req.headers.get('origin'),
                     }
                 },
-                { status: 401 }
+                { status: 401 },
+                req
             )
         }
 
@@ -93,7 +115,8 @@ export async function POST(req: NextRequest) {
         if (!file) {
             return corsJsonResponse(
                 { error: 'VALIDATION_ERROR', message: '請上傳文件' },
-                { status: 400 }
+                { status: 400 },
+                req
             )
         }
 
@@ -105,7 +128,8 @@ export async function POST(req: NextRequest) {
         if (fileSize > MAX_FILE_SIZE) {
             return corsJsonResponse(
                 { error: 'FILE_TOO_LARGE', message: '文件大小不能超過 10MB' },
-                { status: 400 }
+                { status: 400 },
+                req
             )
         }
 
@@ -120,7 +144,8 @@ export async function POST(req: NextRequest) {
         if (!isValidType) {
             return corsJsonResponse(
                 { error: 'INVALID_FILE_TYPE', message: '僅支援 PDF、TXT 和圖片文件 (JPG, PNG, WEBP, HEIC 等)' },
-                { status: 400 }
+                { status: 400 },
+                req
             )
         }
 
@@ -169,7 +194,8 @@ export async function POST(req: NextRequest) {
                                 : '請確認檔案格式正確且未損壞'
                         }
                     },
-                    { status: 500 }
+                    { status: 500 },
+                    req
                 )
             }
         }
@@ -201,7 +227,8 @@ export async function POST(req: NextRequest) {
                             : '請嘗試上傳包含更多文字內容的文件'
                     }
                 },
-                { status: 400 }
+                { status: 400 },
+                req
             )
         }
 
@@ -243,7 +270,7 @@ export async function POST(req: NextRequest) {
                     numPages,
                     isDuplicate: true // Flag for frontend if needed
                 },
-            })
+            }, undefined, req)
         }
 
         const { data: docRecord, error: insertError } = await supabase
@@ -281,7 +308,8 @@ export async function POST(req: NextRequest) {
                             suggestion: '請檢查 RLS 政策是否正確配置，以及 Supabase client 是否有正確的認證上下文'
                         }
                     },
-                    { status: 403 }
+                    { status: 403 },
+                    req
                 )
             }
 
@@ -294,7 +322,8 @@ export async function POST(req: NextRequest) {
                         message: insertError.message,
                     }
                 },
-                { status: 500 }
+                { status: 500 },
+                req
             )
         }
 
@@ -466,7 +495,7 @@ export async function POST(req: NextRequest) {
             extractedText: textToSend,
             extractionMethod: extractionMethod,
             fileHash: fileHash,
-        })
+        }, undefined, req)
     } catch (error) {
         console.error('[RAG Upload] Unexpected error:', error)
         return corsJsonResponse(
@@ -474,7 +503,8 @@ export async function POST(req: NextRequest) {
                 error: 'INTERNAL_ERROR',
                 message: error instanceof Error ? error.message : '未知錯誤',
             },
-            { status: 500 }
+            { status: 500 },
+            req
         )
     }
 }
@@ -491,7 +521,8 @@ export async function GET(req: NextRequest) {
         if (!user) {
             return corsJsonResponse(
                 { error: 'UNAUTHORIZED', message: '需要登入' },
-                { status: 401 }
+                { status: 401 },
+                req
             )
         }
 
@@ -530,19 +561,21 @@ export async function GET(req: NextRequest) {
             console.error('[RAG Upload] Database query error:', error)
             return corsJsonResponse(
                 { error: 'DATABASE_ERROR', message: '資料庫錯誤' },
-                { status: 500 }
+                { status: 500 },
+                req
             )
         }
 
         return corsJsonResponse({
             success: true,
             documents: data,
-        })
+        }, undefined, req)
     } catch (error) {
         console.error('[RAG Upload] Unexpected error:', error)
         return corsJsonResponse(
             { error: 'INTERNAL_ERROR', message: '未知錯誤' },
-            { status: 500 }
+            { status: 500 },
+            req
         )
     }
 }
