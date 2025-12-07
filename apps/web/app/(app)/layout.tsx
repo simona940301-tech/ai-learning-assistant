@@ -21,7 +21,7 @@ export default function AppLayout({
   return (
     <SimpleErrorBoundary>
       {/* 🎯 Full-Screen App: 吃滿整個視窗，不論桌機或手機 */}
-      <div className="flex h-full w-full flex-col bg-background text-foreground">
+      <div className="flex h-[100dvh] w-full flex-col bg-background text-foreground">
         <AuthGuard requireAuth={true}>
           <AskProvider>
             <PlayProvider>

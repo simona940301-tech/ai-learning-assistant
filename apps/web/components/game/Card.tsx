@@ -61,16 +61,16 @@ export const Card: React.FC<CardProps> = ({ data, onSwipe, active }) => {
             onDragEnd={handleDragEnd}
             onClick={handleClick}
             className={cn(
-                "absolute w-[85vw] max-w-[360px] h-[58vh] max-h-[600px] perspective-1000",
+                "absolute w-[75vw] max-w-[320px] h-[50vh] max-h-[500px] perspective-1000 touch-none cursor-grab active:cursor-grabbing",
                 !active && "pointer-events-none"
             )}
             whileHover={{ scale: active ? 1.02 : 1 }}
             whileTap={{ scale: active ? 0.98 : 1 }}
         >
             <motion.div
-                className="relative w-full h-full preserve-3d transition-transform duration-500"
+                className="relative w-full h-full preserve-3d transition-transform duration-200"
                 animate={{ rotateY: isFlipped ? 180 : 0 }}
-                transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+                transition={{ type: 'spring', stiffness: 260, damping: 20, duration: 0.2 }}
                 style={{ transformStyle: 'preserve-3d' }}
             >
                 {/* --- FRONT SIDE --- */}

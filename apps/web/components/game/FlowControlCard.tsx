@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion, useMotionValue, useTransform, PanInfo } from 'framer-motion';
+import { motion, useMotionValue, useTransform, PanInfo, AnimatePresence } from 'framer-motion';
 import { ArrowRight, BookOpen, Crown, RefreshCw } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -37,7 +37,7 @@ export const FlowControlCard: React.FC<FlowControlCardProps> = ({ masteredCount,
     };
 
     return (
-        <div className="relative w-full max-w-sm h-[65vh] flex items-center justify-center">
+        <div className="relative w-full max-w-[340px] h-[55vh] flex items-center justify-center">
             {/* Tutorial Overlay */}
             <AnimatePresence>
                 {showTutorial && (

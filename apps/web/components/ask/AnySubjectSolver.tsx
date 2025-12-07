@@ -307,7 +307,7 @@ export default function AnySubjectSolver() {
   )
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-background text-foreground">
+    <div className="relative flex h-full flex-col overflow-hidden bg-background text-foreground">
       <ChatContainer>
         {currentAnalysis && (
           <motion.div
@@ -372,8 +372,8 @@ export default function AnySubjectSolver() {
         ))}
       </ChatContainer>
 
-      {/* 🎯 固定在底部的輸入區 (ChatGPT 風格) */}
-      <div className="fixed inset-x-0 z-10 border-t border-border/40 bg-background/95 backdrop-blur" style={{ bottom: 'var(--tab-bar-height, 64px)' }}>
+      {/* 🎯 固定在底部的輸入區 (ChatGPT 風格) (Mobile Layout: Use absolute bottom-0 relative to this container) */}
+      <div className="absolute inset-x-0 bottom-0 z-10 border-t border-border/40 bg-background/95 backdrop-blur">
         {activeFollowUp && (
           <div className="flex items-center justify-between px-4 py-2 text-xs text-muted-foreground">
             <div className="truncate">

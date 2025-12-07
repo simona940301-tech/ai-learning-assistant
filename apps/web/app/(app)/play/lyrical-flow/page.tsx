@@ -15,7 +15,7 @@ export default function LyricalFlowPage() {
     const { gameStatus, setArtists, setLevels, startGame } = useGameStore();
 
     return (
-        <div className="relative w-full h-screen bg-gradient-to-br from-zinc-50 to-zinc-100 dark:from-zinc-950 dark:to-zinc-900 overflow-hidden flex flex-col items-center justify-center touch-none">
+        <div className="relative w-full h-screen bg-gradient-to-br from-zinc-50 to-zinc-100 dark:from-zinc-950 dark:to-zinc-900 overflow-hidden flex flex-col items-center justify-center touch-none overscroll-y-none">
             {/* Minimal Header */}
             <motion.div
                 initial={{ opacity: 0, y: -20 }}

@@ -84,7 +84,7 @@ export const Deck: React.FC = () => {
     const visibleCards = words.slice(currentIndex, currentIndex + 3).reverse();
 
     return (
-        <div className="relative w-full h-[70vh] flex items-center justify-center px-4">
+        <div className="relative w-full h-[60vh] flex items-center justify-center px-4">
             {/* Card Stack */}
             <div className="relative w-full h-full flex items-center justify-center">
                 <AnimatePresence>

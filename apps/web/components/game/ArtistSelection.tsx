@@ -27,17 +27,17 @@ export const ArtistSelection: React.FC<ArtistSelectionProps> = ({ onConfirm }) =
     };
 
     return (
-        <div className="w-full h-full flex flex-col items-center justify-center p-6 space-y-8">
-            <div className="text-center space-y-2">
-                <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-violet-500">
+        <div className="w-full h-full flex flex-col items-center justify-center p-4 space-y-4">
+            <div className="text-center space-y-1">
+                <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-violet-500">
                     Pick Your Icons
                 </h2>
-                <p className="text-zinc-500 max-w-xs mx-auto">
-                    We'll customize your vocabulary examples based on the lyrics of artists you love.
+                <p className="text-xs text-zinc-500 max-w-xs mx-auto">
+                    Choose artists to customize your experience.
                 </p>
             </div>
 
-            <div className="flex flex-wrap gap-4 justify-center max-w-sm">
+            <div className="grid grid-cols-2 gap-3 w-full max-w-sm">
                 {ARTISTS.map((artist, index) => {
                     const isSelected = selected.includes(artist.id);
                     return (
@@ -45,20 +45,20 @@ export const ArtistSelection: React.FC<ArtistSelectionProps> = ({ onConfirm }) =
                             key={artist.id}
                             initial={{ scale: 0, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
-                            transition={{ delay: index * 0.05 }}
+                            transition={{ delay: index * 0.03 }}
                             whileTap={{ scale: 0.95 }}
                             onClick={() => toggleArtist(artist.id)}
                             className={`
-                relative px-6 py-3 rounded-full border-2 font-medium transition-all duration-300
+                relative px-3 py-2 rounded-xl border font-medium transition-all duration-200 text-sm
                 ${isSelected
-                                    ? 'bg-zinc-900 border-zinc-900 text-white shadow-lg shadow-zinc-200/50'
+                                    ? 'bg-zinc-900 border-zinc-900 text-white shadow-md'
                                     : 'bg-white border-zinc-200 text-zinc-600 hover:border-zinc-300'
                                 }
               `}
                         >
-                            <div className="flex items-center gap-2">
-                                {isSelected && <Check size={16} />}
-                                {artist.name}
+                            <div className="flex items-center justify-center gap-2">
+                                {isSelected && <Check size={14} />}
+                                <span className="truncate">{artist.name}</span>
                             </div>
                         </motion.button>
                     );
@@ -68,9 +68,9 @@ export const ArtistSelection: React.FC<ArtistSelectionProps> = ({ onConfirm }) =
             <button
                 onClick={() => onConfirm(selected)}
                 disabled={selected.length === 0}
-                className={`w-full max-w-xs py-4 rounded-2xl font-bold text-lg transition-all
+                className={`w-full max-w-xs py-3 rounded-xl font-bold text-base transition-all
           ${selected.length > 0
-                        ? 'bg-zinc-900 text-white shadow-xl hover:shadow-2xl hover:-translate-y-1'
+                        ? 'bg-zinc-900 text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5'
                         : 'bg-zinc-100 text-zinc-300 cursor-not-allowed'
                     }
         `}

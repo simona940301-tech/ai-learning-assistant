@@ -22,20 +22,16 @@ export async function GET(request: NextRequest) {
     const subject = searchParams.get('subject') || 'english'
     const count = parseInt(searchParams.get('count') || '7')
 
-    // Build query - revert to use onboarding_questions table as per requirements
+    // Build query - use seed_questions table as per new requirements
     let query = supabase
-      .from('onboarding_questions')
-      .select('*')
-      .eq('is_active', true) // Only get active questions
-    // .eq('subject', subject) // onboarding_questions might not have subject or it uses valid default. 
-    // Checking local file view in step 20 (previous version was simple), the new version in step 27 added subject filter.
-    // Let's check if onboarding_questions has 'subject'. If not, remove it.
-    // The user wants to revert. The previous version (step 20) was:
-    // .from('onboarding_questions').select('*').eq('is_active', true).order('difficulty_level').limit(3)
-    // The current version (step 27) adds subject filter equal to 'english'.
-    // I should be careful. I will assume subject 'english' is fine or optional. 
-    // But looking at step 20, it didn't filter by subject.
-    // I will remove subject filter to be safe and true to "revert".
+      .from('seed_questions')
+      .select('id, question_text, option_a, option_b, option_c, option_d, correct_answer, difficulty_level, subject')
+      .eq('is_active', true)
+
+    // Handle subject filter (default to english if not specified, but seed_questions has multiple subjects)
+    if (subject) {
+      query = query.eq('subject', subject)
+    }
 
     // Handle difficulty filter(s)
     if (difficultiesParam) {
@@ -83,7 +79,7 @@ export async function GET(request: NextRequest) {
       .sort(() => Math.random() - 0.5)
       .slice(0, count)
 
-    // Transform to expected format (seed_questions already uses difficulty_level)
+    // Transform to expected format
     const transformedQuestions = selectedQuestions.map(q => ({
       id: q.id,
       question_text: q.question_text,
@@ -92,8 +88,8 @@ export async function GET(request: NextRequest) {
       option_c: q.option_c,
       option_d: q.option_d,
       correct_answer: q.correct_answer,
-      difficulty_level: q.difficulty_level, // Already using correct field name
-      explanation: q.explanation,
+      difficulty_level: q.difficulty_level,
+      explanation: null, // seed_questions does not have explanation column
       subject: q.subject
     }))
 
