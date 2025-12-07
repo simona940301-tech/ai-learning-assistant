@@ -57,19 +57,18 @@ export type GameModeFlag =
  * - FOCUS_MODE: 專注模式
  */
 const GAME_MODE_DEFAULTS: Record<GameModeFlag, boolean> = {
-  // ✅ MVP 核心功能 (enabled)
+  // ✅ MVP 核心功能 (enabled by default)
   SYSTEM_BATTLE: true,   // 系統對戰（只有 AI 訓練，無排位/弱點會戰）
   LYRICAL_FLOW: true,    // 單字滑卡
   FOCUS_MODE: true,      // 專注模式
 
-  // 🚀 SOTA FIX: 強制開啟已實作功能 (方案 B - 快速部署)
-  // 這些功能已完成開發，直接啟用以加快上線速度
-  // 未來可移至 Vercel 環境變數管理
-  CUSTOM_BATTLE: true,   // 自訂對戰（PVP） - ✅ Enabled
-  UGC_MODE: true,        // 內容貢獻 - ✅ Enabled
-  PRACTICE_MODE: true,   // 無限練習 - ✅ Enabled
+  // ⏸️ 進階功能 (disabled by default, 可透過環境變數啟用)
+  // 設定 NEXT_PUBLIC_ENABLE_CUSTOM_BATTLE=true 來啟用
+  CUSTOM_BATTLE: false,  // 自訂對戰（PVP）
+  UGC_MODE: false,       // 內容貢獻
+  PRACTICE_MODE: false,  // 無限練習
 
-  // 🚧 未完成功能 (disabled for MVP)
+  // 🚧 未完成功能 (disabled)
   DETECTIVE_MODE: false, // 偵探模式 - API 未完成
   EDITOR_MODE: false,    // 編輯模式 - 需要生產測試
 }
