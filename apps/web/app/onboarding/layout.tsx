@@ -14,7 +14,8 @@ export default function OnboardingLayout({
   return (
     <SimpleErrorBoundary>
       {/* 🎯 關鍵：不包含 AuthGuard，允許匿名訪問 */}
-      <div className="min-h-screen bg-background">
+      {/* 全局 body 是 overflow: hidden，所以這裡必須允許 overflow-y-auto */}
+      <div className="h-full w-full overflow-y-auto overflow-x-hidden bg-background">
         {children}
       </div>
     </SimpleErrorBoundary>

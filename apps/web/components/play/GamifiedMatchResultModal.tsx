@@ -429,7 +429,7 @@ export function GamifiedMatchResultModal({ onClose }: GamifiedMatchResultModalPr
 
             {/* 兩層內容容器 - 平滑垂直滑動過渡 */}
             <div className="relative overflow-hidden pointer-events-auto">
-              <div className="relative" style={{ height: '600px' }}>
+              <div className="relative" style={{ height: 'min(600px, 85dvh)' }}>
                 <AnimatePresence mode="wait" initial={false}>
                   {currentLayer === 'L1' ? (
                     <motion.div

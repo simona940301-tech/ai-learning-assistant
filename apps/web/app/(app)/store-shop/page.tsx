@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { AppBar } from '@/components/layout/app-bar'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { BookOpen, Globe, FlaskConical, Calculator, Languages, Star, Download, Check } from 'lucide-react'
@@ -82,7 +81,6 @@ export default function StoreShopPage() {
 
   return (
     <>
-      <AppBar title="題本商店" user={{ name: 'User', avatar: '' }} />
 
       <main className="mx-auto max-w-lg pb-20">
         {/* Subject Filter */}

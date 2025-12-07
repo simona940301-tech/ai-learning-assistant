@@ -295,7 +295,8 @@ export interface FileAnalysis {
   suggestedQuestions?: SuggestedQuestion[]
   structuredNotes?: string
   // Layer 3
-  examPredictions?: ExamQuestion[]
+  examPrediction?: ExamQuestion[] // Schema field name (singular)
+  examPredictions?: ExamQuestion[] // Legacy field name (plural) - kept for backward compatibility
   weakPoints?: { concept: string; reason: string; practiceSuggestion: string }[]
   studyRoadmap?: { phase: string; topics: string[]; estimatedHours: number }[]
   errorMessage?: string

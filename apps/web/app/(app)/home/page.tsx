@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { AppBar } from '@/components/layout/app-bar'
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { HeaderStatusSection } from '@/components/home/HeaderStatusSection'
 import { CompactDreamSchoolCard } from '@/components/home/CompactDreamSchoolCard'
 import { PrimaryActionSection } from '@/components/home/PrimaryActionSection'
@@ -150,8 +150,7 @@ export default function HomePage() {
   }, [authUser?.id])
 
   return (
-    <>
-      <AppBar title="首頁" />
+    <div className="min-h-screen bg-background pb-20">
 
       <main className="mx-auto max-w-lg px-4 pt-6 pb-24 bg-[#FFFBF0] min-h-screen">
         {isLoading ? (
@@ -202,6 +201,6 @@ export default function HomePage() {
           </div>
         )}
       </main>
-    </>
+    </div>
   )
 }

@@ -27,11 +27,10 @@ export default function BackpackPage() {
       <main className="min-h-screen bg-background pb-20">
         <div className="mx-auto max-w-2xl px-4 pt-16">
           <div
-            className={`rounded-2xl border p-6 text-sm ${
-              !hasValidSession
-                ? 'border-destructive/30 bg-destructive/5 text-destructive'
-                : 'border-border bg-card text-muted-foreground'
-            }`}
+            className={`rounded-2xl border p-6 text-sm ${!hasValidSession
+              ? 'border-destructive/30 bg-destructive/5 text-destructive'
+              : 'border-border bg-card text-muted-foreground'
+              }`}
           >
             {message}
           </div>

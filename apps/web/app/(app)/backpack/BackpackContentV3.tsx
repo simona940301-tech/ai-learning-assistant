@@ -336,13 +336,7 @@ export function BackpackContentV3() {
     return (
       <div className="mx-auto max-w-lg pb-24 min-h-screen bg-background">
         {/* Header with Title */}
-        <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-xl border-b border-border">
-          <div className="px-4 pt-4 pb-3 flex items-center justify-between">
-            <h1 className="text-xl font-bold text-foreground">
-              {contentType === 'note' ? '背包' : contentType === 'wrong' ? '錯題本' : '題本'}
-            </h1>
-          </div>
-        </div>
+
 
         {/* First Layer: Type Tabs */}
         <TypeTabs activeType={contentType} onTypeChange={handleTypeChange} />
@@ -386,13 +380,7 @@ export function BackpackContentV3() {
   return (
     <div className="mx-auto max-w-lg pb-24 min-h-screen bg-background">
       {/* Header with Title */}
-      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-xl border-b border-border">
-        <div className="px-4 pt-4 pb-3 flex items-center justify-between">
-          <h1 className="text-xl font-bold text-foreground">
-            {contentType === 'note' ? '背包' : contentType === 'wrong' ? '錯題本' : '題本'}
-          </h1>
-        </div>
-      </div>
+
 
       {/* First Layer: Type Tabs */}
       <TypeTabs activeType={contentType} onTypeChange={handleTypeChange} />

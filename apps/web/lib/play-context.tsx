@@ -241,6 +241,7 @@ export function PlayProvider({ children }: { children: React.ReactNode }) {
   const isConnectingRef = useRef(false)
   const hasShownConnectionErrorRef = useRef(false)
   const wsRef = useRef<WebSocket | null>(null)
+  const connectionToastTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // ============================================
   // Fetch User Status
@@ -448,6 +449,12 @@ export function PlayProvider({ children }: { children: React.ReactNode }) {
       isConnectingRef.current = false
       hasShownConnectionErrorRef.current = false
 
+      // Clear any pending connection toast
+      if (connectionToastTimeoutRef.current) {
+        clearTimeout(connectionToastTimeoutRef.current)
+        connectionToastTimeoutRef.current = null
+      }
+
       // 連接成功，清除斷線提示並顯示成功提示
       if (typeof window !== 'undefined' && reconnectAttempts.current > 0) {
         import('@/components/ui/Toast').then(({ toast }) => {
@@ -512,10 +519,15 @@ export function PlayProvider({ children }: { children: React.ReactNode }) {
         }
 
         // 顯示斷線提示 Toast (only for first 2 attempts to avoid spam)
+        // 延遲 2 秒顯示，避免閃爍
         if (typeof window !== 'undefined' && reconnectAttempts.current <= 2) {
-          import('@/components/ui/Toast').then(({ toast }) => {
-            toast.loading(`連線中斷，正在嘗試重新連接 (第 ${reconnectAttempts.current} 次 / 5)`)
-          })
+          if (connectionToastTimeoutRef.current) clearTimeout(connectionToastTimeoutRef.current)
+
+          connectionToastTimeoutRef.current = setTimeout(() => {
+            import('@/components/ui/Toast').then(({ toast }) => {
+              toast.loading(`連線中斷，正在嘗試重新連接 (第 ${reconnectAttempts.current} 次 / 5)`)
+            })
+          }, 2000)
         }
 
         reconnectTimeoutRef.current = setTimeout(() => {

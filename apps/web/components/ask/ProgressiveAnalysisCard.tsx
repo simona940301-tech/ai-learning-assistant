@@ -244,15 +244,17 @@ export default function ProgressiveAnalysisCard({
 
         const now = performance.now()
 
-        // 🚀 Layer 1: Quick Summary (Target: 1-3s)
-        if (object.summary && object.summary.length > 50 && !quickSummaryReady) {
+        // 🚀 Layer 1: Quick Summary (Target: 1-3s) - PHASE 1: Immediate render at 5 chars
+        if (object.summary && object.summary.length > 5 && !quickSummaryReady) {
             setQuickSummaryReady(true)
             setProgressiveTimestamps(prev => ({ ...prev, summaryAt: now }))
             console.log('[Progressive] 🎯 Layer 1: Quick Summary ready at', (now / 1000).toFixed(1), 's')
+            console.log('[Progressive] 📊 Summary length:', object.summary.length, 'chars')
+            console.log('[Progressive] 🚀 PHASE 1: Rendering immediately (threshold: 5 chars)')
 
             // Track UX metric
-            if (typeof window !== 'undefined' && window.gtag) {
-                window.gtag('event', 'progressive_summary_ready', {
+            if (typeof window !== 'undefined' && (window as any).gtag) {
+                (window as any).gtag('event', 'progressive_summary_ready', {
                     time_ms: now,
                     char_length: object.summary.length
                 })
@@ -615,7 +617,7 @@ export default function ProgressiveAnalysisCard({
             )}
 
             {/* Layer 3: Exam Predictions (15-30s) */}
-            {examPredictionsReady && (analysis?.examPredictions?.length ?? 0) > 0 && (
+            {examPredictionsReady && (analysis?.examPrediction?.length ?? 0) > 0 && (
                 <motion.div
                     data-section="exam-predictions"
                     initial={{ opacity: 0, y: 10 }}
@@ -628,8 +630,8 @@ export default function ProgressiveAnalysisCard({
                         <h3 className="text-lg font-semibold text-[#6C4A2D]">考題預測</h3>
                     </div>
                     <div className="space-y-3">
-                        {/* ✅ 修復：安全訪問 examPredictions，使用 optional chaining */}
-                        {analysis?.examPredictions?.map((item, idx) => (
+                        {/* ✅ 修復:安全訪問 examPrediction,使用 optional chaining */}
+                        {analysis?.examPrediction?.map((item, idx) => (
                             <div
                                 key={idx}
                                 className="rounded-[10px] bg-[#F8F1E7] px-5 py-5 space-y-4"

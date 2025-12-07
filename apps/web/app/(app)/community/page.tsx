@@ -2,7 +2,6 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { AppBar } from '@/components/layout/app-bar'
 import { Card } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -89,8 +88,6 @@ function CommunityPageContent() {
 
   return (
     <>
-      <AppBar title="Community" />
-
       <main className="mx-auto max-w-lg">
         {/* Removed Tabs - only showing latest posts */}
         <div className="sticky top-14 z-30 border-b bg-background/80 backdrop-blur-xl">

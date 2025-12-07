@@ -1,3 +1,5 @@
+'use client'
+
 import { AnimatePresence, motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 
@@ -14,6 +16,7 @@ interface ModeTabsProps {
 const ModeTabs = ({ active, onChange }: ModeTabsProps) => {
   return (
     <div className="relative mx-auto flex w-full max-w-md items-center justify-center gap-3">
+      {/* Tab Buttons */}
       {TABS.map(({ key, label }) => {
         const isActive = key === active
         return (
@@ -38,3 +41,4 @@ const ModeTabs = ({ active, onChange }: ModeTabsProps) => {
 }
 
 export default ModeTabs
+

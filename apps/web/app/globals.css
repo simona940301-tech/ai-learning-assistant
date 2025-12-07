@@ -47,25 +47,36 @@
     --ring: 42 98% 70%;
 
     /* 🎯 Design System: Border Radius (Issue #1.3.3) */
-    --radius-card: 1rem; /* 16px - Cards */
-    --radius-modal: 1.5rem; /* 24px - Modals/BottomSheets (top only) */
-    --radius-full: 9999px; /* Pills/Chips/Badges */
-    --radius: 1rem; /* Legacy support */
+    --radius-card: 1rem;
+    /* 16px - Cards */
+    --radius-modal: 1.5rem;
+    /* 24px - Modals/BottomSheets (top only) */
+    --radius-full: 9999px;
+    /* Pills/Chips/Badges */
+    --radius: 1rem;
+    /* Legacy support */
 
     /* 🎯 Design System: Spacing Scale */
-    --spacing-xs: 0.5rem; /* 8px */
-    --spacing-sm: 0.75rem; /* 12px */
-    --spacing-md: 1rem; /* 16px */
-    --spacing-lg: 1.5rem; /* 24px */
-    --spacing-xl: 2rem; /* 32px */
-    --spacing-2xl: 3rem; /* 48px */
+    --spacing-xs: 0.5rem;
+    /* 8px */
+    --spacing-sm: 0.75rem;
+    /* 12px */
+    --spacing-md: 1rem;
+    /* 16px */
+    --spacing-lg: 1.5rem;
+    /* 24px */
+    --spacing-xl: 2rem;
+    /* 32px */
+    --spacing-2xl: 3rem;
+    /* 48px */
 
     /* 🎯 Design System: Shadows (2-tier system) */
     --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
     --shadow-card-hover: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 
     /* App-specific heights */
-    --ask-input-dock-height: 40px; /* 🎯 Phase A: 極簡設計 56px → 40px */
+    --ask-input-dock-height: 40px;
+    /* 🎯 Phase A: 極簡設計 56px → 40px */
     --tab-bar-height: 64px;
 
     /* Safe Area Insets */
@@ -88,16 +99,44 @@
     border-color: hsl(var(--border));
   }
 
+  /* ============================================
+   🎯 Full-Screen App Architecture
+   ============================================ */
+
+  /* 讓整個文件高度 = 視窗高度，並關掉瀏覽器自己的捲動條 */
   html,
   body {
     height: 100%;
-    overflow: hidden; /* ✅ 修復：禁止整個頁面滑動,只允許內容區滑動 */
-    position: fixed; /* ✅ 修復：鎖定頁面位置,防止彈跳效果 */
-    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    /* 關掉外層捲動，交給 App 自己控制 */
+    position: relative;
+    /* 移除 fixed，使用 relative */
+    touch-action: manipulation;
     /* Optimize for touch devices */
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
-    touch-action: manipulation;
+  }
+
+  /* 防止水平捲動條出現 */
+  body {
+    overflow-x: hidden;
+  }
+
+  /* 內容可以捲動，但隱藏 scrollbar */
+  .app-scroll {
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+
+    /* Firefox 隱藏 scrollbar */
+    scrollbar-width: none;
+  }
+
+  /* WebKit (Chrome / Safari) 隱藏 scrollbar */
+  .app-scroll::-webkit-scrollbar {
+    display: none;
   }
 
   /* ✅ 只在 Ask 頁面鎖定滾動 */
@@ -136,7 +175,7 @@
 @layer components {
   /* 🎯 方案 3: 移除固定定位的 InputDock 樣式，改用 flex 佈局 */
   /* 以下樣式已不再使用，保留以便參考 */
-  
+
   /* .input-dock-shell {
     @apply fixed inset-x-0 z-[60] pointer-events-none;
   } */
@@ -184,54 +223,65 @@
 /* 🎯 頂尖修復：PDF 頁面容器定位 */
 /* 確保頁面容器有正確的定位基線，讓 Canvas 和 Text Layer 能夠正確對齊 */
 .pdf-page-container {
-  position: relative; /* 關鍵：確保絕對定位的子元素相對於此容器定位 */
-  isolation: isolate; /* 創建新的堆疊上下文，確保 z-index 正確 */
+  position: relative;
+  /* 關鍵：確保絕對定位的子元素相對於此容器定位 */
+  isolation: isolate;
+  /* 創建新的堆疊上下文，確保 z-index 正確 */
 }
 
 /* 🎯 頂尖修復：PDF.js Text Layer 透明化（修復文字重疊問題） */
 /* PDF.js 原理：底層 Canvas（圖片）給眼睛看，上層 HTML 文字（透明）給滑鼠選取用 */
 .textLayer {
-  position: absolute; /* 絕對定位，完全覆蓋 Canvas */
+  position: absolute;
+  /* 絕對定位，完全覆蓋 Canvas */
   left: 0;
   top: 0;
-  opacity: 1; /* 保持層可見以便選取 */
+  opacity: 1;
+  /* 保持層可見以便選取 */
   mix-blend-mode: multiply;
   /* 🎯 關鍵：確保所有變形都是從左上角開始 */
   transform-origin: 0% 0%;
   /* 🎯 頂尖修復：確保 Text Layer 完全鋪平、靜態，沒有 overflow 干擾 */
-  overflow: visible; /* 允許文字層正確顯示，不裁剪 */
+  overflow: visible;
+  /* 允許文字層正確顯示，不裁剪 */
   /* 注意：width 和 height 由 JS 程式碼動態設定，不要在這裡設定 */
 }
 
 .textLayer span {
-  color: transparent !important; /* 關鍵！文字本身必須透明，避免黑色文字重疊 */
+  color: transparent !important;
+  /* 關鍵！文字本身必須透明，避免黑色文字重疊 */
   position: absolute;
   white-space: pre;
   cursor: text;
   transform-origin: 0% 0%;
-  
+
   /* 🎯 終極修復：中文文字選取邊界精確化 */
   /* 確保沒有額外的空間干擾定位，這是修復中文選取重疊的關鍵 */
   padding: 0 !important;
   margin: 0 !important;
-  line-height: 1.0 !important; /* 關鍵：防止行高導致垂直重疊 */
+  line-height: 1.0 !important;
+  /* 關鍵：防止行高導致垂直重疊 */
   border: none !important;
   outline: none !important;
-  
+
   /* 確保字元間距精確 */
   letter-spacing: 0 !important;
   word-spacing: 0 !important;
-  
+
   /* 🎯 終極修復：確保 width 屬性不被其他 CSS 規則干擾 */
   /* 移除所有可能干擾 width 的規則，讓 JS 設置的 width 屬性生效 */
-  box-sizing: border-box !important; /* 確保 width 包含 padding 和 border */
-  min-width: 0 !important; /* 移除最小寬度限制 */
-  max-width: none !important; /* 移除最大寬度限制 */
+  box-sizing: border-box !important;
+  /* 確保 width 包含 padding 和 border */
+  min-width: 0 !important;
+  /* 移除最小寬度限制 */
+  max-width: none !important;
+  /* 移除最大寬度限制 */
 }
 
 /* 針對高亮選取範圍修正 */
 ::selection {
-  background: rgba(0, 0, 255, 0.2); /* 傳統藍色選取框 */
+  background: rgba(0, 0, 255, 0.2);
+  /* 傳統藍色選取框 */
 }
 
 .textLayer ::selection {

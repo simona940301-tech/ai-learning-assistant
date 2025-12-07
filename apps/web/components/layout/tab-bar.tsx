@@ -18,10 +18,12 @@ export function TabBar() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur-xl safe-area-pb"
-      style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)' }}
+      className="flex items-center justify-around border-t border-border bg-background/98 px-4 pt-2 pb-1 backdrop-blur-xl"
+      style={{
+        paddingBottom: 'env(safe-area-inset-bottom, 8px)',
+      }}
     >
-      <div className="mx-auto flex h-16 w-full items-center justify-around px-2 sm:px-4 sm:max-w-2xl lg:max-w-3xl">
+      <div className="mx-auto flex h-14 sm:h-16 w-full items-center justify-around sm:max-w-2xl lg:max-w-3xl">
         {tabs.map((tab) => {
           const isActive = pathname?.startsWith(tab.href)
           const Icon = tab.icon

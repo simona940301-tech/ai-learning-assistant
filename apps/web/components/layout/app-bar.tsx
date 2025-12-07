@@ -37,8 +37,13 @@ export function AppBar({
   // 🎯 Phase A: Play 頁面 - 極簡 HUD（Level + Energy）
   if (isPlayPage) {
     return (
-      <header className="sticky top-0 z-40 border-b border-border/30 bg-[#F7F2EC]">
-        <div className={`mx-auto flex h-14 items-center justify-between px-4 ${maxWidthClass}`}>
+      <header
+        className="flex items-center justify-between border-b border-border/30 bg-[#F7F2EC] px-4 pb-2 pt-2 shadow-sm"
+        style={{
+          paddingTop: 'env(safe-area-inset-top, 8px)',
+        }}
+      >
+        <div className={`mx-auto flex h-14 w-full items-center justify-between ${maxWidthClass}`}>
           {/* 左：Level Bar */}
           <div className="flex-1 min-w-0 max-w-[320px]">
             <LevelBar />
@@ -91,8 +96,13 @@ export function AppBar({
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/30 bg-[#F7F2EC]/95 backdrop-blur-xl">
-      <div className={`mx-auto flex h-14 items-center justify-between px-4 ${maxWidthClass}`}>
+    <header
+      className="flex items-center justify-between border-b border-border/30 bg-[#F7F2EC]/95 px-4 pb-2 pt-2 shadow-sm backdrop-blur-xl"
+      style={{
+        paddingTop: 'env(safe-area-inset-top, 8px)',
+      }}
+    >
+      <div className={`mx-auto flex h-14 w-full items-center justify-between ${maxWidthClass}`}>
         {/* 左：Home Button + Title */}
         <div className="flex items-center gap-2">
           <Link href="/home">

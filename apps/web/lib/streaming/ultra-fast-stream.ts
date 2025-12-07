@@ -103,16 +103,27 @@ export class UltraFastStream {
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
 
+
       let buffer = ''
       let hasEmittedSummary = false
       let hasEmittedConcepts = false
       let hasEmittedPredictions = false
+      let lastChunk: any = null // Track last valid chunk
 
       while (true) {
         const { done, value } = await reader.read()
 
         if (done) {
           console.log('[UltraFastStream] ✅ Stream complete')
+
+          // 🚀 FIX: Emit final chunk if we have one
+          if (lastChunk) {
+            onChunk?.({
+              type: 'complete',
+              data: lastChunk,
+              timestamp: performance.now()
+            })
+          }
           break
         }
 
@@ -126,32 +137,54 @@ export class UltraFastStream {
           if (!line.trim()) continue
 
           try {
-            // Parse each line as a complete JSON object (NDJSON)
-            const chunk = JSON.parse(line)
+            // 🚀 PHASE 1: Permissive JSON parsing for partial chunks
+            let chunk: any
 
-            // Inspect the chunk to determine what data is ready
-            // This matches the partial objects streamed by Vercel AI SDK
+            try {
+              // Try normal parse first (fastest)
+              chunk = JSON.parse(line)
+            } catch (parseError) {
+              // 🔧 Best-effort parsing for incomplete JSON
+              const { parsePartialJSON } = await import('@/lib/utils/permissive-json')
+              chunk = parsePartialJSON(line)
 
-            // 1. Summary
-            if (chunk.summary && chunk.summary.length > 0) {
-              if (!hasEmittedSummary) {
-                console.log('[UltraFastStream] 🎯 Summary started')
-                hasEmittedSummary = true
+              if (!chunk) {
+                console.warn('[UltraFastStream] ⚠️ Could not parse line:', line.substring(0, 100))
+                continue // Skip this line
               }
-              // Always emit updates to ensure full content is rendered
-              onChunk?.({
-                type: 'summary',
-                data: chunk.summary,
-                timestamp: performance.now()
-              })
+
+              console.log('[UltraFastStream] 🔧 Partial JSON parsed:', Object.keys(chunk))
             }
 
-            // 2. Concepts
+            lastChunk = chunk // Track for final emission
+
+            // 🚀 FIX: More aggressive early emission for progressive rendering
+
+            // 1. Summary - emit as soon as we have ANY content (even 5 chars)
+            if (chunk.summary && chunk.summary.length > 0) {
+              if (!hasEmittedSummary || chunk.summary.length > 5) {
+                // Emit on first content OR when we have any new content
+                if (!hasEmittedSummary) {
+                  console.log('[UltraFastStream] 🎯 Summary started (', chunk.summary.length, 'chars)')
+                  hasEmittedSummary = true
+                }
+
+                // Always emit updates to ensure full content is rendered
+                onChunk?.({
+                  type: 'summary',
+                  data: chunk.summary,
+                  timestamp: performance.now()
+                })
+              }
+            }
+
+            // 2. Concepts - emit as soon as we have at least 1 concept
             if (chunk.keyConcepts && chunk.keyConcepts.length > 0) {
               if (!hasEmittedConcepts) {
-                console.log('[UltraFastStream] 🎯 Concepts started')
+                console.log('[UltraFastStream] 🎯 Concepts started (', chunk.keyConcepts.length, 'items)')
                 hasEmittedConcepts = true
               }
+
               // Always emit updates (e.g. as array grows or content fills in)
               onChunk?.({
                 type: 'concepts',
@@ -160,12 +193,13 @@ export class UltraFastStream {
               })
             }
 
-            // 3. Predictions
+            // 3. Predictions - emit as soon as we have at least 1 prediction
             if (chunk.examPrediction && chunk.examPrediction.length > 0) {
               if (!hasEmittedPredictions) {
-                console.log('[UltraFastStream] 🎯 Predictions started')
+                console.log('[UltraFastStream] 🎯 Predictions started (', chunk.examPrediction.length, 'items)')
                 hasEmittedPredictions = true
               }
+
               // Always emit updates
               onChunk?.({
                 type: 'predictions',
@@ -173,9 +207,6 @@ export class UltraFastStream {
                 timestamp: performance.now()
               })
             }
-
-            // Keep updating complete state implicitly
-            // Final completion is handled by the last chunk or explicit close
 
           } catch (e) {
             // Ignore individual line parse errors - stream might have split a line (unlikely with this buffering)

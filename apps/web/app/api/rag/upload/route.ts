@@ -86,6 +86,11 @@ export async function POST(req: NextRequest) {
         const formData = await req.formData()
         const file = formData.get('file') as File | null
 
+        // 🚀 PHASE 3: IndexedDB cache support
+        const skipExtraction = formData.get('skip_extraction') === 'true'
+        const cachedText = formData.get('cached_text') as string | null
+        const fileHash = formData.get('file_hash') as string | null
+
         if (!file) {
             return NextResponse.json(
                 { error: 'VALIDATION_ERROR', message: '請上傳文件' },
@@ -127,38 +132,47 @@ export async function POST(req: NextRequest) {
         let numPages: number | undefined
         let extractionMethod: string
 
-        try {
-            console.log(`[RAG Upload] Starting smart text extraction for ${fileName} (${fileType})`)
-            const extractionResult = await extractTextSmart(buffer, fileName, fileType)
-            extractedText = extractionResult.text
-            numPages = extractionResult.numPages
-            extractionMethod = extractionResult.method
+        // 🚀 PHASE 3: Use cached text if available
+        if (skipExtraction && cachedText) {
+            console.log(`[RAG Upload] ⏩ Using client-side cached text for ${fileName} (${cachedText.length} chars)`)
+            extractedText = cachedText
+            numPages = undefined // Will be populated from metadata if needed
+            extractionMethod = 'cached'
+        } else {
+            // Normal extraction flow
+            try {
+                console.log(`[RAG Upload] Starting smart text extraction for ${fileName} (${fileType})`)
+                const extractionResult = await extractTextSmart(buffer, fileName, fileType, fileHash || undefined)
+                extractedText = extractionResult.text
+                numPages = extractionResult.numPages
+                extractionMethod = extractionResult.method
 
-            console.log(`[RAG Upload] Extraction complete: ${extractionMethod} (${extractionResult.durationMs}ms, ${extractedText.length} chars)`)
-        } catch (extractError) {
-            console.error('[RAG Upload] Text extraction failed:', extractError)
-            const errorMsg = extractError instanceof Error ? extractError.message : String(extractError)
+                console.log(`[RAG Upload] Extraction complete: ${extractionMethod} (${extractionResult.durationMs}ms, ${extractedText.length} chars)`)
+            } catch (extractError) {
+                console.error('[RAG Upload] Text extraction failed:', extractError)
+                const errorMsg = extractError instanceof Error ? extractError.message : String(extractError)
 
-            // Provide specific error messages based on file type
-            const fileTypeLabel = fileName.endsWith('.pdf') ? 'PDF' :
-                fileType.startsWith('image/') ? '圖片' : '文件'
+                // Provide specific error messages based on file type
+                const fileTypeLabel = fileName.endsWith('.pdf') ? 'PDF' :
+                    fileType.startsWith('image/') ? '圖片' : '文件'
 
-            return NextResponse.json(
-                {
-                    error: 'EXTRACTION_ERROR',
-                    message: `${fileTypeLabel}處理失敗: ${errorMsg}`,
-                    debug: {
-                        fileName,
-                        fileSize,
-                        fileType,
-                        bufferSize: buffer.length,
-                        suggestion: fileType.startsWith('image/')
-                            ? '請確認圖片清晰且包含可辨識的文字內容'
-                            : '請確認檔案格式正確且未損壞'
-                    }
-                },
-                { status: 400 }
-            )
+                return NextResponse.json(
+                    {
+                        error: 'EXTRACTION_ERROR',
+                        message: `${fileTypeLabel}處理失敗: ${errorMsg}`,
+                        debug: {
+                            fileName,
+                            fileSize,
+                            fileType,
+                            bufferSize: buffer.length,
+                            suggestion: fileType.startsWith('image/')
+                                ? '請確認圖片清晰且包含可辨識的文字內容'
+                                : '請確認檔案格式正確且未損壞'
+                        }
+                    },
+                    { status: 500 }
+                )
+            }
         }
 
         // 5. 清理文本
@@ -433,6 +447,12 @@ export async function POST(req: NextRequest) {
             console.warn(`[RAG Upload] Background task error for ${documentId}:`, err)
         })
 
+        // 🚀 PHASE 3: Construct response with extracted text for client caching
+        const TEXT_SIZE_LIMIT = 4 * 1024 * 1024 // 4MB safety limit for Vercel
+        const textToSend = (cleanedText && cleanedText.length < TEXT_SIZE_LIMIT && !skipExtraction)
+            ? cleanedText
+            : null
+
         // 🚀 立即返回（不等待摘要生成和 Cache 創建）
         return NextResponse.json({
             success: true,
@@ -442,6 +462,11 @@ export async function POST(req: NextRequest) {
                 status: 'processing', // 狀態為 processing，摘要正在背景生成
                 numPages,
             },
+            // 🚀 PHASE 3: Return extracted text for client caching
+            // Only return if we actually extracted (not from cache) and within size limit
+            extractedText: textToSend,
+            extractionMethod: extractionMethod,
+            fileHash: fileHash,
         })
     } catch (error) {
         console.error('[RAG Upload] Unexpected error:', error)

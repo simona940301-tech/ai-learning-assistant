@@ -627,8 +627,12 @@ export default function OnboardingChallengePage() {
   // Show review after all questions
   if (showReview) {
     const wrongQuestions = resultsRef.current
-      .map((result, index) => ({ result, question: questions[index] }))
-      .filter(({ result }) => !result.isCorrect)
+      .filter((result) => !result.isCorrect)
+      .map((result) => {
+        const question = questions.find((q) => q.id === result.questionId)
+        return { result, question }
+      })
+      .filter((item): item is { result: Result; question: Question } => !!item.question)
 
     return (
       <div className="min-h-screen bg-[#FAF6E9] px-4 font-sans" style={{

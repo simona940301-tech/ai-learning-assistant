@@ -1,7 +1,7 @@
 'use client'
 
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
-import { Sparkles, Loader2, AlertCircle, MessageSquare, Check, Menu } from 'lucide-react'
+import { Sparkles, Loader2, AlertCircle, MessageSquare, Check, Menu, FileText } from 'lucide-react'
 import { FileUploader } from '@/components/ask/file-uploader'
 import { Button } from '@/components/ui/button'
 import { useAsk } from '@/lib/ask-context'
@@ -25,7 +25,12 @@ interface EliteUploadResponse {
         id: string
         filename: string
         status: string
+        numPages?: number
     }
+    // 🚀 PHASE 3: IndexedDB cache fields
+    extractedText?: string | null
+    extractionMethod?: string
+    fileHash?: string
 }
 
 interface ClassificationJobState {
@@ -56,17 +61,23 @@ class ClassificationError extends Error {
 /**
  * Format full analysis content for saving
  */
-const formatFullContent = (analysis: FileAnalysis): string => {
+const formatFullContent = (
+    analysis: FileAnalysis,
+    options: {
+        includeKeyConcepts: boolean
+        includeExamPredictions: boolean
+    } = { includeKeyConcepts: true, includeExamPredictions: true }
+): string => {
     let md = ''
 
-    // 1. Summary
+    // 1. Summary (always included)
     const summary = analysis.structuredNotes || analysis.quickSummary
     if (summary) {
         md += summary + '\n\n'
     }
 
-    // 2. Core Concepts
-    if (analysis.coreConcepts && analysis.coreConcepts.length > 0) {
+    // 2. Core Concepts (optional)
+    if (options.includeKeyConcepts && analysis.coreConcepts && analysis.coreConcepts.length > 0) {
         md += '---\n\n## 🔑 關鍵概念\n\n'
         analysis.coreConcepts.forEach((c) => {
             md += `### ${c.concept}\n${c.explanation}\n`
@@ -75,8 +86,8 @@ const formatFullContent = (analysis: FileAnalysis): string => {
         })
     }
 
-    // 3. Exam Predictions
-    if (analysis.examPredictions && analysis.examPredictions.length > 0) {
+    // 3. Exam Predictions (optional)
+    if (options.includeExamPredictions && analysis.examPredictions && analysis.examPredictions.length > 0) {
         md += '---\n\n## 📝 考題預測\n\n'
         analysis.examPredictions.forEach((q, i) => {
             md += `### 題目 ${i + 1}\n${q.questionText}\n\n`
@@ -160,7 +171,11 @@ function uploadWithProgress(
     })
 }
 
-export function SummaryWorkbench() {
+interface SummaryWorkbenchProps {
+    onMenuOpen?: (openFn: () => void) => void // Callback to expose menu open function
+}
+
+export function SummaryWorkbench({ onMenuOpen }: SummaryWorkbenchProps = {}) {
     const { attachedFiles, clearAll } = useAsk()
 
     // State Machine Hook
@@ -178,6 +193,7 @@ export function SummaryWorkbench() {
     const [analysisContent, setAnalysisContent] = useState<string>('')
     const [detectedSubject, setDetectedSubject] = useState<string>('')
     const [conversationHistory, setConversationHistory] = useState<RAGMessage[]>([])
+    const [currentAnalysisData, setCurrentAnalysisData] = useState<FileAnalysis | undefined>(undefined)
     const [isSaving, setIsSaving] = useState(false)
     const [saveSuccess, setSaveSuccess] = useState(false)
 
@@ -186,7 +202,20 @@ export function SummaryWorkbench() {
     const [classificationJob, setClassificationJob] = useState<ClassificationJobState | null>(null)
     const classificationPollRef = useRef<NodeJS.Timeout | null>(null)
     const accessTokenRef = useRef<string | null>(null)
+
+    // Expose menu open function to parent
+    useEffect(() => {
+        if (onMenuOpen) {
+            // 修正: React useState若直接傳入函數會被視為 functional update
+            // 所以要儲存函數本身，必須 wrap 成 () => function
+            onMenuOpen(() => () => setIsSourceSheetOpen(true))
+        }
+    }, [onMenuOpen])
     const [examPredictionReady, setExamPredictionReady] = useState(false)
+
+    // 🚀 STEP 1: Instant UI Feedback (前端詐欺)
+    const [showInstantFeedback, setShowInstantFeedback] = useState(false)
+    const [fakeProgress, setFakeProgress] = useState(0)
 
     const stopClassificationPolling = () => {
         if (classificationPollRef.current) {
@@ -276,6 +305,25 @@ export function SummaryWorkbench() {
     }
 
     /**
+     * 🚀 STEP 1: Instant UI Feedback - Show skeleton immediately
+     */
+    const showInstantAnalysisUI = () => {
+        setShowInstantFeedback(true)
+        setFakeProgress(0)
+
+        // Fake progress animation for psychology
+        const progressInterval = setInterval(() => {
+            setFakeProgress(prev => {
+                if (prev >= 90) {
+                    clearInterval(progressInterval)
+                    return 90 // Stop at 90%, real progress takes over
+                }
+                return prev + Math.random() * 15
+            })
+        }, 300)
+    }
+
+    /**
      * ⚡ PHASE 5: Upload & Classification Handler
      *
      * Flow:
@@ -296,6 +344,9 @@ export function SummaryWorkbench() {
             setError('請先上傳文件或圖片', 'UPLOAD')
             return
         }
+
+        // 🚀 STEP 1: Show instant UI feedback FIRST (0ms perceived delay)
+        showInstantAnalysisUI()
 
         // Reset all state
         reset()
@@ -344,6 +395,33 @@ export function SummaryWorkbench() {
 
                 const fileId = `file-${i}`
                 console.log(`[SummaryWorkbench] 📄 [${i + 1}/${totalFiles}] Uploading:`, attachedFile.name)
+
+                // 🚀 PHASE 3: Check IndexedDB cache before upload
+                let cachedText: string | null = null
+                let fileHash: string | undefined
+
+                try {
+                    // Fetch blob to compute hash
+                    const blobResponse = await fetch(attachedFile.url)
+                    const blob = await blobResponse.blob()
+                    const file = new File([blob], attachedFile.name, { type: blob.type })
+
+                    // Compute hash
+                    const { IndexedDBCache } = await import('@/lib/storage/indexed-db-cache')
+                    fileHash = await IndexedDBCache.computeFileHash(file)
+
+                    // Check cache
+                    cachedText = await IndexedDBCache.getCachedText(fileHash)
+
+                    if (cachedText) {
+                        console.log(`[SummaryWorkbench] 🔥 Cache HIT for ${attachedFile.name}! Skipping extraction.`)
+                    } else {
+                        console.log(`[SummaryWorkbench] ⚠️ Cache MISS for ${attachedFile.name}, will extract on server.`)
+                    }
+                } catch (cacheError) {
+                    console.warn('[SummaryWorkbench] Cache check failed (non-critical):', cacheError)
+                    // Continue without cache
+                }
 
                 // Fetch blob from object URL or storage path
                 let fetchUrl = attachedFile.url
@@ -416,7 +494,15 @@ export function SummaryWorkbench() {
 
                 // Upload to Elite RAG with real-time progress tracking
                 const formData = new FormData()
-                formData.append('file', file)
+                formData.append('file', blob, attachedFile.name)
+
+                // 🚀 PHASE 3: Add cache data if available
+                if (cachedText) {
+                    formData.append('cached_text', cachedText)
+                    formData.append('skip_extraction', 'true')
+                    formData.append('file_hash', fileHash || '')
+                    console.log(`[SummaryWorkbench] 📦 Sending cached text (${cachedText.length} chars) for ${attachedFile.name}`)
+                }
 
                 console.log('[SummaryWorkbench] 📡 Sending request with auth header:', {
                     authHeaderSet: !!accessToken,
@@ -460,6 +546,33 @@ export function SummaryWorkbench() {
 
                 if (!uploadData.success || !uploadData.document) {
                     throw new UploadError(`上傳回應格式錯誤: ${file.name}`)
+                }
+
+                // 🚀 PHASE 3: Cache Write Back (寫入快取)
+                // 邏輯：如果我們本地原本沒有 cachedText，且 Server 回傳了 extractedText，就存起來
+                if (!cachedText && uploadData.extractedText && uploadData.fileHash) {
+                    // 使用非阻塞方式寫入，不影響 UI 流程
+                    (async () => {
+                        try {
+                            console.log('[Cache] 💾 New text received, saving to IndexedDB...')
+                            const { IndexedDBCache } = await import('@/lib/storage/indexed-db-cache')
+
+                            await IndexedDBCache.cacheText(
+                                uploadData.fileHash!,
+                                uploadData.extractedText!,
+                                {
+                                    fileName: attachedFile.name,
+                                    fileSize: blob.size,
+                                    fileType: blob.type,
+                                    method: (uploadData.extractionMethod as 'pdf-parse' | 'gemini-ocr' | 'direct') || 'pdf-parse',
+                                }
+                            )
+                            console.log('[Cache] ✅ Cache updated for:', attachedFile.name)
+                        } catch (err) {
+                            // 快取寫入失敗不應阻斷主流程，僅警告
+                            console.warn('[Cache] ⚠️ Failed to save to cache:', err)
+                        }
+                    })()
                 }
 
                 console.log(`[SummaryWorkbench] ✅ [${i + 1}/${totalFiles}] Uploaded:`, file.name, '→', uploadData.document.id)
@@ -586,17 +699,45 @@ export function SummaryWorkbench() {
             contentLength: saveData.content.length,
             contentPreview: saveData.content.substring(0, 300),
             includeConversation: saveData.includeConversation,
+            includeKeyConcepts: saveData.includeKeyConcepts,
+            includeExamPredictions: saveData.includeExamPredictions,
             conversationCount: saveData.conversationHistory?.length || 0
         })
-        console.log('[handleSaveToBackpack] 📄 Full content:', saveData.content)
 
         setIsSaving(true)
         try {
+            // Format content based on user's selections
+            let finalContent = ''
+
+            if (currentAnalysisData) {
+                finalContent = formatFullContent(currentAnalysisData, {
+                    includeKeyConcepts: saveData.includeKeyConcepts,
+                    includeExamPredictions: saveData.includeExamPredictions
+                })
+            } else {
+                finalContent = saveData.content
+            }
+
+            // Append conversation history if selected
+            if (saveData.includeConversation && saveData.conversationHistory && saveData.conversationHistory.length > 0) {
+                finalContent += '\n\n---\n\n## 💬 問答記錄\n\n'
+                saveData.conversationHistory.forEach((msg, i) => {
+                    if (msg.role === 'user') {
+                        finalContent += `**Q${Math.floor(i / 2) + 1}**: ${msg.content}\n\n`
+                    } else {
+                        finalContent += `**A${Math.floor(i / 2) + 1}**: ${msg.content}\n\n`
+                    }
+                })
+            }
+
+            console.log('[handleSaveToBackpack] 📄 Final formatted content length:', finalContent.length)
+            console.log('[handleSaveToBackpack] 📄 Final formatted content preview:', finalContent.substring(0, 300))
+
             const payload = {
                 user_id: 'auto',
                 title: saveData.title,
                 subject: saveData.subject,
-                content: saveData.content,
+                content: finalContent,
                 include_conversation: saveData.includeConversation,
                 conversation_history: saveData.conversationHistory,
             }
@@ -642,48 +783,37 @@ export function SummaryWorkbench() {
     return (
         <div className="mx-auto max-w-4xl px-4 pb-20 pt-8">
             <div className="space-y-6">
-                {/* Header Section with Hamburger Menu */}
-                <div className="relative flex items-center justify-center py-2">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute left-0 top-1/2 -translate-y-1/2 hover:bg-black/5 rounded-full"
-                        onClick={() => setIsSourceSheetOpen(true)}
-                    >
-                        <Menu className="h-6 w-6 text-foreground/80" />
-                    </Button>
-
-                    <div className="text-center space-y-1">
-                        <h1 className="text-2xl font-semibold text-foreground">
-                            上傳講義
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            AI 自動生成重點與考題
-                        </p>
-                    </div>
-
-                    {/* Source Management Sheet */}
-                    <SourceManagementSheet
-                        isOpen={isSourceSheetOpen}
-                        onClose={() => setIsSourceSheetOpen(false)}
-                        currentUploadIds={state.uploadedDocIds}
-                        selectedIds={selectedFileIds}
-                        onSelectionChange={(selectedIds) => {
-                            console.log('[SummaryWorkbench] File selection changed:', selectedIds)
-                            setSelectedFileIds(selectedIds)
-
-                            // Show confirmation toast if selection differs from current analysis
-                            const selectionChanged =
-                                selectedIds.length !== pendingAnalysisIds.length ||
-                                selectedIds.some(id => !pendingAnalysisIds.includes(id))
-
-                            if (selectionChanged) {
-                                setShowConfirmToast(true)
-                                setTimeout(() => setShowConfirmToast(false), 5000)
-                            }
-                        }}
-                    />
+                {/* Header Section - Title only */}
+                <div className="text-center space-y-1 py-2">
+                    <h1 className="text-2xl font-semibold text-foreground">
+                        上傳講義
+                    </h1>
+                    <p className="text-sm text-muted-foreground">
+                        AI 自動生成重點與考題
+                    </p>
                 </div>
+
+                {/* Source Management Sheet */}
+                <SourceManagementSheet
+                    isOpen={isSourceSheetOpen}
+                    onClose={() => setIsSourceSheetOpen(false)}
+                    currentUploadIds={state.uploadedDocIds}
+                    selectedIds={selectedFileIds}
+                    onSelectionChange={(selectedIds) => {
+                        console.log('[SummaryWorkbench] File selection changed:', selectedIds)
+                        setSelectedFileIds(selectedIds)
+
+                        // Show confirmation toast if selection differs from current analysis
+                        const selectionChanged =
+                            selectedIds.length !== pendingAnalysisIds.length ||
+                            selectedIds.some(id => !pendingAnalysisIds.includes(id))
+
+                        if (selectionChanged) {
+                            setShowConfirmToast(true)
+                            setTimeout(() => setShowConfirmToast(false), 5000)
+                        }
+                    }}
+                />
 
                 {/* Toast Logic (kept for re-analysis prompts) */}
                 <AnimatePresence>
@@ -738,6 +868,55 @@ export function SummaryWorkbench() {
                         </motion.div>
                     )}
                 </AnimatePresence>
+
+                {/* 🚀 STEP 1: Instant Skeleton UI (Fake it till you make it) */}
+                {showInstantFeedback && !isAnalysisReady && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="space-y-6"
+                    >
+                        {/* Fake header with filename */}
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <FileText className="w-4 h-4 text-muted-foreground" />
+                                <span className="text-sm font-medium text-muted-foreground">
+                                    分析中: {attachedFiles[0]?.name || '文件'}
+                                </span>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                                {fakeProgress.toFixed(0)}%
+                            </div>
+                        </div>
+
+                        {/* Fake progress bar */}
+                        <div className="h-1.5 bg-[#F1E8DB] rounded-full overflow-hidden">
+                            <motion.div
+                                className="h-full bg-gradient-to-r from-[#8C6B4A] to-[#6C4A2D]"
+                                initial={{ width: '0%' }}
+                                animate={{ width: `${fakeProgress}%` }}
+                                transition={{ duration: 0.3 }}
+                            />
+                        </div>
+
+                        {/* Skeleton content - length based on file count */}
+                        <div className="bg-card/50 backdrop-blur-sm rounded-3xl p-8 md:p-12 shadow-sm border border-border/50 space-y-4">
+                            <div className="flex items-center gap-2 mb-4">
+                                <div className="h-4 w-4 bg-muted/50 animate-pulse rounded" />
+                                <div className="h-4 w-24 bg-muted/50 animate-pulse rounded" />
+                            </div>
+                            <div className="space-y-3">
+                                {Array.from({ length: Math.min(attachedFiles.length * 3, 8) }).map((_, i) => (
+                                    <div key={i} className="h-4 bg-muted/40 animate-pulse rounded" style={{ width: `${60 + Math.random() * 40}%` }} />
+                                ))}
+                            </div>
+                            <div className="mt-6 text-sm text-muted-foreground animate-pulse">
+                                正在提取關鍵概念...
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
 
                 {/* ⚡ NEW LAYOUT: Upload area always visible, analysis results appear below */}
                 <div className="space-y-8">
@@ -923,8 +1102,14 @@ export function SummaryWorkbench() {
                                                 console.log('[DEBUG] 📊 quickSummary length:', analysis.quickSummary?.length)
                                                 console.log('[DEBUG] 📊 quickSummary preview:', analysis.quickSummary?.substring(0, 200))
 
-                                                // Capture analysis content for saving
-                                                const capturedContent = formatFullContent(analysis)
+                                                // Store full analysis data for save dialog
+                                                setCurrentAnalysisData(analysis)
+
+                                                // Capture analysis content for saving (with all options enabled by default)
+                                                const capturedContent = formatFullContent(analysis, {
+                                                    includeKeyConcepts: true,
+                                                    includeExamPredictions: true
+                                                })
                                                 console.log('[DEBUG] 💾 Final captured content length:', capturedContent.length)
                                                 console.log('[DEBUG] 💾 Final captured content preview:', capturedContent.substring(0, 300))
                                                 console.log('[DEBUG] 💾 Full captured content:', capturedContent)
@@ -1049,6 +1234,7 @@ export function SummaryWorkbench() {
                 confidence={0.8}
                 onConfirm={handleSaveToBackpack}
                 isLoading={isSaving}
+                analysisData={currentAnalysisData}
             />
         </div>
     )

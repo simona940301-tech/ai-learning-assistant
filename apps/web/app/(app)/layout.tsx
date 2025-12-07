@@ -1,7 +1,6 @@
 'use client'
 
 import { TabBar } from '@/components/layout/tab-bar'
-import { SafeAreaLayout } from '@/components/layout/SafeAreaLayout'
 import { AskProvider } from '@/lib/ask-context'
 import { PlayProvider } from '@/lib/play-context'
 import { SimpleErrorBoundary } from '@/components/error-boundary'
@@ -21,27 +20,20 @@ export default function AppLayout({
 
   return (
     <SimpleErrorBoundary>
-      <SafeAreaLayout enableBottom={false} enableTop={true}>
-        {/* 🎯 修復：全局認證保護 - 只保護真正的功能頁面 */}
+      {/* 🎯 Full-Screen App: 吃滿整個視窗，不論桌機或手機 */}
+      <div className="flex h-full w-full flex-col bg-background text-foreground">
         <AuthGuard requireAuth={true}>
           <AskProvider>
             <PlayProvider>
               <CompanionProvider>
-                {/* Mobile-first: flex column layout, TabBar 固定在底部 */}
-                <div className="flex min-h-screen flex-col">
-                  {/* 主內容區 - flex-1 佔滿剩餘空間 */}
-                  <main className="flex-1 overflow-hidden">
-                    <ReunionGate />
-                    {children}
-                  </main>
+                {/* 中間內容區 - 唯一可以捲動的地方，使用 app-scroll 隱藏 scrollbar */}
+                <main className="app-scroll flex-1 min-h-0">
+                  <ReunionGate />
+                  {children}
+                </main>
 
-                  {/* Tamagotchi Companion - REMOVED from global layout, moved to Play page */}
-
-                  {/* 底部 TabBar - shrink-0 固定高度，永遠貼在底部 */}
-                  <div className="shrink-0">
-                    <TabBar />
-                  </div>
-                </div>
+                {/* 底部 TabBar - 固定在底部 */}
+                <TabBar />
 
                 {/* PWA Update Notification */}
                 {updateAvailable && <UpdateNotification onRefresh={refreshApp} />}
@@ -49,7 +41,7 @@ export default function AppLayout({
             </PlayProvider>
           </AskProvider>
         </AuthGuard>
-      </SafeAreaLayout>
+      </div>
     </SimpleErrorBoundary>
   )
 }

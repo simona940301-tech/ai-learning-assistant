@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { AppBar } from '@/components/layout/app-bar'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { MoreVertical } from 'lucide-react'
@@ -30,7 +29,6 @@ export default function SubjectDetailPage({
 
   return (
     <>
-      <AppBar
         title={subjectName}
         rightAction={
           <Button

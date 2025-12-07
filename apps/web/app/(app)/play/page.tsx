@@ -625,10 +625,8 @@ function PlayPageContent() {
 
   return (
     <>
-      <AppBar title="知識對戰" maxWidthClass="max-w-3xl" />
-
       {/* Mobile-first: 減少 padding，確保在 360×800、390×844 等尺寸下完整顯示 */}
-      <main className="mx-auto max-w-3xl px-4 py-4 pb-20 md:py-10 md:pb-24">
+      <div className="mx-auto max-w-3xl px-4 py-4 pb-20 md:py-10 md:pb-24">
         <div className="space-y-4 md:space-y-6">
           {/* 主標題區 - 極簡主義，保留大量留白 */}
           <div className="space-y-2 pt-4 text-center">
@@ -667,7 +665,7 @@ function PlayPageContent() {
             ))}
           </div>
         </div>
-      </main>
+      </div>
 
       <Dialog open={isChestModalOpen} onOpenChange={setChestModalOpen}>
         <DialogContent className="max-w-sm">

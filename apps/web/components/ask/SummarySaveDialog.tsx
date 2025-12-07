@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Check, Sparkles, BookmarkPlus, Loader2, Edit2, MessageSquare } from 'lucide-react'
+import { Check, Sparkles, BookmarkPlus, Loader2, Edit2, MessageSquare, Lightbulb, FileQuestion } from 'lucide-react'
 import {
     Dialog,
     DialogContent,
@@ -17,6 +17,7 @@ import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
 import { RAGMessage } from '@/lib/hooks/useRAGChat'
+import { FileAnalysis } from '@/lib/types'
 
 export type SubjectTag = '英文' | '數學' | '國文' | '社會' | '自然' | '其他'
 
@@ -29,6 +30,7 @@ interface SummarySaveDialogProps {
     confidence?: number
     onConfirm: (data: SaveData) => Promise<void>
     isLoading?: boolean
+    analysisData?: FileAnalysis
 }
 
 export interface SaveData {
@@ -37,6 +39,8 @@ export interface SaveData {
     content: string
     includeConversation: boolean
     conversationHistory?: RAGMessage[]
+    includeKeyConcepts: boolean
+    includeExamPredictions: boolean
 }
 
 const SUBJECTS: Array<{ tag: SubjectTag; emoji: string; color: string }> = [
@@ -94,12 +98,15 @@ export function SummarySaveDialog({
     confidence,
     onConfirm,
     isLoading = false,
+    analysisData,
 }: SummarySaveDialogProps) {
     const [selectedSubject, setSelectedSubject] = useState<SubjectTag>(() =>
         normalizeSubject(detectedSubject)
     )
     const [title, setTitle] = useState('')
-    const [includeConversation, setIncludeConversation] = useState(false)
+    const [includeConversation, setIncludeConversation] = useState(true)
+    const [includeKeyConcepts, setIncludeKeyConcepts] = useState(true)
+    const [includeExamPredictions, setIncludeExamPredictions] = useState(true)
     const [isEditingTitle, setIsEditingTitle] = useState(false)
 
     // Generate default title when dialog opens or content changes
@@ -125,6 +132,8 @@ export function SummarySaveDialog({
 
     const confidenceInfo = getConfidenceLabel(confidence)
     const hasConversation = conversationHistory.length > 0
+    const hasKeyConcepts = (analysisData?.coreConcepts?.length ?? 0) > 0
+    const hasExamPredictions = (analysisData?.examPredictions?.length ?? 0) > 0
 
     const handleConfirm = async () => {
         if (!title.trim()) {
@@ -137,11 +146,15 @@ export function SummarySaveDialog({
             content: summaryContent,
             includeConversation,
             conversationHistory: includeConversation ? conversationHistory : undefined,
+            includeKeyConcepts,
+            includeExamPredictions,
         })
 
         // Reset form
         setTitle('')
-        setIncludeConversation(false)
+        setIncludeConversation(true)
+        setIncludeKeyConcepts(true)
+        setIncludeExamPredictions(true)
         setIsEditingTitle(false)
     }
 
@@ -207,60 +220,104 @@ export function SummarySaveDialog({
                         </Label>
                         <div className="grid grid-cols-3 gap-2">
                             {SUBJECTS.map((subject) => {
-                                    const isSelected = selectedSubject === subject.tag
+                                const isSelected = selectedSubject === subject.tag
 
-                                    return (
-                                        <button
-                                            key={subject.tag}
-                                            type="button"
-                                            onClick={() => setSelectedSubject(subject.tag)}
-                                            className={cn(
-                                                'relative flex items-center gap-2 p-2.5 rounded-lg border transition-all',
-                                                'hover:scale-[1.02] active:scale-[0.98]',
-                                                isSelected
-                                                    ? subject.color + ' border-current'
-                                                    : 'bg-card border-border hover:border-primary/30'
-                                            )}
-                                        >
-                                            <span className="text-lg">{subject.emoji}</span>
-                                            <span className={cn(
-                                                'text-xs font-medium',
-                                                isSelected ? 'text-current' : 'text-foreground'
-                                            )}>
-                                                {subject.tag}
-                                            </span>
+                                return (
+                                    <button
+                                        key={subject.tag}
+                                        type="button"
+                                        onClick={() => setSelectedSubject(subject.tag)}
+                                        className={cn(
+                                            'relative flex items-center gap-2 p-2.5 rounded-lg border transition-all',
+                                            'hover:scale-[1.02] active:scale-[0.98]',
+                                            isSelected
+                                                ? subject.color + ' border-current'
+                                                : 'bg-card border-border hover:border-primary/30'
+                                        )}
+                                    >
+                                        <span className="text-lg">{subject.emoji}</span>
+                                        <span className={cn(
+                                            'text-xs font-medium',
+                                            isSelected ? 'text-current' : 'text-foreground'
+                                        )}>
+                                            {subject.tag}
+                                        </span>
 
-                                            {/* Selection Indicator */}
-                                            {isSelected && (
-                                                <div className="absolute -top-1 -right-1">
-                                                    <div className="flex h-4 w-4 items-center justify-center rounded-full bg-current">
-                                                        <Check className="h-2.5 w-2.5 text-white" />
-                                                    </div>
+                                        {/* Selection Indicator */}
+                                        {isSelected && (
+                                            <div className="absolute -top-1 -right-1">
+                                                <div className="flex h-4 w-4 items-center justify-center rounded-full bg-current">
+                                                    <Check className="h-2.5 w-2.5 text-white" />
                                                 </div>
-                                            )}
-                                        </button>
-                                    )
-                                })}
+                                            </div>
+                                        )}
+                                    </button>
+                                )
+                            })}
                         </div>
                     </div>
 
-                    {/* Conversation History Option - Compact */}
-                    {hasConversation && (
-                        <div className="flex items-center space-x-2 p-2.5 rounded-lg bg-muted/50 border border-border">
-                            <Checkbox
-                                id="include-conversation"
-                                checked={includeConversation}
-                                onCheckedChange={(checked: boolean | 'indeterminate') => setIncludeConversation(Boolean(checked))}
-                            />
-                            <Label
-                                htmlFor="include-conversation"
-                                className="text-xs font-medium cursor-pointer flex items-center gap-1.5"
-                            >
-                                <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
-                                <span>含問答記錄 ({conversationHistory.length})</span>
-                            </Label>
+                    {/* Content Options - Compact */}
+                    <div className="space-y-2">
+                        <Label className="text-xs font-medium text-muted-foreground">
+                            包含內容
+                        </Label>
+                        <div className="space-y-2">
+                            {/* Key Concepts Option */}
+                            {hasKeyConcepts && (
+                                <div className="flex items-center space-x-2 p-2.5 rounded-lg bg-muted/50 border border-border">
+                                    <Checkbox
+                                        id="include-key-concepts"
+                                        checked={includeKeyConcepts}
+                                        onCheckedChange={(checked: boolean | 'indeterminate') => setIncludeKeyConcepts(Boolean(checked))}
+                                    />
+                                    <Label
+                                        htmlFor="include-key-concepts"
+                                        className="text-xs font-medium cursor-pointer flex items-center gap-1.5"
+                                    >
+                                        <Lightbulb className="h-3.5 w-3.5 text-muted-foreground" />
+                                        <span>含關鍵概念 ({analysisData?.coreConcepts?.length || 0})</span>
+                                    </Label>
+                                </div>
+                            )}
+
+                            {/* Exam Predictions Option */}
+                            {hasExamPredictions && (
+                                <div className="flex items-center space-x-2 p-2.5 rounded-lg bg-muted/50 border border-border">
+                                    <Checkbox
+                                        id="include-exam-predictions"
+                                        checked={includeExamPredictions}
+                                        onCheckedChange={(checked: boolean | 'indeterminate') => setIncludeExamPredictions(Boolean(checked))}
+                                    />
+                                    <Label
+                                        htmlFor="include-exam-predictions"
+                                        className="text-xs font-medium cursor-pointer flex items-center gap-1.5"
+                                    >
+                                        <FileQuestion className="h-3.5 w-3.5 text-muted-foreground" />
+                                        <span>含考題預測 ({analysisData?.examPredictions?.length || 0})</span>
+                                    </Label>
+                                </div>
+                            )}
+
+                            {/* Conversation History Option */}
+                            {hasConversation && (
+                                <div className="flex items-center space-x-2 p-2.5 rounded-lg bg-muted/50 border border-border">
+                                    <Checkbox
+                                        id="include-conversation"
+                                        checked={includeConversation}
+                                        onCheckedChange={(checked: boolean | 'indeterminate') => setIncludeConversation(Boolean(checked))}
+                                    />
+                                    <Label
+                                        htmlFor="include-conversation"
+                                        className="text-xs font-medium cursor-pointer flex items-center gap-1.5"
+                                    >
+                                        <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
+                                        <span>含問答記錄 ({conversationHistory.length})</span>
+                                    </Label>
+                                </div>
+                            )}
                         </div>
-                    )}
+                    </div>
                 </div>
 
                 <DialogFooter className="px-5 py-3 bg-muted/20 border-t border-border">

@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { AppBar } from '@/components/layout/app-bar'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -226,7 +225,6 @@ export default function ProfileSettingsPage() {
 
   return (
     <>
-      <AppBar
         title="設定"
         rightAction={
           <Link href="/home">
