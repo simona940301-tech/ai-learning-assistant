@@ -22,7 +22,7 @@
   },
   "overrides": [
     {
-      "files": ["app/api/**/route.ts"],
+      "files": ["**/app/api/**/route.ts"],
       "rules": {
         "no-restricted-syntax": [
           "error",
@@ -35,8 +35,8 @@
     },
     {
       "files": [
-        "app/api/tutor/answer/route.ts",
-        "app/api/warmup/keypoint-mcq/route.ts"
+        "**/app/api/tutor/answer/route.ts",
+        "**/app/api/warmup/keypoint-mcq/route.ts"
       ],
       "rules": {
         "no-restricted-imports": "warn"
