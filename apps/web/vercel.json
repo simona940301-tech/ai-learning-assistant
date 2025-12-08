@@ -1,5 +1,10 @@
 {
-  "buildCommand": "pnpm build",
+  "buildCommand": "cd ../.. && pnpm install && turbo run build --filter=web",
   "installCommand": "cd ../.. && pnpm install",
-  "framework": "nextjs"
+  "outputDirectory": "apps/web/.next",
+  "framework": "nextjs",
+  "regions": ["hkg1"],
+  "env": {
+    "NODE_ENV": "production"
+  }
 }
