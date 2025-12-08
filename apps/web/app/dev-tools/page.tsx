@@ -192,12 +192,6 @@ export default function DevToolsPage() {
                   {process.env.NEXT_PUBLIC_SUPABASE_URL?.split('.')[0]}...
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Battle WS URL:</span>
-                <span className="font-mono text-xs">
-                  {process.env.NEXT_PUBLIC_BATTLE_WS_URL || 'ws://localhost:8080/ws/battle'}
-                </span>
-              </div>
             </div>
           </div>
         </Card>
@@ -205,7 +199,7 @@ export default function DevToolsPage() {
         <div className="mt-6 text-center text-sm text-muted-foreground">
           <p>⚠️ Development tools are only available in development mode</p>
         </div>
-      </div>
-    </AuthGuard>
+      </div >
+    </AuthGuard >
   )
 }

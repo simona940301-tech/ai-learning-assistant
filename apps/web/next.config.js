@@ -52,6 +52,8 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '10mb',
     },
+    // Ensure native deps stay external so Vercel can use prebuilt binaries
+    serverComponentsExternalPackages: ['sharp'],
   },
   webpack: (config, { isServer }) => {
     if (!isServer) {

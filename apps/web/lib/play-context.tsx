@@ -296,16 +296,33 @@ export function PlayProvider({ children }: { children: React.ReactNode }) {
         // 認證失敗，清空狀態
         console.warn('[PlayProvider] User status API returned 401 - authentication required')
         setUserStatus(null)
+      } else if (response.status === 403) {
+        // 🎯 FIX: 處理 403 Forbidden 錯誤（可能是認證或權限問題）
+        console.error('[PlayProvider] User status API returned 403 - forbidden access')
+        const errorData = await response.json().catch(() => ({}))
+        console.error('[PlayProvider] 403 Error details:', errorData)
+        setUserStatus(null)
       } else {
         console.error('[PlayProvider] User status API error:', response.status, response.statusText)
+        // 🎯 FIX: 對於其他錯誤狀態，也嘗試解析錯誤訊息
+        try {
+          const errorData = await response.json().catch(() => ({}))
+          console.error('[PlayProvider] API error details:', errorData)
+        } catch (e) {
+          // 忽略 JSON 解析錯誤
+        }
       }
     } catch (error) {
       console.error('[PlayProvider] Failed to fetch user status:', error)
-      // 發生錯誤時不清空狀態，保留之前的狀態
+      // 🎯 FIX: 如果是網路錯誤或 CORS 錯誤，記錄詳細資訊
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        console.error('[PlayProvider] Network error - check CORS and API availability')
+      }
+      // 發生錯誤時不清空狀態，保留之前的狀態（避免 UI 閃爍）
     } finally {
       setIsLoadingStatus(false)
     }
-  }, [user?.id])
+  }, [user])
 
   // 當 user 狀態改變時，重新獲取 userStatus
   useEffect(() => {

@@ -1,17 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSupabaseClient } from '@/lib/api/auth'
+import { getApiUser } from '@/lib/api/auth'
 import { fetchPveQuestions } from '@/lib/api/pve-helpers'
 
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json()
-        const { userId, subject, timeLimit = 20 } = body
+        const { userId: requestedUserId, subject, timeLimit = 20 } = body
+        const { supabase, user, errorType } = await getApiUser(req)
 
+        // Prefer authenticated user from session to avoid spoofing/blank IDs
+        const userId = user?.id ?? requestedUserId
         if (!userId) {
-            return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
+            return NextResponse.json(
+                { error: 'Authentication required', code: errorType || 'UNAUTHENTICATED' },
+                { status: 401 }
+            )
         }
 
-        const supabase = getSupabaseClient(req)
+        if (requestedUserId && user && requestedUserId !== user.id) {
+            console.warn('[PVE Start] User ID mismatch, using session user', { requestedUserId, sessionUserId: user.id })
+        }
 
         // 1. Fetch Questions
         const { questions: rawQuestions, baselineDifficulty } = await fetchPveQuestions(supabase, {

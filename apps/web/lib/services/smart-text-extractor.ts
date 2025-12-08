@@ -1,6 +1,20 @@
-import sharp from 'sharp'
 import { extractTextFromPDFWithGemini, extractTextFromImageWithGemini } from './elite-rag-analyzer'
 import { getRedisClient } from '../redis'
+
+// Lazy-load sharp so that environments without libvips (e.g. Vercel optional deps not installed)
+// can still serve the route by falling back to uncompressed images.
+let sharpModule: typeof import('sharp') | null | undefined
+async function getSharp() {
+    if (sharpModule !== undefined) return sharpModule
+    try {
+        const mod = await import('sharp')
+        sharpModule = (mod as any).default || mod
+    } catch (error) {
+        console.warn('[SmartExtractor] Sharp unavailable, skipping compression:', error)
+        sharpModule = null
+    }
+    return sharpModule
+}
 
 /**
  * 🚀 Smart Text Extractor - 智能文字提取器
@@ -243,6 +257,18 @@ async function extractImageSmart(
     console.log(`[SmartExtractor] 🖼️ Image extraction: ${fileName}`)
 
     try {
+        const sharp = await getSharp()
+        if (!sharp) {
+            console.warn('[SmartExtractor] Sharp missing, using original image for OCR')
+            const text = await extractTextFromImageWithGemini(fileBuffer, fileType)
+            return {
+                text,
+                numPages: 1,
+                method: 'gemini-ocr',
+                durationMs: Date.now() - startTime
+            }
+        }
+
         // 壓縮圖片 (減少 API 傳輸時間)
         const compressed = await sharp(fileBuffer)
             .resize(2048, 2048, { fit: 'inside', withoutEnlargement: true })

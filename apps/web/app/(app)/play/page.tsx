@@ -260,7 +260,7 @@ function PlayPageContent() {
           router.replace(`/play?${newParams.toString()}`)
         })()
     }
-  }, [searchParams, battleState?.isInBattle, startMatch, router, setIsPveTransitioning, checkEnergy])
+  }, [searchParams, battleState?.isInBattle, startMatch, router, setIsPveTransitioning, checkEnergy, trackEnergyError])
 
 
   // 如果沒有用戶狀態，檢查是否應該跳過（Supabase 未配置時）
@@ -343,15 +343,43 @@ function PlayPageContent() {
         <Card className="border border-border bg-card/50 p-8 text-center backdrop-blur">
           <h2 className="mb-4 text-2xl font-semibold text-foreground">請先登入</h2>
           <p className="mb-6 text-sm text-muted-foreground">登入後即可開始挑戰知識對戰。</p>
-          <Button onClick={() => router.push('/home')} className="bg-[#5B7CFF] text-white hover:bg-[#4a63d7]">
-            返回首頁
-          </Button>
-          <Button
-            onClick={() => router.push('/onboarding')}
-            className="mt-4 w-full bg-gray-600 text-white hover:bg-gray-700"
-          >
-            登入或註冊
-          </Button>
+          <div className="space-y-2">
+            <Button onClick={() => router.push('/home')} className="w-full bg-[#5B7CFF] text-white hover:bg-[#4a63d7]">
+              返回首頁
+            </Button>
+            <Button
+              onClick={() => {
+                // 🎯 FIX: 嘗試重新獲取用戶狀態
+                if (checkEnergy) {
+                  checkEnergy().catch(console.error)
+                }
+                router.push('/auth/login')
+              }}
+              className="w-full bg-gray-600 text-white hover:bg-gray-700"
+            >
+              登入或註冊
+            </Button>
+            {/* 🎯 FIX: 添加診斷按鈕（僅在開發環境顯示） */}
+            {process.env.NODE_ENV === 'development' && (
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    const response = await fetch('/api/play/user/status', { credentials: 'include' })
+                    const data = await response.json()
+                    console.log('[PlayPage Debug] API Response:', { status: response.status, data })
+                    alert(`API Status: ${response.status}\nResponse: ${JSON.stringify(data, null, 2)}`)
+                  } catch (error) {
+                    console.error('[PlayPage Debug] API Error:', error)
+                    alert(`API Error: ${error}`)
+                  }
+                }}
+                className="mt-2 w-full text-xs"
+              >
+                🔍 診斷 API 連線
+              </Button>
+            )}
+          </div>
         </Card>
       </main>
     )

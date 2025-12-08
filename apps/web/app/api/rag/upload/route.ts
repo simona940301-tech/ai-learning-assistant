@@ -1,7 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getApiUser } from '@/lib/api/auth'
 import { cleanText } from '@/lib/utils/text-extraction'
-import { extractTextSmart } from '@/lib/services/smart-text-extractor'
 import { generateSummary, extractKeywords } from '@/lib/services/rag-summary'
 import { createContextCache } from '@/lib/services/context-cache-service'
 import { createClient } from '@supabase/supabase-js'
@@ -30,6 +29,9 @@ export const OPTIONS = createOptionsHandler()
  */
 export async function POST(req: NextRequest) {
     try {
+        // ✅ Lazy load heavy/text-extraction modules to avoid init errors on GET
+        const { extractTextSmart } = await import('@/lib/services/smart-text-extractor')
+
         // 🔍 DIAGNOSTIC: Log request details for mobile debugging
         console.log('[RAG Upload] ==================== REQUEST START ====================')
         console.log('[RAG Upload] Method:', req.method)

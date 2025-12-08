@@ -137,6 +137,13 @@ export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
     }
   }
 
+  // 🎯 MVP 階段：只有一個模式時，直接進入 PVE 設定畫面
+  useEffect(() => {
+    if (modes.length === 1 && !systemMode) {
+      setSystemMode('PVE_TRAINING')
+    }
+  }, [modes.length, setSystemMode, systemMode])
+
   if (systemMode === 'PVE_TRAINING') {
     return (
       <Dialog open={true} onOpenChange={onClose}>
@@ -333,15 +340,6 @@ export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
       </Dialog>
     )
   }
-
-  // 🎯 MVP 階段：只有一個模式時，直接進入 PVE 設定畫面
-  useEffect(() => {
-    if (modes.length === 1 && !systemMode) {
-      setSystemMode('PVE_TRAINING')
-    }
-  }, [modes.length, systemMode, setSystemMode])
-
-
 
   return (
     <Dialog open={true} onOpenChange={onClose}>

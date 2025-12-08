@@ -36,7 +36,9 @@ const PROTECTED_API_ROUTES = [
   '/api/avatar/',
   '/api/play/practice/',
   '/api/play/progression/',
+  '/api/play/user/', // 🎯 FIX: 明確保護用戶狀態和能量消耗 API
   '/api/play/ugc-questions/',
+  '/api/play/pve/', // 🎯 FIX: 保護 PVE 相關 API
   '/api/error-book/',
   '/api/admin/',
   '/api/notebook/',

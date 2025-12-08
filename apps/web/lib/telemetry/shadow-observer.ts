@@ -46,7 +46,8 @@ export class ShadowObserver {
     }
 
     private connect() {
-        const wsUrl = process.env.NEXT_PUBLIC_BATTLE_WS_URL?.replace('/ws/battle', '/ws/telemetry') || 'ws://localhost:8080/ws/telemetry'
+        // 🚀 SOTA FIX: Telemetry is now using a dedicated endpoint, independent of battle-ws
+        const wsUrl = process.env.NEXT_PUBLIC_TELEMETRY_WS_URL || 'ws://localhost:8080/ws/telemetry'
 
         console.log('[ShadowObserver] Connecting to', wsUrl)
         this.ws = new WebSocket(wsUrl)
