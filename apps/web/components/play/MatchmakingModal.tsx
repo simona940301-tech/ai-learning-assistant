@@ -63,13 +63,12 @@ const phases = [
 
 export function MatchmakingModal({ onCancel, matchType, subject, timeLimit = 20 }: MatchmakingModalProps) {
   const {
-    sendWebSocketMessage,
-    wsConnected,
     progression,
     setPveCountdown,
     checkEnergy,
     battleState,
   } = usePlay()
+
   const [isSearching, setIsSearching] = useState(true)
   const [searchElapsed, setSearchElapsed] = useState(0) // 搜索經過時間（秒）
   const [searchRange, setSearchRange] = useState(100) // 當前搜索範圍（±段位）
@@ -92,19 +91,14 @@ export function MatchmakingModal({ onCancel, matchType, subject, timeLimit = 20 
   }, [battleState?.matchId, matchId])
 
   // 發送匹配請求
+  // 發送匹配請求
   useEffect(() => {
-    if (wsConnected) {
-      sendWebSocketMessage({
-        type: 'START_MATCH',
-        match_type: matchType,
-        subject: subject || null,
-        time_limit: timeLimit,
-      })
-      setIsSearching(true)
-      setSearchElapsed(0)
-      setSearchRange(100)
-    }
-  }, [wsConnected, matchType, subject, timeLimit, sendWebSocketMessage])
+    // PVP Disabled for MVP
+    setIsSearching(true)
+    setSearchElapsed(0)
+    setSearchRange(100)
+  }, [matchType, subject, timeLimit])
+
 
   // 獲取知識點提示
   useEffect(() => {
@@ -138,12 +132,8 @@ export function MatchmakingModal({ onCancel, matchType, subject, timeLimit = 20 
 
   // 取消匹配處理
   const handleCancelMatch = () => {
-    if (matchId && wsConnected) {
-      sendWebSocketMessage({
-        type: 'CANCEL_LOBBY',
-        match_id: matchId,
-      })
-    }
+    // Local cancel only
+
     setIsSearching(false)
     onCancel()
   }
@@ -223,37 +213,17 @@ export function MatchmakingModal({ onCancel, matchType, subject, timeLimit = 20 
         return
       }
       setPveCountdown(adaptiveCountdown)
-      sendWebSocketMessage({
-        type: 'START_MATCH',
-        match_type: 'PVE_TRAINING',
-        subject: subject || null,
-        time_limit: timeLimit,
-        origin: 'SMART_RETRY_AI',
-      })
+      // Switch to PVE (HTTP)
+      // We rely on parent handling the switch or just close and let user pick PVE
       setIsSearching(false)
       onCancel()
       return
     }
 
-    if (matchId && wsConnected) {
-      sendWebSocketMessage({
-        type: 'CANCEL_LOBBY',
-        match_id: matchId,
-        reason: 'SMART_RETRY_WIDE',
-      })
-    }
-    setSearchElapsed(0)
-    setSearchRange(800)
-    sendWebSocketMessage({
-      type: 'START_MATCH',
-      match_type: matchType,
-      subject: subject || null,
-      time_limit: timeLimit,
-      elo_range: 800,
-      widen: true,
-    })
+    // WIDE retry disabled
     setSmartRetryChoice(null)
-  }, [adaptiveCountdown, checkEnergy, matchId, matchType, onCancel, sendWebSocketMessage, setPveCountdown, smartRetryChoice, subject, timeLimit, wsConnected])
+  }, [adaptiveCountdown, checkEnergy, matchId, matchType, onCancel, setPveCountdown, smartRetryChoice, subject, timeLimit])
+
 
   const smartRetryPending = isTimeout && !smartRetryChoice
 
@@ -316,13 +286,12 @@ export function MatchmakingModal({ onCancel, matchType, subject, timeLimit = 20 
                   return (
                     <motion.div
                       key={phase.id}
-                      className={`relative overflow-hidden rounded-2xl border px-4 py-3 ${
-                        isDone
+                      className={`relative overflow-hidden rounded-2xl border px-4 py-3 ${isDone
                           ? 'border-emerald-400/40 bg-emerald-400/10'
                           : isActive
-                          ? 'border-white/40 bg-white/10'
-                          : 'border-white/10 bg-white/5'
-                      }`}
+                            ? 'border-white/40 bg-white/10'
+                            : 'border-white/10 bg-white/5'
+                        }`}
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                     >
@@ -367,11 +336,8 @@ export function MatchmakingModal({ onCancel, matchType, subject, timeLimit = 20 
                 </motion.div>
               )}
 
-              {!wsConnected && (
-                <p className="rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
-                  WebSocket 未連接，正在重試中...
-                </p>
-              )}
+              {/* WebSocket Status Removed */}
+
             </div>
           </section>
 

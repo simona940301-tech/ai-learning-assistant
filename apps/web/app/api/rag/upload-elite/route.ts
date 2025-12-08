@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getApiUser } from '@/lib/api/auth'
+import { createOptionsHandler } from '@/lib/api/cors'
+
+export const OPTIONS = createOptionsHandler()
 import { createClient } from '@supabase/supabase-js'
 import { nanoid } from 'nanoid'
 import { randomUUID } from 'crypto'

@@ -123,13 +123,16 @@ export async function middleware(request: NextRequest) {
   // ⚠️ 必須放在所有邏輯的最前面！在任何 auth 檢查之前
   // 這確保 OPTIONS 預檢請求永遠返回 200，不會被 auth 攔截
   if (request.method === 'OPTIONS') {
+    const origin = request.headers.get('origin') || '*'
     return new NextResponse(null, {
       status: 200,
       headers: {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': origin,
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, PATCH',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Date, X-Api-Version, X-API-Key, X-Internal-API-Key',
+        'Access-Control-Allow-Credentials': 'true',
         'Access-Control-Max-Age': '86400', // 24 hours
+        'Vary': 'Origin', // Tell caches that the response varies by Origin
       },
     })
   }

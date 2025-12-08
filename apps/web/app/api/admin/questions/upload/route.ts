@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createOptionsHandler } from '@/lib/api/cors'
+
+export const OPTIONS = createOptionsHandler()
 
 export const dynamic = 'force-dynamic'
 

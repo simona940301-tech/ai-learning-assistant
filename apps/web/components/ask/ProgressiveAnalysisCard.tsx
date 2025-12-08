@@ -216,7 +216,7 @@ export default function ProgressiveAnalysisCard({
                                 processingTimeMs: 0,
                                 quickSummary: chunk.data.summary,
                                 detectedSubject: chunk.data.subject,
-                                detectedTopics: chunk.data.topics?.filter((t): t is string => Boolean(t)),
+                                detectedTopics: chunk.data.topics?.filter((t: any): t is string => Boolean(t)),
                                 coreConcepts: chunk.data.keyConcepts?.filter(Boolean) as unknown as CoreConcept[],
                                 structuredNotes: chunk.data.summary,
                                 examPredictions: chunk.data.examPrediction?.filter(Boolean) as unknown as ExamQuestion[]
@@ -296,7 +296,7 @@ export default function ProgressiveAnalysisCard({
             processingTimeMs: 0,
             quickSummary: object.summary,
             detectedSubject: object.subject,
-            detectedTopics: object.topics?.filter((t): t is string => Boolean(t)),
+            detectedTopics: object.topics?.filter((t: any): t is string => Boolean(t)),
             // ✅ 使用 as unknown as 進行安全類型轉換，因為 streaming 數據類型是 PartialObject
             coreConcepts: object.keyConcepts?.filter(Boolean) as unknown as CoreConcept[] | undefined,
             structuredNotes: object.summary,

@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getApiUser } from '@/lib/api/auth'
+import { createOptionsHandler } from '@/lib/api/cors'
+
+export const OPTIONS = createOptionsHandler()
+
+export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
 

@@ -1,3 +1,38 @@
+import { NextResponse } from 'next/server'
+
+// Type definitions for Editor Mode
+interface EditorModeQuestion {
+    questionNumber: number
+    topic: string | null
+    articleText: string
+    blanks: Array<{
+        blankId: number
+        correctAnswer: string
+        partOfSpeech: string
+        chineseMeaning: string
+        contextBefore: string
+        contextAfter: string
+        analysis: string
+    }>
+    optionPool: Array<{
+        label: string
+        word: string
+        chineseMeaning: string
+        partOfSpeech: string
+    }>
+    distractorOptions: Array<{
+        label: string
+        word: string
+        chineseMeaning: string
+        partOfSpeech: string
+    }>
+}
+
+// Parser function (stub - implement as needed)
+function parseEditorModeQuestion(text: string): EditorModeQuestion | null {
+    // TODO: Implement actual parsing logic
+    return null
+}
 
 /**
  * 處理 Editor Mode 檔案

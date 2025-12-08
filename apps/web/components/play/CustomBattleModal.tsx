@@ -27,7 +27,7 @@ interface RoomSettings {
 }
 
 export function CustomBattleModal({ onClose }: CustomBattleModalProps) {
-  const { customMode, setCustomMode, checkEnergy, consumeEnergy, sendWebSocketMessage } = usePlay()
+  const { customMode, setCustomMode, checkEnergy, consumeEnergy } = usePlay()
   const [roomCode, setRoomCode] = useState('')
   const [isCreating, setIsCreating] = useState(false)
   const [isJoining, setIsJoining] = useState(false)
@@ -43,6 +43,9 @@ export function CustomBattleModal({ onClose }: CustomBattleModalProps) {
   const [copied, setCopied] = useState(false)
 
   const handleCreateRoom = async () => {
+    alert('自訂房間功能即將推出！')
+    return
+
     if (!roomSettings.roomName.trim()) {
       alert('請輸入房間名稱')
       return
@@ -57,17 +60,13 @@ export function CustomBattleModal({ onClose }: CustomBattleModalProps) {
 
     setIsCreating(true)
     try {
-      // 發送 WebSocket START_MATCH 消息（包含合約金額和用戶自創題目模式）
-      // Energy 將在大廳確認完成時才消耗
-      sendWebSocketMessage({
-        type: 'START_MATCH',
-        match_type: 'CUSTOM',
-        subject: roomSettings.subject || null,
-        contract_amount: roomSettings.contractAmount || null,
-        enable_user_created_questions: roomSettings.enableUserCreatedQuestions || false,
-        question_source: roomSettings.questionSource,
-      })
-      
+      // Feature disabled
+      throw new Error('即將推出')
+
+      /* 
+      // Legacy WebSocket logic removed
+      */
+
       // 生成臨時房間代碼（實際應由服務端返回）
       const tempRoomCode = Math.random().toString(36).substring(2, 8).toUpperCase()
       setCreatedRoom({
@@ -241,11 +240,10 @@ export function CustomBattleModal({ onClose }: CustomBattleModalProps) {
                     key={amount}
                     type="button"
                     variant={roomSettings.contractAmount === amount ? 'default' : 'outline'}
-                    className={`transition-all ${
-                      roomSettings.contractAmount === amount
-                        ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md'
-                        : ''
-                    }`}
+                    className={`transition-all ${roomSettings.contractAmount === amount
+                      ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md'
+                      : ''
+                      }`}
                     onClick={() =>
                       setRoomSettings({
                         ...roomSettings,

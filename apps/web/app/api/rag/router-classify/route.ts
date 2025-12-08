@@ -30,6 +30,7 @@ const DocumentGroupSchema = z.object({
 })
 
 type DocumentGroup = z.infer<typeof DocumentGroupSchema>
+type DocumentGroupItem = DocumentGroup['groups'][number]
 
 type RouterJobStatus = 'pending' | 'processing' | 'completed' | 'failed'
 
@@ -130,7 +131,7 @@ export async function POST(req: NextRequest) {
 
         // Single document: mark as completed immediately without AI call
         if (uniqueIds.length === 1) {
-            const singleGroup: DocumentGroup[] = [{
+            const singleGroup: DocumentGroupItem[] = [{
                 subject: '其他',
                 documentIds: uniqueIds,
                 confidence: 1.0,

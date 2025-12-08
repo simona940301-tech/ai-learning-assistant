@@ -29,19 +29,6 @@ export default function SubjectDetailPage({
 
   return (
     <>
-        title={subjectName}
-        rightAction={
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9"
-            onClick={() => setShowEditMode(!showEditMode)}
-          >
-            <MoreVertical className="h-5 w-5" />
-          </Button>
-        }
-      />
-
       <main className="mx-auto max-w-lg px-4 py-6">
         {/* 🎯 Phase A: Tab 切換 - 錯題 / 題本 */}
         <Tabs defaultValue="mistakes" className="w-full">

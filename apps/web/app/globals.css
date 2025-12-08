@@ -185,16 +185,21 @@
   /* 🎯 SOTA Mobile Optimizations */
 
   /* Prevent iOS Safari zoom on input focus (font-size < 16px triggers zoom) */
+  /* Prevent iOS Safari zoom on input focus (font-size < 16px triggers zoom) */
   input,
   textarea,
   select {
-    font-size: max(16px, 1em) !important;
+    font-size: 16px !important;
+    /* Force 16px exactly effectively prevents zoom */
+    max-height: 100%;
+    /* Prevent weird layout issues */
   }
 
-  /* Prevent overscroll bounce on iOS */
+  /* Prevent overscroll bounce on iOS - Native App Feel */
   html,
   body {
     overscroll-behavior-y: none;
+    -webkit-overflow-scrolling: touch;
   }
 
   /* Disable text selection on UI elements (prevents long-press selection) */

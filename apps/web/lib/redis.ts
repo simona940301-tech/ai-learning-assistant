@@ -31,7 +31,7 @@ export function getRedisClient(): RedisClientType | null {
     // ✅ 支持 Upstash Redis（需要 TLS）
     // Upstash URL 格式：redis://default:token@host:6379
     const isUpstash = redisUrl.includes('upstash.io')
-    
+
     redisClient = createClient({
       url: redisUrl,
       password: redisPassword,
@@ -165,29 +165,10 @@ export const energyCache = {
  * 
  * @deprecated 請使用 Rust WebSocket 進行匹配
  */
-export const matchPool = {
-  /**
-   * @deprecated 已遷移到 Rust 引擎，請使用 WebSocket START_MATCH 消息
-   */
-  async add(userId: string, elo: number, matchType: string, subject?: string): Promise<boolean> {
-    console.warn('[DEPRECATED] matchPool.add() is deprecated. Use Rust WebSocket START_MATCH instead.')
-    return false
-  },
-
-  /**
-   * @deprecated 已遷移到 Rust 引擎，請使用 WebSocket START_MATCH 消息
-   */
-  async findMatch(userId: string, elo: number, matchType: string, subject?: string): Promise<string | null> {
-    console.warn('[DEPRECATED] matchPool.findMatch() is deprecated. Use Rust WebSocket START_MATCH instead.')
-    return null
-  },
-
-  /**
-   * @deprecated 已遷移到 Rust 引擎，請使用 WebSocket CANCEL_LOBBY 消息
-   */
-  async remove(userId: string, matchType: string, subject?: string): Promise<boolean> {
-    console.warn('[DEPRECATED] matchPool.remove() is deprecated. Use Rust WebSocket CANCEL_LOBBY instead.')
-    return false
-  },
-}
+/**
+ * Match Pool Logic
+ * 
+ * ⚠️ Previously handled here, now fully migrated to Rust Game Engine or HTTP stateless logic.
+ * This section intentionally left empty to prevent usage of legacy Redis matching.
+ */
 

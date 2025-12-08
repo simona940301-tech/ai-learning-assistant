@@ -70,10 +70,8 @@ const TamagotchiWidget = preloadOnIdle(
   { ssr: false }
 )
 
-const WsStatusIndicator = preloadOnIdle(
-  () => import('@/components/status/WsStatusIndicator').then(m => ({ default: m.WsStatusIndicator })),
-  { ssr: false }
-)
+// WsStatusIndicator removed
+
 
 // 靜態導入（不需要預取）
 import { BattleQuestionV3 } from '@/components/play/BattleQuestionV3'
@@ -180,11 +178,7 @@ function PlayPageContent() {
     userStatus,
     isLoadingStatus,
     battleState,
-    lobbyConfirmState,
-    setLobbyConfirmState,
-    sendWebSocketMessage,
     setBattleState,
-    wsConnected,
     openSystemModal,
     openCustomModal,
     openUGCContractModal,
@@ -196,12 +190,14 @@ function PlayPageContent() {
     setIsPveTransitioning,
     startMatch,
     checkEnergy,
+    advancePveRound
   } = usePlay()
   const [isChestModalOpen, setChestModalOpen] = useState(false)
   const [isFocusModalOpen, setFocusModalOpen] = useState(false)
   const [isEditorModalOpen, setEditorModalOpen] = useState(false)
   const [isPracticeSourceModalOpen, setIsPracticeSourceModalOpen] = useState(false)
   const [isPracticeSetupModalOpen, setPracticeSetupModalOpen] = useState(false)
+
 
   // 🎯 引導系統：自動檢測 T04 (Onboarding 完成後) 和 T01 (停留過久)
   const { recordOperation } = useGuidance({
@@ -224,7 +220,7 @@ function PlayPageContent() {
 
   useEffect(() => {
     const mode = searchParams.get('mode')
-    if (mode === 'onboarding' && wsConnected && !battleState?.isInBattle && !hasTriggeredOnboardingRef.current) {
+    if (mode === 'onboarding' && !battleState?.isInBattle && !hasTriggeredOnboardingRef.current) {
       console.log('[PlayPage] 🚀 Auto-starting ONBOARDING match')
       hasTriggeredOnboardingRef.current = true
 
@@ -264,7 +260,8 @@ function PlayPageContent() {
           router.replace(`/play?${newParams.toString()}`)
         })()
     }
-  }, [searchParams, wsConnected, battleState?.isInBattle, startMatch, router, setIsPveTransitioning, checkEnergy])
+  }, [searchParams, battleState?.isInBattle, startMatch, router, setIsPveTransitioning, checkEnergy])
+
 
   // 如果沒有用戶狀態，檢查是否應該跳過（Supabase 未配置時）
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -366,12 +363,13 @@ function PlayPageContent() {
   const showPveTransitionOverlay = isPveTransitioning && !battleState?.isInBattle
 
   // PVP 的轉場畫面（匹配成功後的等待畫面）
-  const isPveMatch = !lobbyConfirmState || lobbyConfirmState?.skipUI === true
+  const isPveMatch = true // Always PVE since we removed PVP
   const showMatchTransitionOverlay =
     !showPveCountdownOverlay &&
     !showPveTransitionOverlay && // 不與 PVE 過渡動畫重疊
     !isPveMatch && // 如果是 PVE，不顯示轉場
     Boolean(battleState?.matchId && !battleState?.isInBattle)
+
 
   const totalMatches = progression?.totalMatches || 0
   const canSkipCountdown = totalMatches >= 20
@@ -543,22 +541,25 @@ function PlayPageContent() {
           }
         })
 
-        // 發送答案到 WebSocket（如果連接且 matchId 存在）
-        if (battleState.matchId && wsConnected) {
-          console.log('[PlayPage] 📤 Sending SUBMIT_ANSWER:', answer)
-          sendWebSocketMessage({
-            type: 'SUBMIT_ANSWER',
-            match_id: battleState.matchId,
-            question_index: battleState.currentQuestionIndex,
-            answer: answer,
-            client_timestamp: Date.now(),
+
+        // PVE: 自動進入下一題
+        setTimeout(() => {
+          advancePveRound()
+        }, 2000)
+
+        // 背景提交答案（樂觀更新，不等待結果）
+        fetch('/api/play/pve/submit-answer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            matchId: battleState.matchId,
+            questionId: question.id,
+            answer,
+            isCorrect,
+            timeRemaining,
+            score: finalScore
           })
-        } else {
-          console.warn('[PlayPage] Cannot send SUBMIT_ANSWER:', {
-            hasMatchId: !!battleState.matchId,
-            wsConnected,
-          })
-        }
+        }).catch(err => console.error('[PlayPage] Background submit error:', err))
       }
 
       return (
@@ -790,53 +791,15 @@ function PlayPageContent() {
           />
         )}
         {!showPveCountdownOverlay && !showPveTransitionOverlay && showMatchTransitionOverlay && (
-          <BattleTransitionOverlay
-            key="sync-overlay"
-            variant="syncing"
-            countdown={lobbyConfirmState?.countdown ?? null}
-            matchId={battleState?.matchId ?? lobbyConfirmState?.matchId ?? null}
-            questionCount={battleState?.questionList.length || 0}
-          />
+          // Dead code removed for PVP sync overlay
+          null
         )}
+
       </AnimatePresence>
 
       {
-        lobbyConfirmState && !lobbyConfirmState.skipUI && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-            <Card className="max-w-md space-y-4 bg-card p-6 text-card-foreground">
-              <h3 className="text-xl font-semibold">確認對戰</h3>
-              <p className="text-sm text-muted-foreground">對戰即將開始，倒數 {lobbyConfirmState.countdown} 秒</p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => {
-                    if (!lobbyConfirmState.matchId) return
-                    sendWebSocketMessage({
-                      type: 'CANCEL_LOBBY',
-                      match_id: lobbyConfirmState.matchId,
-                    })
-                    setLobbyConfirmState(null)
-                  }}
-                >
-                  取消
-                </Button>
-                <Button
-                  className="flex-1 bg-[#5B7CFF] text-white hover:bg-[#4a63d7]"
-                  onClick={() => {
-                    if (!lobbyConfirmState.matchId) return
-                    sendWebSocketMessage({
-                      type: 'CONFIRM_LOBBY',
-                      match_id: lobbyConfirmState.matchId,
-                    })
-                  }}
-                >
-                  確認
-                </Button>
-              </div>
-            </Card>
-          </div>
-        )
+        {/* Lobby Confirm UI Removed */ }
+
       }
 
       {/* 系統對戰不再顯示大廳確認UI，直接開始遊戲 */}

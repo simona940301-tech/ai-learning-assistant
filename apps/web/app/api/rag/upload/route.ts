@@ -9,36 +9,13 @@ import { createOptionsHandler, corsJsonResponse } from '@/lib/api/cors'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
+export const maxDuration = 60 // 60s max duration for Pro plan
 
 // 最大文件大小：10MB
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 
-/**
- * 🚀 SOTA FIX: Explicit Route-Level OPTIONS Handler
- * This is the LAST LINE OF DEFENSE against 405 errors
- * 
- * Why this is necessary:
- * - Middleware handles OPTIONS globally (Plan C)
- * - createOptionsHandler() provides dynamic origin reflection (Plan B)
- * - This explicit handler ensures OPTIONS ALWAYS returns 200 (Plan A)
- * 
- * Critical for mobile browsers which ALWAYS send CORS preflight requests
- */
-export async function OPTIONS(request: Request) {
-    // Dynamic origin reflection - spec-compliant with credentials
-    const origin = request.headers.get('origin') || '*'
-
-    return new Response(null, {
-        status: 200,
-        headers: {
-            'Access-Control-Allow-Origin': origin,
-            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Date, X-Api-Version, X-API-Key',
-            'Access-Control-Allow-Credentials': 'true',
-            'Access-Control-Max-Age': '86400', // 24 hours
-        },
-    })
-}
+// Standardized CORS Options Handler
+export const OPTIONS = createOptionsHandler()
 
 /**
  * POST /api/rag/upload

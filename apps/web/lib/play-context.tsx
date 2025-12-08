@@ -137,9 +137,8 @@ type SystemMode = 'PVE_TRAINING' | 'WEAKNESS_BATTLE' | 'RANKED' | null
 type CustomMode = 'CREATE_ROOM' | 'JOIN_ROOM' | null
 
 export interface PlayContextType {
-  // WebSocket
-  wsConnected: boolean
-  sendWebSocketMessage: (message: any) => void
+  // WebSocket removed
+
   startMatch: (params: { type: string; subject?: string | null; timeLimit?: number; origin?: string }) => Promise<{ ok: boolean; error?: string }>
 
   // User Status
@@ -198,45 +197,19 @@ export interface PlayContextType {
   // Battle flow state
   battleFlow: BattleFlowState
   setBattleFlow: React.Dispatch<React.SetStateAction<BattleFlowState>>
+
+  // PVE Logic
+  advancePveRound: () => void
 }
 
 export type BattleFlowState = 'IDLE' | 'QUEUEING' | 'MATCHED' | 'IN_BATTLE' | 'RESULT'
 
 const PlayContext = createContext<PlayContextType | undefined>(undefined)
 
-// ============================================
-// WebSocket URL - Environment-Aware Configuration
-// ============================================
+// WebSocket configuration removed
 
-// 🎯 SOTA FIX: Environment-aware WebSocket URL
-// Production (mobile/Vercel): Use remote wss:// server
-// Development (localhost): Use local ws:// server
-const WS_URL = process.env.NODE_ENV === 'production'
-  ? (process.env.NEXT_PUBLIC_BATTLE_WS_URL || process.env.NEXT_PUBLIC_WS_URL || '')
-  : (process.env.NEXT_PUBLIC_BATTLE_WS_URL || process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080/ws/battle')
 
-// WebSocket is disabled if URL is empty or explicitly set to 'false'
-const WS_ENABLED = WS_URL !== '' &&
-  (process.env.NEXT_PUBLIC_BATTLE_WS_ENABLED ?? process.env.NEXT_PUBLIC_WS_ENABLED) !== 'false'
-
-// 開發環境警告：檢測到舊的環境變數
-if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_WS_URL && !process.env.NEXT_PUBLIC_BATTLE_WS_URL) {
-  console.warn(
-    '[PlayProvider] ⚠️ NEXT_PUBLIC_WS_URL is deprecated. Please use NEXT_PUBLIC_BATTLE_WS_URL instead.',
-    '\n  Current: NEXT_PUBLIC_WS_URL =', process.env.NEXT_PUBLIC_WS_URL,
-    '\n  Recommended: NEXT_PUBLIC_BATTLE_WS_URL = wss://battle-ws.fly.dev/ws/battle'
-  )
-}
-
-// 生產環境警告：WebSocket URL 未配置
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production' && !WS_URL) {
-  console.warn(
-    '[PlayProvider] ⚠️ WebSocket URL not configured for production.',
-    '\n  Please set NEXT_PUBLIC_BATTLE_WS_URL in Vercel environment variables.',
-    '\n  Example: wss://your-battle-ws.fly.dev/ws/battle',
-    '\n  WebSocket features will be disabled.'
-  )
-}
+// WebSocket configuration removed (HTTP-only architecture)
 
 // ============================================
 // Play Provider
@@ -244,8 +217,6 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production' && !W
 
 export function PlayProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
-  const [ws, setWs] = useState<WebSocket | null>(null)
-  const [wsConnected, setWsConnected] = useState(false)
   const [battleState, setBattleState] = useState<BattleState | null>(null)
   const [battleFlow, setBattleFlow] = useState<BattleFlowState>('IDLE')
   const [lobbyConfirmState, setLobbyConfirmState] = useState<LobbyConfirmState | null>(null)
@@ -260,15 +231,6 @@ export function PlayProvider({ children }: { children: React.ReactNode }) {
   const [pveCountdown, setPveCountdown] = useState<number | null>(null)
   const [isPveTransitioning, setIsPveTransitioning] = useState(false)
   const [progression, setProgression] = useState<ProgressionStatus | null>(null)
-
-  const messageQueue = useRef<any[]>([])
-  const reconnectAttempts = useRef(0)
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const confirmedLobbyMatchesRef = useRef<Set<string>>(new Set())
-  const isConnectingRef = useRef(false)
-  const hasShownConnectionErrorRef = useRef(false)
-  const wsRef = useRef<WebSocket | null>(null)
-  const connectionToastTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // ============================================
   // Fetch User Status
@@ -424,163 +386,6 @@ export function PlayProvider({ children }: { children: React.ReactNode }) {
   }, [postMatchInsights?.matchId, user, fetchUserStatus])
 
   // ============================================
-  // WebSocket Connection
-  // ============================================
-
-  // 使用 ref 存儲最新的 handleServerMessage，避免閉包陷阱
-  const handleServerMessageRef = useRef<((message: any) => void) | null>(null)
-
-  const connectWebSocket = useCallback(() => {
-    // Check if WebSocket is disabled
-    if (!WS_ENABLED) {
-      if (!hasShownConnectionErrorRef.current) {
-        console.log('[PlayProvider] ⚠️ WebSocket is disabled via NEXT_PUBLIC_BATTLE_WS_ENABLED=false')
-        hasShownConnectionErrorRef.current = true
-      }
-      return
-    }
-
-    // Prevent multiple simultaneous connection attempts
-    if (isConnectingRef.current) {
-      return
-    }
-
-    // 使用 ref 來檢查連接狀態，避免依賴問題
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      console.log('[PlayProvider] ⚠️ WebSocket already connected, skipping')
-      return
-    }
-
-    // Don't attempt connection if we've exceeded max retries
-    if (reconnectAttempts.current >= 5) {
-      if (!hasShownConnectionErrorRef.current) {
-        console.warn('[PlayProvider] ⚠️ WebSocket connection disabled after max retry attempts. Server may not be running.')
-        hasShownConnectionErrorRef.current = true
-      }
-      return
-    }
-
-    isConnectingRef.current = true
-
-    // Only log connection attempt for first few tries to reduce console noise
-    if (reconnectAttempts.current < 2) {
-      console.log('[PlayProvider] 🔌 Connecting to WebSocket:', WS_URL)
-    }
-
-    const websocket = new WebSocket(WS_URL)
-
-    websocket.onopen = () => {
-      console.log('[PlayProvider] ✅ WebSocket connected')
-      setWsConnected(true)
-      reconnectAttempts.current = 0
-      isConnectingRef.current = false
-      hasShownConnectionErrorRef.current = false
-
-      // Clear any pending connection toast
-      if (connectionToastTimeoutRef.current) {
-        clearTimeout(connectionToastTimeoutRef.current)
-        connectionToastTimeoutRef.current = null
-      }
-
-      // 連接成功，清除斷線提示並顯示成功提示
-      if (typeof window !== 'undefined' && reconnectAttempts.current > 0) {
-        import('@/components/ui/Toast').then(({ toast }) => {
-          toast.success('連線已恢復', 2000)
-        })
-      }
-
-      // 發送認證消息
-      if (user?.id) {
-        websocket.send(JSON.stringify({
-          type: 'AUTH',
-          userId: user.id,
-        }))
-      }
-
-      // 發送排隊的消息
-      while (messageQueue.current.length > 0) {
-        const message = messageQueue.current.shift()
-        websocket.send(JSON.stringify(message))
-      }
-    }
-
-    websocket.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data)
-        console.log('[PlayProvider] 📨 Received message:', message.type)
-        // 使用 ref 中最新的 handleServerMessage
-        handleServerMessageRef.current?.(message)
-      } catch (error) {
-        console.error('[PlayProvider] ❌ Failed to parse message:', error)
-      }
-    }
-
-    websocket.onerror = (error) => {
-      isConnectingRef.current = false
-      // Only log error for first few attempts to reduce console noise
-      if (reconnectAttempts.current < 2) {
-        console.error('[PlayProvider] ❌ WebSocket connection failed. Server may not be running at', WS_URL)
-      }
-    }
-
-    websocket.onclose = (event) => {
-      isConnectingRef.current = false
-      setWsConnected(false)
-      setWs(null)
-      wsRef.current = null
-      setBattleFlow('IDLE')
-
-      // Only log close event for first few attempts
-      if (reconnectAttempts.current < 2) {
-        console.log('[PlayProvider] 🔌 WebSocket closed', event.code !== 1000 ? `(code: ${event.code})` : '')
-      }
-
-      // 自動重連（最多 5 次）
-      if (reconnectAttempts.current < 5) {
-        reconnectAttempts.current++
-        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 10000)
-
-        // Only log reconnection attempts for first few tries
-        if (reconnectAttempts.current <= 2) {
-          console.log(`[PlayProvider] 🔄 Reconnecting in ${delay}ms (attempt ${reconnectAttempts.current}/5)`)
-        }
-
-        // 顯示斷線提示 Toast (only for first 2 attempts to avoid spam)
-        // 延遲 2 秒顯示，避免閃爍
-        if (typeof window !== 'undefined' && reconnectAttempts.current <= 2) {
-          if (connectionToastTimeoutRef.current) clearTimeout(connectionToastTimeoutRef.current)
-
-          connectionToastTimeoutRef.current = setTimeout(() => {
-            import('@/components/ui/Toast').then(({ toast }) => {
-              toast.loading(`連線中斷，正在嘗試重新連接 (第 ${reconnectAttempts.current} 次 / 5)`)
-            })
-          }, 2000)
-        }
-
-        reconnectTimeoutRef.current = setTimeout(() => {
-          connectWebSocket()
-        }, delay)
-      } else {
-        // Max retries reached - stop trying and show final error
-        if (!hasShownConnectionErrorRef.current) {
-          console.warn('[PlayProvider] ⚠️ WebSocket connection failed after 5 attempts. Server may not be running.')
-          hasShownConnectionErrorRef.current = true
-
-          // 顯示重連失敗提示
-          if (typeof window !== 'undefined') {
-            import('@/components/ui/Toast').then(({ toast }) => {
-              toast.error('無法連接到對戰服務器，請確認服務器是否運行', 5000)
-            })
-          }
-        }
-      }
-    }
-
-    setWs(websocket)
-    wsRef.current = websocket
-  }, [user])
-
-  // ============================================
   // Check Energy (預扣檢查)
   // ============================================
 
@@ -652,721 +457,82 @@ export function PlayProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   // ============================================
-  // Handle Server Messages
+  // Start Match (HTTP only)
   // ============================================
+  const startMatch = useCallback(async ({ type, subject = null, timeLimit = 20, origin }: { type: string; subject?: string | null; timeLimit?: number; origin?: string }) => {
+    // 🎯 HTTP-only PVE Mode
+    if (type === 'PVE_TRAINING') {
+      const energy = await checkEnergy()
+      if (!energy.success) {
+        setBattleFlow('IDLE')
+        return { ok: false, error: energy.message || '羽毛不足，無法開始對戰' }
+      }
 
-  const handleServerMessage = useCallback((message: any) => {
-    switch (message.type) {
-      case 'MATCH_FOUND': {
-        const questionList = message.question_list || []
-        const isPveMatch = systemMode === 'PVE_TRAINING' || message.match_type === 'PVE_TRAINING'
+      console.log('[PlayProvider] 🚀 Starting PVE match via HTTP:', { type, subject, timeLimit, origin })
+      setBattleFlow('QUEUEING')
+      setIsPveTransitioning(true)
 
-        console.log('[PlayProvider] 🎯 MATCH_FOUND EVENT RECEIVED!', {
-          matchId: message.match_id,
-          questions: questionList.length,
-          isPVE: isPveMatch,
-          matchType: message.match_type,
-          firstQuestion: questionList[0] ? {
-            id: questionList[0].id,
-            hasOptions: !!questionList[0].options,
-            optionsLength: questionList[0].options?.length,
-            optionsType: Array.isArray(questionList[0].options) ? 'array' : typeof questionList[0].options,
-            firstOption: questionList[0].options?.[0],
-          } : null,
+      try {
+        const response = await fetch('/api/play/pve/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user?.id,
+            subject,
+            timeLimit
+          })
         })
 
-        // 🎯 關鍵修復：PVE 模式在後端已經直接設置為 InBattle 狀態
-        // 所以前端收到 MATCH_FOUND 時，如果是 PVE，應該立即設置 isInBattle: true
-        // 這樣可以確保在 ROUND_STARTED 到達前，battleState 已經準備好進入對戰頁面
-        const newBattleState = {
-          isInBattle: isPveMatch, // PVE 模式立即進入對戰，PVP 需要等待 lobby 確認
-          matchId: message.match_id,
-          questionList,
+        if (!response.ok) throw new Error('Failed to start match')
+
+        const data = await response.json()
+        if (!data.success) throw new Error(data.error || 'Unknown error')
+
+        // Initialize Battle State directly
+        setBattleState({
+          matchId: data.matchId,
+          matchType: type,
+          isInBattle: true,
           currentQuestionIndex: 0,
+          questionList: data.questions,
           player1Score: 0,
           player2Score: 0,
           player1Streak: 0,
           player2Streak: 0,
           playerHasAnswered: false,
-          opponentStatus: 'idle' as OpponentStatus,
-          opponentAnswer: null,
           answerRecords: [],
-          matchType: message.match_type || null,
-          subject: message.subject || null,
-          timeLimitSeconds: message.time_limit || questionList[0]?.time_limit,
-          seed: message.seed || null,
-        }
-
-        console.log('[PlayProvider] 📝 Setting battleState with:', {
-          matchId: newBattleState.matchId,
-          questionCount: newBattleState.questionList.length,
-          isInBattle: newBattleState.isInBattle,
-          isPveMatch,
+          opponentStatus: 'idle',
+          opponentAnswer: null, // 🎯 FIX: Required field for BattleState type
+          roundStartedAt: Date.now(),
+          roundExpiresAt: Date.now() + (timeLimit || 20) * 1000
         })
 
-        setBattleState(newBattleState)
-        setBattleFlow(isPveMatch ? 'IN_BATTLE' : 'MATCHED')
-
-        // 關閉 PVE 過渡動畫（收到 MATCH_FOUND 表示連線成功）
-        if (isPveMatch) {
-          console.log('[PlayProvider] ✅ PVE MATCH_FOUND - clearing transition overlay and entering battle')
-          setIsPveTransitioning(false)
-        }
-
-        break
-      }
-
-      case 'LOBBY_CONFIRMING': {
-        // 系統對戰（PVE、RANKED、WEAKNESS_BATTLE）都跳過 lobby UI
-        const isSystemBattle =
-          systemMode === 'PVE_TRAINING' ||
-          systemMode === 'RANKED' ||
-          systemMode === 'WEAKNESS_BATTLE' ||
-          message.match_type?.includes('PVE') ||
-          message.match_type === 'PVE_TRAINING' ||
-          message.match_type === 'PVE_CHALLENGE' ||
-          message.match_type === 'RANKED' ||
-          message.match_type === 'WEAKNESS_BATTLE'
-
-        const countdown = message.countdown ?? 0
-        const players = message.players || []
-        const matchId = message.match_id
-        if (!isSystemBattle) {
-          setBattleFlow('QUEUEING')
-        }
-
-        setLobbyConfirmState(prev => {
-          if (!matchId) return prev
-
-          if (prev && prev.matchId === matchId) {
-            return {
-              ...prev,
-              countdown,
-              skipUI: isSystemBattle,
-            }
-          }
-
-          return {
-            matchId,
-            countdown,
-            players,
-            skipUI: isSystemBattle,
-          }
-        })
-
-        // 如果是系統對戰，自動發送確認（使用 ws 直接發送）
-        if (isSystemBattle && matchId && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-          console.log('[PlayProvider] 🚀 Auto-confirming system battle lobby')
-          wsRef.current.send(JSON.stringify({
-            type: 'CONFIRM_LOBBY',
-            match_id: matchId,
-          }))
-        }
-        break
-      }
-
-      case 'LOBBY_CONFIRMED':
-        console.log('[PlayProvider] ✅ Lobby confirmed')
-        setLobbyConfirmState(null)
-        setBattleFlow('MATCHED')
-        // 大廳確認完成，現在才真正消耗 Energy（僅 PVP 模式）
-        if (systemMode !== 'PVE_TRAINING') {
-          consumeEnergy().catch(error => {
-            console.error('[PlayProvider] Failed to consume energy after lobby confirmation:', error)
-            // 即使消耗失敗，也不阻止對戰繼續（避免影響用戶體驗）
-          })
-        }
-        // 等待 ROUND_STARTED
-        break
-
-      case 'LOBBY_DISSOLVED':
-        console.log('[PlayProvider] ❌ Lobby dissolved:', message.reason)
-        setLobbyConfirmState(null)
-        setBattleState(null)
-        setBattleFlow('IDLE')
-        break
-
-      case 'ROUND_STARTED':
-        // 🎯 關鍵調試：打印完整的消息對象
-        console.log('[PlayProvider] 🎮 Round started:', {
-          question_index: message.question_index,
-          match_id: message.match_id,
-          hasQuestion: !!message.question,
-          questionId: message.question?.id,
-          fullMessage: message,
-        })
-
-        // 清除 lobby state（PVE 和 PVP 都需要）
-        setLobbyConfirmState(null)
-        setSystemMode(null)
         setBattleFlow('IN_BATTLE')
+        setIsPveTransitioning(false)
+        console.log('[PlayProvider] ✅ PVE Match started locally with', data.questions.length, 'questions')
+        return { ok: true }
 
-        setBattleState(prev => {
-          const prevInfo = {
-            exists: !!prev,
-            matchId: prev?.matchId,
-            questionCount: prev?.questionList?.length,
-            currentIndex: prev?.currentQuestionIndex,
-          }
-          console.log('[PlayProvider] 🔍 ROUND_STARTED - prev state:', prevInfo)
-
-          // 🎯 防止重複處理：檢查當前問題是否已經是這個 question_index
-          // 如果 prev 存在且 currentQuestionIndex 已經等於 message.question_index
-          // 且該問題已經在 questionList 中，則跳過更新（避免 React Strict Mode 雙重調用）
-          if (prev && prev.currentQuestionIndex === message.question_index) {
-            const existingQuestion = prev.questionList?.[message.question_index]
-            if (existingQuestion && existingQuestion.id === message.question?.id) {
-              console.log('[PlayProvider] ⏭️ Skipping duplicate ROUND_STARTED for q' + message.question_index)
-              return prev
-            }
-          }
-
-          // 詳細記錄以便調試
-          if (!prev) {
-            console.log('[PlayProvider] 🔴 prev is NULL/UNDEFINED, will use ROUND_STARTED data')
-          } else {
-            console.log('[PlayProvider] 🟢 prev EXISTS, will update existing state')
-          }
-
-          // 🎯 關鍵修復：如果 prev 為 null，使用 ROUND_STARTED 消息中的 question 數據
-          // React 18 的自動批處理可能導致 MATCH_FOUND 的狀態更新延遲
-          // ROUND_STARTED 消息包含當前題目數據，我們可以直接使用它
-          if (!prev) {
-            console.warn('[PlayProvider] ⚠️ battleState is null due to React batching, using ROUND_STARTED question data')
-
-            // 從 ROUND_STARTED 消息中提取題目數據
-            const currentQuestion = message.question
-
-            console.log('[PlayProvider] 📋 ROUND_STARTED message details:', {
-              hasQuestion: !!currentQuestion,
-              questionId: currentQuestion?.id,
-              matchId: message.match_id,
-              questionIndex: message.question_index,
-              messageKeys: Object.keys(message),
-            })
-
-            if (!currentQuestion) {
-              console.error('[PlayProvider] ❌ CRITICAL: No question in ROUND_STARTED message!')
-              console.error('[PlayProvider] ❌ Full message:', message)
-              return null
-            }
-
-            console.log('[PlayProvider] ✅ Creating battleState with question:', currentQuestion.id)
-
-            // 使用 ROUND_STARTED 中的題目創建初始狀態
-            // 這樣即使 MATCH_FOUND 的狀態更新延遲，戰鬥也能正常開始
-            return {
-              isInBattle: true,
-              matchId: message.match_id || null,
-              questionList: [currentQuestion], // 使用當前題目，後續題目會在下一個 ROUND_STARTED 中到達
-              currentQuestionIndex: message.question_index || 0,
-              player1Score: 0,
-              player2Score: 0,
-              player1Streak: 0,
-              player2Streak: 0,
-              playerHasAnswered: false,
-              opponentStatus: 'idle' as OpponentStatus,
-              opponentAnswer: null,
-              answerRecords: [],
-              matchType: message.match_type || null,
-              subject: message.subject || null,
-              timeLimitSeconds: currentQuestion.time_limit || null,
-              roundStartedAt: message.server_now || Date.now(),
-              roundExpiresAt: message.round_expires_at || ((message.server_now || Date.now()) + (currentQuestion.time_limit || 0) * 1000),
-            }
-          }
-
-          console.log('[PlayProvider] ✅ Setting isInBattle = true')
-
-          // 🎯 驗證 matchId 是否匹配
-          const currentMatchId = message.match_id
-          if (prev.matchId !== currentMatchId) {
-            console.warn('[PlayProvider] ⚠️ Match ID mismatch! prev:', prev.matchId, 'current:', currentMatchId)
-            console.warn('[PlayProvider] ⚠️ This is likely from a previous match, using ROUND_STARTED data instead')
-
-            // matchId 不匹配，使用 ROUND_STARTED 的數據重新創建狀態
-            const currentQuestion = message.question
-            if (!currentQuestion) {
-              console.error('[PlayProvider] ❌ CRITICAL: No question in ROUND_STARTED message!')
-              return null
-            }
-
-            return {
-              isInBattle: true,
-              matchId: currentMatchId,
-              questionList: [currentQuestion],
-              currentQuestionIndex: message.question_index || 0,
-              player1Score: 0,
-              player2Score: 0,
-              player1Streak: 0,
-              player2Streak: 0,
-              playerHasAnswered: false,
-              opponentStatus: 'idle' as OpponentStatus,
-              opponentAnswer: null,
-              answerRecords: [],
-            }
-          }
-
-          // 🎯 關鍵修復：每次 ROUND_STARTED 都必須更新對應索引的題目
-          // 因為 MATCH_FOUND 的 questionList 可能不完整（只有第一題有完整數據）
-          // 後續題目需要從 ROUND_STARTED 中獲取完整數據
-          const currentQuestionIndex = message.question_index ?? 0
-          const currentQuestion = message.question
-
-          console.log('[PlayProvider] 🔄 Updating to question index:', {
-            messageQuestionIndex: message.question_index,
-            currentQuestionIndex,
-            prevIndex: prev.currentQuestionIndex,
-            questionId: currentQuestion?.id,
-            prevQuestionListLength: prev.questionList?.length || 0,
-            prevQuestionAtIndex: prev.questionList?.[currentQuestionIndex]?.id,
-          })
-
-          // 🎯 關鍵修復：如果收到新的題目數據，必須更新到 questionList 中
-          // 即使 questionList 已經有該索引的題目，也要用新的完整數據替換
-          let updatedQuestionList = prev.questionList || []
-          if (currentQuestion) {
-            // 確保 questionList 有足夠的長度
-            updatedQuestionList = [...updatedQuestionList]
-            while (updatedQuestionList.length <= currentQuestionIndex) {
-              // 用當前題目填充空位（臨時，後續會被正確的題目替換）
-              updatedQuestionList.push(currentQuestion)
-            }
-            // 🎯 關鍵：無論如何都要更新當前索引的題目（使用最新的完整數據）
-            updatedQuestionList[currentQuestionIndex] = currentQuestion
-
-            console.log('[PlayProvider] 📝 Updated question at index:', currentQuestionIndex, {
-              questionId: currentQuestion.id,
-              hasOptions: !!currentQuestion.options,
-              optionsLength: currentQuestion.options?.length || 0,
-              questionListLength: updatedQuestionList.length,
-            })
-          } else {
-            console.warn('[PlayProvider] ⚠️ ROUND_STARTED message has no question data!', message)
-          }
-
-          const updatedState = {
-            ...prev,
-            isInBattle: true,
-            questionList: updatedQuestionList,
-            currentQuestionIndex, // 🎯 關鍵：使用 message.question_index 更新索引
-            playerHasAnswered: false,
-            opponentStatus: 'idle' as OpponentStatus,
-            opponentAnswer: null,
-            matchType: currentMatchId ? (message.match_type || prev.matchType || null) : prev.matchType,
-            subject: message.subject || prev.subject || null,
-            timeLimitSeconds: currentQuestion?.time_limit || prev.timeLimitSeconds,
-            roundStartedAt: message.server_now || Date.now(),
-            roundExpiresAt: message.round_expires_at || ((message.server_now || Date.now()) + (currentQuestion?.time_limit || prev.timeLimitSeconds || 0) * 1000),
-          }
-
-          console.log('[PlayProvider] ✅ Updated battleState:', {
-            currentQuestionIndex: updatedState.currentQuestionIndex,
-            questionListLength: updatedState.questionList.length,
-            questionId: updatedState.questionList[currentQuestionIndex]?.id,
-            fullQuestionList: updatedState.questionList.map((q, idx) => ({ id: q.id, index: idx })),
-            // 🎯 關鍵診斷：確認 currentQuestionIndex 是否正確設置
-            actualCurrentQuestion: updatedState.questionList[updatedState.currentQuestionIndex]?.id,
-            messageQuestionIndex: message.question_index,
-            prevCurrentQuestionIndex: prev.currentQuestionIndex,
-          })
-
-          // 🎯 關鍵驗證：確保 currentQuestionIndex 正確更新
-          if (updatedState.currentQuestionIndex !== currentQuestionIndex) {
-            console.error('[PlayProvider] ❌ CRITICAL: currentQuestionIndex mismatch!', {
-              expected: currentQuestionIndex,
-              actual: updatedState.currentQuestionIndex,
-              messageQuestionIndex: message.question_index,
-            })
-            // 強制修正 - 創建新對象以觸發重新渲染
-            return {
-              ...updatedState,
-              currentQuestionIndex,
-            }
-          }
-
-          // 🎯 關鍵驗證：確保當前題目存在
-          if (!updatedState.questionList[updatedState.currentQuestionIndex]) {
-            console.error('[PlayProvider] ❌ CRITICAL: Question at currentQuestionIndex does not exist!', {
-              currentQuestionIndex: updatedState.currentQuestionIndex,
-              questionListLength: updatedState.questionList.length,
-              questionList: updatedState.questionList.map((q, idx) => ({ id: q.id, index: idx })),
-              hasCurrentQuestion: !!currentQuestion,
-            })
-            // 如果題目不存在但有 currentQuestion，強制添加
-            if (currentQuestion) {
-              const fixedQuestionList = [...updatedQuestionList]
-              while (fixedQuestionList.length <= currentQuestionIndex) {
-                fixedQuestionList.push(currentQuestion)
-              }
-              fixedQuestionList[currentQuestionIndex] = currentQuestion
-              return {
-                ...updatedState,
-                questionList: fixedQuestionList,
-              }
-            }
-            // 否則返回 null 讓組件處理
-            return null
-          }
-
-          return updatedState
-        })
-        break
-
-      case 'OPPONENT_THINKING':
-        console.log('[PlayProvider] 🤖 Opponent thinking')
-        setBattleState(prev => {
-          if (!prev) return null
-          return {
-            ...prev,
-            opponentStatus: 'thinking',
-            opponentAnswer: null,
-          }
-        })
-        break
-
-      case 'ROUND_RESOLVED':
-        console.log('[PlayProvider] ✅ Round resolved:', {
-          player1Score: message.player1_score,
-          player2Score: message.player2_score,
-          currentQuestionIndex: message.question_index,
-        })
-
-        setBattleState(prev => {
-          if (!prev) return null
-          const oldPlayer2Score = prev.player2Score
-          const newPlayer2Score = message.player2_score || 0
-          const opponentScoreChanged = newPlayer2Score > oldPlayer2Score
-          const opponentStatus: 'hit' | 'miss' = opponentScoreChanged ? 'hit' : 'miss'
-
-          // 推斷 DDA 狀態（根據分數變化）
-          // 如果 player1 得分增加，可能答對了（系統可能降低難度）
-          // 如果 player1 得分未增加，可能答錯了（系統可能提高難度）
-          const player1ScoreChanged = (message.player1_score || prev.player1Score) > prev.player1Score
-          let newDdaBand: 'low' | 'target' | 'high' | undefined = prev.ddaBand || 'target'
-
-          // 簡單推斷：連續答對可能提高難度，連續答錯可能降低難度
-          if (player1ScoreChanged) {
-            // 答對了，根據連擊數推斷難度
-            const currentStreak = prev.player1Streak || 0
-            if (currentStreak >= 3) {
-              newDdaBand = 'high' // 連續答對，難度提高
-            } else if (currentStreak === 0) {
-              newDdaBand = 'low' // 剛答對，難度降低
-            }
-          } else {
-            // 答錯了，降低難度
-            newDdaBand = 'low'
-          }
-
-          // 🎯 關鍵修復：重置答題狀態，為下一題做準備
-          // 雖然 ROUND_STARTED 也會重置，但提前重置可以避免狀態不一致
-          return {
-            ...prev,
-            player1Score: message.player1_score || prev.player1Score,
-            player2Score: newPlayer2Score,
-            opponentStatus: opponentStatus,
-            ddaBand: newDdaBand,
-            playerHasAnswered: false, // 🎯 重置答題狀態
-            opponentAnswer: null, // 🎯 重置對手答案
-          }
-        })
-
-        // 更新 tempo 和 arousal
-        if (message.tempo_hint) {
-          setTempoHint(message.tempo_hint)
-        }
-        if (message.arousal_level !== undefined) {
-          setArousalLevel(message.arousal_level)
-        }
-
-        // 後端會在 ROUND_RESOLVED 後自動發送下一題的 ROUND_STARTED
-        break
-
-      case 'QUESTION_DECK_UPDATE':
-        setBattleState(prev => {
-          if (!prev) return null
-          const updated = [...prev.questionList]
-          message.questions?.forEach((q: Question, idx: number) => {
-            const targetIndex = (message.start_index || 0) + idx
-            if (updated[targetIndex]) {
-              updated[targetIndex] = q
-            }
-          })
-          return { ...prev, questionList: updated }
-        })
-        break
-
-      case 'BATTLE_END':
-        console.log('[PlayProvider] 🏁 Battle ended:', {
-          winner: message.winner,
-          finalScore: message.final_score,
-        })
-        setLobbyConfirmState(null)
-        setBattleFlow('RESULT')
-
-        setBattleState(prev => {
-          if (!prev) {
-            // 即使沒有 battleState，也設置 postMatchInsights
-            setPostMatchInsights({
-              matchId: message.match_id || null,
-              winner: message.winner || null,
-              finalScore: message.final_score || {
-                player1: 0,
-                player2: 0,
-              },
-              retestSuggestions: message.retest_suggestions || [],
-              recallOverlay: message.recall_overlay || null,
-            })
-            return null
-          }
-
-          // 寫入 battle_events（如果 Rust 引擎沒有寫入）
-          if (prev.answerRecords && prev.answerRecords.length > 0 && prev.matchId && user?.id) {
-            const questionIdArray = prev.answerRecords.map(r => r.questionId)
-            const isCorrectArray = prev.answerRecords.map(r => r.isCorrect ?? false)
-            const userAnswerArray = prev.answerRecords.map(r => r.userAnswer)
-
-            console.log('[PlayProvider] 📝 Writing battle_events:', {
-              matchId: prev.matchId,
-              questionCount: questionIdArray.length,
-              correctCount: isCorrectArray.filter(c => c).length,
-            })
-
-            // 異步寫入，不阻塞 UI
-            fetch('/api/play/battle/events', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                user_id: user.id,
-                opponent_id: message.opponent_id || null,
-                match_id: prev.matchId,
-                match_type: message.match_type || prev.matchType || 'PVE_TRAINING',
-                question_id_array: questionIdArray,
-                is_correct_array: isCorrectArray,
-                final_scores: message.final_score || {
-                  player1: prev.player1Score || 0,
-                  player2: prev.player2Score || 0,
-                },
-                server_timestamp: Date.now(),
-                metadata: {
-                  user_answers: userAnswerArray,
-                  subject: prev.subject || null,
-                  time_limit: prev.timeLimitSeconds || null,
-                  seed: prev.seed || null,
-                },
-              }),
-            })
-              .then(res => res.json())
-              .then(data => {
-                if (data.success) {
-                  console.log('[PlayProvider] ✅ Successfully wrote battle_events:', data.event_id)
-                } else {
-                  console.warn('[PlayProvider] ⚠️ Failed to write battle_events:', data.error)
-                }
-              })
-              .catch(err => {
-                console.error('[PlayProvider] ❌ Error writing battle_events:', err)
-              })
-          }
-
-          // 設置 postMatchInsights
-          // coinBreakdown 將從 Elo 更新 API 返回，這裡先不設置
-          setPostMatchInsights({
-            matchId: message.match_id || prev.matchId || null,
-            winner: message.winner || null,
-            finalScore: message.final_score || {
-              player1: prev.player1Score || 0,
-              player2: prev.player2Score || 0,
-            },
-            coinsEarned: message.coins_earned, // 如果 Rust 返回了
-            // coinBreakdown 將在對戰結束後從 Elo 更新 API 獲取
-            retestSuggestions: message.retest_suggestions || [],
-            recallOverlay: message.recall_overlay || null,
-          })
-
-          return {
-            ...prev,
-            isInBattle: false,
-          }
-        })
-
-        setActiveModal('BATTLE_RESULT')
-        fetchProgressionStatus().catch((err) => console.error('Failed to refresh progression', err))
-        break
-
-      case 'ANSWER_RESULT':
-        // 🎯 關鍵修復：只更新分數，不要覆蓋 currentQuestionIndex
-        // 因為 ROUND_STARTED 可能同時到達，需要保持 currentQuestionIndex 的更新
-        setBattleState(prev => {
-          if (!prev) return null
-
-          const newPlayer1Score = message.player1_score ?? prev.player1Score
-          const isCorrect = newPlayer1Score > (prev.lastPlayer1Score ?? prev.player1Score)
-          const currentQuestion = prev.questionList[prev.currentQuestionIndex]
-
-          // 記錄答題結果
-          const answerRecords = [...(prev.answerRecords || [])]
-          if (currentQuestion?.id) {
-            // 檢查是否已經記錄過這題（避免重複記錄）
-            const existingIndex = answerRecords.findIndex(r => r.questionId === currentQuestion.id)
-            if (existingIndex >= 0) {
-              answerRecords[existingIndex] = {
-                ...answerRecords[existingIndex],
-                isCorrect,
-              }
-            } else {
-              answerRecords.push({
-                questionId: currentQuestion.id,
-                isCorrect,
-                userAnswer: null,
-              })
-            }
-          }
-
-          return {
-            ...prev,
-            player1Score: newPlayer1Score,
-            player2Score: message.player2_score ?? prev.player2Score,
-            lastPlayer1Score: prev.player1Score, // 保存上一次分數
-            answerRecords,
-            // 🎯 關鍵：保持 currentQuestionIndex 不變，不要重置
-            // currentQuestionIndex 應該由 ROUND_STARTED 更新
-          }
-        })
-
-        if (message.tempo_hint) {
-          setTempoHint(message.tempo_hint)
-        }
-        if (message.arousal_level !== undefined) {
-          setArousalLevel(message.arousal_level)
-        }
-        break
-
-      case 'ERROR':
-        console.error('[PlayProvider] ❌ Server error:', message.message)
-        break
-
-      default:
-        console.warn('[PlayProvider] ⚠️ Unknown message type:', message.type)
-    }
-  }, [systemMode, consumeEnergy, fetchProgressionStatus, user?.id])
-
-  // Update ref whenever handleServerMessage changes
-  useEffect(() => {
-    handleServerMessageRef.current = handleServerMessage
-  }, [handleServerMessage])
-
-  // ============================================
-  // Send WebSocket Message
-  // ============================================
-
-  const sendWebSocketMessage = useCallback((message: any) => {
-    // Check if WebSocket is disabled
-    if (!WS_ENABLED) {
-      console.warn('[PlayProvider] ⚠️ WebSocket is disabled, message not sent:', message.type)
-      return
-    }
-
-    // 使用 ref 來訪問最新的 ws，避免依賴問題
-    const currentWs = wsRef.current
-    if (currentWs && currentWs.readyState === WebSocket.OPEN) {
-      console.log('[PlayProvider] 📤 Sending message:', message.type)
-      currentWs.send(JSON.stringify(message))
-    } else {
-      console.warn('[PlayProvider] ⚠️ WebSocket not connected, queuing message')
-      messageQueue.current.push(message)
-      // 嘗試連接（只有在未超過最大重試次數時）
-      if ((!currentWs || currentWs.readyState === WebSocket.CLOSED) && reconnectAttempts.current < 5) {
-        connectWebSocket()
+      } catch (err: any) {
+        console.error('[PlayProvider] PVE Start Error:', err)
+        setBattleFlow('IDLE')
+        setIsPveTransitioning(false)
+        return { ok: false, error: '無法啟動對戰，請稍後再試' }
       }
     }
-  }, [connectWebSocket])
 
-  // 共用對戰啟動 API：統一能量檢查與 WS 可用性
-  const startMatch = useCallback(async ({ type, subject = null, timeLimit = 20, origin }: { type: string; subject?: string | null; timeLimit?: number; origin?: string }) => {
-    if (!WS_ENABLED) {
-      return { ok: false, error: '對戰服務已停用' }
-    }
+    // PvP is currently disabled
+    return { ok: false, error: 'PVP 對戰功能即將推出' }
+  }, [checkEnergy, setIsPveTransitioning, user?.id])
 
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      setBattleFlow('IDLE')
-      return { ok: false, error: '尚未連線，請稍後再試' }
-    }
+  // Auto-confirm Lobby removed
 
-    const energy = await checkEnergy()
-    if (!energy.success) {
-      setBattleFlow('IDLE')
-      return { ok: false, error: energy.message || '羽毛不足，無法開始對戰' }
-    }
-
-    // 標記流程進入排隊狀態
-    setBattleFlow('QUEUEING')
-
-    // PVE 轉場顯示
-    if (type === 'PVE_TRAINING') {
-      setIsPveTransitioning(true)
-    }
-
-    sendWebSocketMessage({
-      type: 'START_MATCH',
-      match_type: type,
-      subject: subject || null,
-      time_limit: timeLimit,
-      origin,
-    })
-
-    return { ok: true }
-  }, [checkEnergy, sendWebSocketMessage, setIsPveTransitioning])
-
-  // ============================================
-  // Auto-confirm Lobby (PVE & PVP)
-  // ============================================
-  //
-  // 前端自動幫玩家送出 CONFIRM_LOBBY：
-  // - PVE：不需要玩家再按一次確認
-  // - PVP：簡化流程，只保留匹配與退出
-  useEffect(() => {
-    if (!lobbyConfirmState) return
-    // 使用 ref 來檢查連接狀態，避免依賴問題
-    const currentWs = wsRef.current
-    if (!currentWs || currentWs.readyState !== WebSocket.OPEN) return
-
-    const matchId = lobbyConfirmState.matchId
-    if (!matchId) return
-
-    if (confirmedLobbyMatchesRef.current.has(matchId)) return
-    confirmedLobbyMatchesRef.current.add(matchId)
-
-    sendWebSocketMessage({
-      type: 'CONFIRM_LOBBY',
-      match_id: matchId,
-    })
-  }, [lobbyConfirmState, sendWebSocketMessage])
 
   // ============================================
   // Connect on Mount
   // ============================================
 
-  useEffect(() => {
-    if (user && WS_ENABLED) {
-      connectWebSocket()
-    }
+  // WebSocket lazy connection effect removed
 
-    return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current)
-      }
-      // 使用 ref 來訪問最新的 ws，避免依賴問題
-      const currentWs = wsRef.current
-      if (currentWs) {
-        currentWs.close()
-      }
-      isConnectingRef.current = false
-    }
-  }, [user, connectWebSocket])
 
   // ============================================
   // Modal Controls
@@ -1395,8 +561,8 @@ export function PlayProvider({ children }: { children: React.ReactNode }) {
   // ============================================
 
   const value: PlayContextType = {
-    wsConnected,
-    sendWebSocketMessage,
+    // WebSocket removed from value
+
     startMatch,
     userStatus,
     isLoadingStatus,
@@ -1418,8 +584,81 @@ export function PlayProvider({ children }: { children: React.ReactNode }) {
     consumeEnergy,
     tempoHint,
     arousalLevel,
-    postMatchInsights,
     setPostMatchInsights,
+    battleFlow,
+    setBattleFlow,
+
+    // 🎯 PVE Logic: Optimistic UI & Local State
+    advancePveRound: useCallback(() => {
+      setBattleState(prev => {
+        if (!prev) return null
+
+        const nextIndex = prev.currentQuestionIndex + 1
+
+        // Check if match is finished
+        if (nextIndex >= prev.questionList.length) {
+          // End of match
+          setBattleFlow('RESULT')
+
+          // Generate insights locally first (Optimistic)
+          const isWinner = prev.player1Score > prev.player2Score
+          const result: PostMatchInsights = {
+            matchId: prev.matchId,
+            winner: isWinner ? user?.id || 'player' : 'ai',
+            finalScore: {
+              player1: prev.player1Score,
+              player2: prev.player2Score
+            },
+            eloChange: {
+              oldElo: userStatus?.eloRank || 1000,
+              newElo: (userStatus?.eloRank || 1000) + (isWinner ? 20 : -10), // Mock calc
+              eloDiff: isWinner ? 20 : -10
+            },
+            coinsEarned: Math.floor(prev.player1Score / 10),
+            coinBreakdown: {
+              base: Math.floor(prev.player1Score / 10),
+              winner: isWinner ? 50 : 0,
+              contract: 0,
+              total: Math.floor(prev.player1Score / 10) + (isWinner ? 50 : 0)
+            }
+          }
+          setPostMatchInsights(result)
+          setActiveModal('BATTLE_RESULT')
+
+          // TODO: Async sync state to server
+          fetch('/api/play/pve/finish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              matchId: prev.matchId,
+              finalScore: {
+                player1: prev.player1Score,
+                player2: prev.player2Score
+              },
+              winnerId: isWinner ? user?.id : 'ai',
+              coinsEarned: result.coinsEarned
+            })
+          }).catch(err => console.error('[PlayContext] Background finish error:', err))
+
+          return {
+            ...prev,
+            isInBattle: false
+          }
+        }
+
+        // Next Round
+        return {
+          ...prev,
+          currentQuestionIndex: nextIndex,
+          playerHasAnswered: false,
+          opponentAnswer: null, // Reset opponent
+          opponentStatus: 'thinking',
+          roundStartedAt: Date.now(),
+          roundExpiresAt: Date.now() + (prev.questionList[nextIndex].timeLimit || 20) * 1000
+        }
+      })
+    }, [user?.id, userStatus?.eloRank]),
+    postMatchInsights,
     pveCountdown,
     setPveCountdown,
     isPveTransitioning,
@@ -1427,8 +666,6 @@ export function PlayProvider({ children }: { children: React.ReactNode }) {
     progression,
     refreshProgression: fetchProgressionStatus,
     openChest,
-    battleFlow,
-    setBattleFlow,
   }
 
   return (
@@ -1448,8 +685,8 @@ const noopDispatch = (() => { }) as React.Dispatch<React.SetStateAction<any>>
 
 export function createMockPlayContextValue(overrides: Partial<PlayContextType> = {}): PlayContextType {
   const base: PlayContextType = {
-    wsConnected: true,
-    sendWebSocketMessage: noop,
+    // WebSocket removed from mock
+
     startMatch: async () => ({ ok: true }),
     userStatus: null,
     isLoadingStatus: false,
@@ -1482,6 +719,7 @@ export function createMockPlayContextValue(overrides: Partial<PlayContextType> =
     openChest: asyncNoop,
     battleFlow: 'IDLE',
     setBattleFlow: noopDispatch,
+    advancePveRound: noop,
   }
 
   return {

@@ -10,6 +10,8 @@ import { useRouter } from 'next/navigation'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { toast } from 'sonner'
+import { supabaseBrowser as supabase } from '@/lib/supabase'
+
 
 interface Question {
     id: string

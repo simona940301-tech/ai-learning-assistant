@@ -15,7 +15,8 @@ interface SystemBattleModalProps {
 }
 
 export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
-  const { systemMode, setSystemMode, checkEnergy, startMatch, setIsPveTransitioning, wsConnected } = usePlay()
+  const { systemMode, setSystemMode, checkEnergy, startMatch, setIsPveTransitioning } = usePlay()
+
   const [showMatchmaking, setShowMatchmaking] = useState(false)
   const [selectedSubject, setSelectedSubject] = useState<string | undefined>('english')
   const [timeLimit, setTimeLimit] = useState<20 | 30 | 45 | 60>(20) // 預設 20 秒
@@ -106,6 +107,10 @@ export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
 
       // 🎯 關鍵修改：啟動過渡動畫
       console.log('[SystemBattleModal] 🚀 Starting PVE transition overlay')
+
+      // PVE 現在使用 HTTP-only 模式，不需要 WS 連接
+
+
       setIsPveTransitioning(true)
 
       const startResult = await startMatch({
@@ -114,7 +119,7 @@ export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
         timeLimit: quickTimeLimit,
         origin: 'QUICK_PVE',
       })
-      if (!startResult.success) {
+      if (!startResult.ok) {
         toast.error(startResult.error || '啟動失敗，請稍後再試')
         hasStartedRef.current = false
         setIsPveTransitioning(false)
@@ -336,10 +341,7 @@ export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
     }
   }, [modes.length, systemMode, setSystemMode])
 
-  // 如果只有一個模式且已設定，等待 PVE 設定畫面渲染
-  if (modes.length === 1 && systemMode === 'PVE_TRAINING') {
-    return null // 會觸發上面的 PVE_TRAINING 分支
-  }
+
 
   return (
     <Dialog open={true} onOpenChange={onClose}>

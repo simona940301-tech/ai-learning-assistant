@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { UploadResult } from '@plms/shared/types';
+import { createOptionsHandler } from '@/lib/api/cors';
+
+export const OPTIONS = createOptionsHandler();
 import { withInternalAuth, unauthorizedResponse } from '@/lib/auth-middleware';
 
 /**

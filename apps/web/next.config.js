@@ -47,8 +47,10 @@ const nextConfig = {
     },
   },
   experimental: {
+    // Increase body size limit for Server Actions (default is 1MB)
+    // Note: This does NOT affect API Routes (App Router) which are limited by the platform (Vercel: 4.5MB)
     serverActions: {
-      bodySizeLimit: '2mb',
+      bodySizeLimit: '10mb',
     },
   },
   webpack: (config, { isServer }) => {
@@ -105,36 +107,18 @@ const nextConfig = {
     maxInactiveAge: 60 * 1000, // 60 秒（從 25 秒提升）
     pagesBufferLength: 5, // 緩存 5 個頁面（從 2 個提升）
   },
-  // 🎯 SOTA: Server-level CORS headers (Plan B)
-  // Higher priority than Middleware - handles OPTIONS before auth
+  // 🚀 SOTA: CORS Headers - REMOVED
+  // Global CORS headers have been removed to avoid conflicts with route-level cors.ts
+  // 
+  // WHY: Browser spec FORBIDS `Access-Control-Allow-Origin: *` with `Credentials: true`
+  // Our cors.ts implements dynamic origin reflection which is spec-compliant
+  // Global headers here would override route-level configuration
+  // 
+  // CORS is now handled by:
+  // - apps/web/lib/api/cors.ts (dynamic origin reflection)
+  // - Individual API routes using corsJsonResponse()
   async headers() {
-    return [
-      {
-        source: '/api/:path*',
-        headers: [
-          {
-            key: 'Access-Control-Allow-Credentials',
-            value: 'true',
-          },
-          {
-            key: 'Access-Control-Allow-Origin',
-            value: '*', // or process.env.NEXT_PUBLIC_APP_URL for production
-          },
-          {
-            key: 'Access-Control-Allow-Methods',
-            value: 'GET,DELETE,PATCH,POST,PUT,OPTIONS',
-          },
-          {
-            key: 'Access-Control-Allow-Headers',
-            value: 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, X-API-Key, X-Internal-API-Key',
-          },
-          {
-            key: 'Access-Control-Max-Age',
-            value: '86400', // 24 hours
-          },
-        ],
-      },
-    ]
+    return []
   },
 }
 

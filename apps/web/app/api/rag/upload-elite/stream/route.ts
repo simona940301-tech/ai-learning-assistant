@@ -4,6 +4,9 @@
 import { NextRequest } from 'next/server'
 import { getApiUser } from '@/lib/api/auth'
 import { createClient } from '@supabase/supabase-js'
+import { createOptionsHandler } from '@/lib/api/cors'
+
+export const OPTIONS = createOptionsHandler()
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -16,17 +19,17 @@ export async function GET(req: NextRequest) {
     try {
         // ⭐ Use getApiUser for consistent authentication (handles cookies automatically)
         const { supabase, user, errorType } = await getApiUser(req)
-        
+
         if (!user) {
             const message = errorType === 'invalid-jwt'
                 ? '登入狀態失效，請重新登入'
                 : errorType === 'unauthenticated'
-                ? '需要登入'
-                : '認證失敗'
-            
+                    ? '需要登入'
+                    : '認證失敗'
+
             return new Response(
                 JSON.stringify({ error: 'UNAUTHORIZED', message }),
-                { 
+                {
                     status: 401,
                     headers: { 'Content-Type': 'application/json' }
                 }
@@ -35,11 +38,11 @@ export async function GET(req: NextRequest) {
 
         const { searchParams } = new URL(req.url)
         const analysisId = searchParams.get('analysisId')
-        
+
         if (!analysisId) {
             return new Response(
                 JSON.stringify({ error: 'VALIDATION_ERROR', message: '缺少 analysisId 參數' }),
-                { 
+                {
                     status: 400,
                     headers: { 'Content-Type': 'application/json' }
                 }
@@ -58,7 +61,7 @@ export async function GET(req: NextRequest) {
             console.error('[SSE] Analysis not found or access denied:', analysisError)
             return new Response(
                 JSON.stringify({ error: 'NOT_FOUND', message: '找不到分析記錄或無權限訪問' }),
-                { 
+                {
                     status: 404,
                     headers: { 'Content-Type': 'application/json' }
                 }
@@ -121,11 +124,11 @@ export async function GET(req: NextRequest) {
     } catch (error) {
         console.error('[SSE] Unexpected error:', error)
         return new Response(
-            JSON.stringify({ 
-                error: 'INTERNAL_ERROR', 
-                message: error instanceof Error ? error.message : '伺服器錯誤' 
+            JSON.stringify({
+                error: 'INTERNAL_ERROR',
+                message: error instanceof Error ? error.message : '伺服器錯誤'
             }),
-            { 
+            {
                 status: 500,
                 headers: { 'Content-Type': 'application/json' }
             }

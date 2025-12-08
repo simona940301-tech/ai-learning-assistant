@@ -1,5 +1,8 @@
 import { NextRequest } from 'next/server'
 import { getApiUser } from '@/lib/api/auth'
+import { createOptionsHandler } from '@/lib/api/cors'
+
+export const OPTIONS = createOptionsHandler()
 import { extractTextFromPDF, extractTextFromTXT, cleanText } from '@/lib/utils/text-extraction'
 import { generateUltimateAnalysis } from '@/lib/services/elite-rag-analyzer'
 import { createClient } from '@supabase/supabase-js'

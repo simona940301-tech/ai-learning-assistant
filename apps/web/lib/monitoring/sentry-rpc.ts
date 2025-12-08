@@ -78,6 +78,7 @@ export function reportRPCLatencyToSentry(metric: RPCLatencyMetrics): void {
 
     // Send custom metric to Sentry (for dashboard/alerting)
     if (typeof Sentry.metrics?.distribution === 'function') {
+        // @ts-ignore
         Sentry.metrics.distribution('rpc.latency', metric.latencyMs, {
             tags: {
                 operation: metric.operation,
@@ -85,7 +86,7 @@ export function reportRPCLatencyToSentry(metric: RPCLatencyMetrics): void {
                 success: metric.success.toString(),
             },
             unit: 'millisecond',
-        })
+        } as any)
     }
 }
 

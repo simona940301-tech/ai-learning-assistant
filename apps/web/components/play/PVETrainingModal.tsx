@@ -13,7 +13,8 @@ interface PVETrainingModalProps {
 }
 
 export function PVETrainingModal({ onClose }: PVETrainingModalProps) {
-  const { wsConnected, startMatch, setPveCountdown, progression } = usePlay()
+  const { startMatch, setPveCountdown, progression } = usePlay()
+
   const [selectedSubject, setSelectedSubject] = useState<string>('english')
   const [timeLimit, setTimeLimit] = useState<20 | 30 | 45 | 60>(20)
   const [isStarting, setIsStarting] = useState(false)
@@ -23,10 +24,7 @@ export function PVETrainingModal({ onClose }: PVETrainingModalProps) {
   ]
 
   const handleStart = async () => {
-    if (!wsConnected) { // Changed from wsConnected to isConnected in instruction, but keeping wsConnected as it's defined in usePlay
-      toast.error('WebSocket 未連接，請稍候再試')
-      return
-    }
+
 
     setIsStarting(true)
     setPveCountdown(getAdaptiveCountdownDuration(progression?.totalMatches))
@@ -119,8 +117,9 @@ export function PVETrainingModal({ onClose }: PVETrainingModalProps) {
             <Button variant="outline" onClick={onClose} className="flex-1">
               取消
             </Button>
-            <Button onClick={handleStart} className="flex-1" disabled={!wsConnected || isStarting}>
-              {isStarting ? '檢查中...' : '開始訓練'}
+            <Button onClick={handleStart} className="flex-1" disabled={isStarting}>
+              {isStarting ? '啟動中...' : '開始訓練'}
+
             </Button>
           </div>
         </div>

@@ -225,16 +225,6 @@ export default function ProfileSettingsPage() {
 
   return (
     <>
-        title="設定"
-        rightAction={
-          <Link href="/home">
-            <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-primary">
-              返回
-            </Button>
-          </Link>
-        }
-      />
-
       <main className="mx-auto max-w-lg px-7 py-4 bg-[#FFFBF0] min-h-full">
         {loading ? (
           <SkeletonProfile />

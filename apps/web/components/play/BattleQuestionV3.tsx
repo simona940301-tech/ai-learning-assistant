@@ -46,10 +46,10 @@ export function calculateBaseScore(difficulty: number): number {
  */
 export function calculateSpeedCoefficient(timeRemaining: number, timeLimit: number): number {
   if (timeLimit <= 0) return 1.0
-  
+
   const timeUsed = timeLimit - timeRemaining
   const timeRatio = timeUsed / timeLimit
-  
+
   // Speed bonus: answering quickly gives higher multiplier
   // Linear interpolation from 1.5x (instant) to 0.8x (timeout)
   const speedBonus = Math.max(0.8, Math.min(1.5, 1.5 - (timeRatio * 0.7)))
@@ -61,7 +61,7 @@ export function calculateSpeedCoefficient(timeRemaining: number, timeLimit: numb
  */
 export function calculateComboCoefficient(streak: number): number {
   if (streak <= 1) return 1.0
-  
+
   // Combo multiplier: increases with streak but with diminishing returns
   // 2x = 1.1x, 3x = 1.2x, 5x = 1.3x, 8x = 1.4x, 10+ = 1.5x
   let multiplier = 1.0
@@ -70,7 +70,7 @@ export function calculateComboCoefficient(streak: number): number {
   if (streak >= 5) multiplier += 0.1
   if (streak >= 8) multiplier += 0.1
   if (streak >= 10) multiplier += 0.1
-  
+
   return Number(multiplier.toFixed(2))
 }
 
@@ -86,7 +86,7 @@ export function calculateComboMilestoneBonus(streak: number): number {
     10: 300,
     15: 500,
   }
-  
+
   return milestones[streak as keyof typeof milestones] || 0
 }
 
@@ -147,7 +147,8 @@ export function BattleQuestionV3({
   hideExitControls = false,
   playerPresetId,
 }: BattleQuestionV3Props) {
-  const { wsConnected, battleState, sendWebSocketMessage, systemMode } = usePlay()
+  const { battleState, systemMode, setBattleFlow, setBattleState } = usePlay()
+
 
   // Determine if it's PVE (System Battle)
   const isPVE = systemMode === 'PVE_TRAINING' || systemMode === 'WEAKNESS_BATTLE'
@@ -244,7 +245,7 @@ export function BattleQuestionV3({
 
   // 倒計時：以 server timestamp 為主，缺少時退回本地時間
   const roundStartTimeRef = useRef<number | null>(null)
-  
+
   useEffect(() => {
     if (isAnswered) return
 
@@ -261,10 +262,10 @@ export function BattleQuestionV3({
 
     const tick = () => {
       if (!roundStartTimeRef.current) return
-      
+
       const elapsed = Date.now() - roundStartTimeRef.current
       const remainingSec = Math.max(0, Math.ceil((question.timeLimit * 1000 - elapsed) / 1000))
-      
+
       setTimeRemaining((prev) => (prev !== remainingSec ? remainingSec : prev))
 
       if (remainingSec <= 0) {
@@ -278,7 +279,7 @@ export function BattleQuestionV3({
     const timer = setInterval(tick, 300)
     return () => clearInterval(timer)
   }, [battleState?.roundExpiresAt, isAnswered, onAnswer, question.timeLimit, questionIndex])
-  
+
   // 🎯 重置開始時間當題目改變
   useEffect(() => {
     roundStartTimeRef.current = null
@@ -296,7 +297,8 @@ export function BattleQuestionV3({
   // 處理答題
   const handleAnswerSelect = useCallback(
     (answer: OptionLetter) => {
-      if (isAnswered || !wsConnected) return
+      if (isAnswered) return
+
 
       const isCorrect = answer === question.correctAnswer
 
@@ -323,13 +325,15 @@ export function BattleQuestionV3({
       // 提交答案
       onAnswer(answer, timeRemaining)
     },
-    [isAnswered, onAnswer, timeRemaining, question.correctAnswer, wsConnected]
+    [isAnswered, onAnswer, timeRemaining, question.correctAnswer]
+
   )
 
   // 鍵盤快捷鍵（1-4 / A-D）
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if (isAnswered || !wsConnected) return
+      if (isAnswered) return
+
       const key = event.key.toLowerCase()
       const mapping: Record<string, OptionLetter> = {
         '1': 'A',
@@ -349,16 +353,15 @@ export function BattleQuestionV3({
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [handleAnswerSelect, isAnswered, wsConnected])
+  }, [handleAnswerSelect, isAnswered])
+
 
   // 處理退出
   const handleLeaveBattle = () => {
-    if (battleState?.matchId && wsConnected) {
-      sendWebSocketMessage({
-        type: 'LEAVE_BATTLE',
-        match_id: battleState.matchId,
-      })
-    }
+    // Local exit for PVE
+    setBattleState(null)
+    setBattleFlow('IDLE')
+
     setShowLeaveDialog(false)
   }
 
@@ -452,12 +455,8 @@ export function BattleQuestionV3({
         </>
       )}
 
-      {/* WebSocket 狀態 */}
-      {!wsConnected && (
-        <div className="absolute left-2 top-2 z-50 rounded-full border border-amber-400/50 bg-amber-400/20 px-2 py-1 text-[10px] font-semibold text-amber-800 md:left-4 md:top-4 md:px-3 md:text-xs">
-          ⚠️ 連接中...
-        </div>
-      )}
+      {/* WebSocket 狀態移除 */}
+
 
       {/* Combo 里程碑提示 */}
       <AnimatePresence>
