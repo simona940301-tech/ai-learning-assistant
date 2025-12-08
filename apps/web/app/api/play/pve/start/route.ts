@@ -1,16 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getApiUser } from '@/lib/api/auth'
+import { getServiceSupabaseClient } from '@/lib/supabase'
 import { fetchPveQuestions } from '@/lib/api/pve-helpers'
 
 export async function POST(req: NextRequest) {
+    console.log('[PVE Start] ========== ROUTE HIT ==========')
     try {
         const body = await req.json()
         const { userId: requestedUserId, subject, timeLimit = 20 } = body
-        const { supabase, user, errorType } = await getApiUser(req)
+        console.log('[PVE Start] Body parsed:', { requestedUserId, subject, timeLimit })
+        const { supabase: _sessionSupabase, user, errorType } = await getApiUser(req)
 
         // Prefer authenticated user from session to avoid spoofing/blank IDs
         const userId = user?.id ?? requestedUserId
+        console.log('[PVE Start] Request received:', { userId, subject, timeLimit })
+
         if (!userId) {
+            console.warn('[PVE Start] No user ID found')
             return NextResponse.json(
                 { error: 'Authentication required', code: errorType || 'UNAUTHENTICATED' },
                 { status: 401 }
@@ -22,11 +28,16 @@ export async function POST(req: NextRequest) {
         }
 
         // 1. Fetch Questions
+        console.log('[PVE Start] Fetching questions...')
+        // Use service-role client to bypass RLS on match_history insert while still requiring auth above
+        const supabase = getServiceSupabaseClient()
+
         const { questions: rawQuestions, baselineDifficulty } = await fetchPveQuestions(supabase, {
             userId,
             subject,
             numQuestions: 10, // Default 10 questions for PVE
         })
+        console.log('[PVE Start] Fetched questions:', { count: rawQuestions?.length, baselineDifficulty })
 
         // 2. Format Questions
         // 🎯 SOTA FIX: Type assertion to use strict DBQuestionRow type

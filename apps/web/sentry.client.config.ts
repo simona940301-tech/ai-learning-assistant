@@ -8,7 +8,16 @@ import * as Sentry from "@sentry/nextjs";
 const SENTRY_DSN = process.env.NEXT_PUBLIC_SENTRY_DSN;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
-if (SENTRY_DSN && IS_PRODUCTION) {
+const IS_PREVIEW = process.env.NEXT_PUBLIC_VERCEL_ENV === 'preview';
+
+// Only initialize if DSN exists, it's production, AND we are not on localhost (to avoid 403s on local prod builds)
+// Also optional: enable in preview if desired, but for now strict production
+const shouldInitSentry = SENTRY_DSN && IS_PRODUCTION &&
+    typeof window !== 'undefined' &&
+    !window.location.hostname.includes('localhost') &&
+    !window.location.hostname.includes('127.0.0.1');
+
+if (shouldInitSentry) {
     Sentry.init({
         dsn: SENTRY_DSN,
 

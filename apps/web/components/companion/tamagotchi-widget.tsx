@@ -265,10 +265,6 @@ export function TamagotchiWidget({ forceState }: { forceState?: ChickEmotion }) 
             }
 
             setIdleAnimation(null)
-            // Reset to base state - only if component is still mounted
-            if (isMountedRef.current) {
-                idleControls.set({ y: 0, rotate: 0 })
-            }
         }
 
         const interval = setInterval(() => {

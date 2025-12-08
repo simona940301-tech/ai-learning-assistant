@@ -135,6 +135,9 @@ export async function GET(req: NextRequest) {
             walletBalance: newProfile.coins ?? newProfile.user_wallet_balance ?? 0,
             eloRank: newProfile.elo_rank || 1000,
             dailyEnergyResetAt: newProfile.daily_energy_reset_at,
+            userId: user.id,
+            name: newProfile.name || newProfile.full_name || null,
+            avatarUrl: newProfile.avatar_url || newProfile.avatar || null,
           },
           Api.withTimestamp()
         )
@@ -271,6 +274,10 @@ export async function GET(req: NextRequest) {
         eloRank: profile.elo_rank || 1000,
         dailyEnergyResetAt,
         energyLastUpdatedAt: energyLastUpdatedAt || new Date().toISOString(),  // 🔧 FIX: 使用更新後的變量，不是原始 profile
+        // 基本資料（供前端安全渲染用）
+        userId: user.id,
+        name: profile.name || profile.full_name || null,
+        avatarUrl: profile.avatar_url || profile.avatar || null,
       },
       Api.withTimestamp()
     )

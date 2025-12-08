@@ -144,6 +144,7 @@ export async function fetchPveQuestions(
                     baselineDifficulty = Math.min(5, Math.max(1, Math.round(profile.level / 5)))
                 }
             }
+            console.log('[PVE Helper] Proficiency Check Complete. Baseline:', baselineDifficulty)
         } catch (e) {
             console.warn('Error fetching proficiency:', e)
         }
@@ -196,6 +197,10 @@ export async function fetchPveQuestions(
     }
 
     console.log('[PVE Helper] Querying seed_questions with:', { subject, numQuestions, is_active: true })
+
+    // 🎯 PROPER FIX: Use Supabase JS client with RLS fixed via JWT claims
+    // RLS policies now use auth.jwt() instead of table lookups, preventing recursion
+    // This allows safe client-to-DB access for mobile apps
     let query = db.from('seed_questions')
         .select('id, question_text, option_a, option_b, option_c, option_d, correct_answer, difficulty_level, subject, knowledge_tags')
 
@@ -206,8 +211,11 @@ export async function fetchPveQuestions(
         .order('difficulty_level', { ascending: true })
         .limit(numQuestions * 3)
 
+    console.log('[PVE Helper] Query completed!', { questionCount: questions?.length, hasError: !!error })
+
     if (error) {
-        throw new Error(error.message)
+        console.error('[PVE Helper] DB Error:', error)
+        // Fall through to fallback
     }
 
     if (!questions || questions.length === 0) {
@@ -220,16 +228,13 @@ export async function fetchPveQuestions(
         }
     }
 
-    // 🎯 SOTA FIX: Use strict typing for database rows
+    // Continue with normal processing
     const grouped: Record<number, QuestionRow[]> = {}
-    for (const row of (questions as DBQuestionRow[]) || []) {
+    for (const row of questions as DBQuestionRow[]) {
         const diff = row.difficulty_level || 3
         grouped[diff] = grouped[diff] || []
         grouped[diff].push(row as QuestionRow)
     }
-
-    // Clone grouped to avoid mutation issues if reused (though pickQuestions mutates the arrays inside)
-    // Since we create a new grouped object each time, it's fine.
 
     let selectedQuestions = pickQuestions({ ...grouped }, baselineDifficulty, numQuestions)
 

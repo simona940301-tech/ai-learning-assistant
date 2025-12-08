@@ -825,11 +825,6 @@ function PlayPageContent() {
 
       </AnimatePresence>
 
-      {
-        {/* Lobby Confirm UI Removed */ }
-
-      }
-
       {/* 系統對戰不再顯示大廳確認UI，直接開始遊戲 */}
 
       <TamagotchiWidget />
