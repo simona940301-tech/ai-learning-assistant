@@ -352,7 +352,22 @@ export function PlayProvider({ children }: { children: React.ReactNode }) {
       const response = await fetch('/api/play/progression/status', {
         credentials: 'include',
       })
-      if (!response.ok) return
+      if (!response.ok) {
+        // 🐛 FIX: Log error details instead of silent failure
+        console.warn('[PlayProvider] Progression status API error:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url
+        })
+        // Try to parse error message
+        try {
+          const errorData = await response.json()
+          console.warn('[PlayProvider] Error details:', errorData)
+        } catch (e) {
+          // Ignore JSON parse errors
+        }
+        return
+      }
       const data = await response.json()
       if (data.success) {
         setProgression({
