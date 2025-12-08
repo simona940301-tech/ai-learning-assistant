@@ -13,7 +13,7 @@
     }
   },
   "scripts": {
-    "build": "run-p build:types build:js",
+    "build": "npm-run-all --parallel build:types build:js",
     "build:types": "tsc -p tsconfig.build.json",
     "build:js": "tsup index.ts --format esm,cjs --minify --out-dir dist",
     "dev": "tsup index.ts --format cjs,esm --watch",
