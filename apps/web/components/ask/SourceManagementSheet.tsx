@@ -195,10 +195,10 @@ function DocumentItem({ doc, selected, onToggle, isCurrent }: DocumentItemProps)
     return (
         <div
             className={cn(
-                "group flex items-start gap-3 p-3 rounded-lg transition-all cursor-pointer border border-transparent",
+                "group flex items-start gap-2 p-2 rounded-xl transition-all cursor-pointer border",
                 selected
-                    ? "bg-primary/5 border-primary/20"
-                    : "hover:bg-secondary/50"
+                    ? "bg-primary/10 backdrop-blur-sm border-primary/30"
+                    : "bg-background/60 backdrop-blur-sm border-border/50 hover:bg-background/80 hover:border-border"
             )}
             onClick={onToggle}
         >
@@ -206,7 +206,7 @@ function DocumentItem({ doc, selected, onToggle, isCurrent }: DocumentItemProps)
                 checked={selected}
                 onCheckedChange={onToggle}
                 className={cn(
-                    "mt-0.5",
+                    "mt-0.5 h-3 w-3",
                     selected ? "border-primary data-[state=checked]:bg-primary" : "border-muted-foreground/30"
                 )}
             />

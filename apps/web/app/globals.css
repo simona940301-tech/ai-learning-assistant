@@ -280,6 +280,44 @@
     min-height: 100dvh;
     /* 🎯 SOTA: Dynamic viewport height (modern standard) */
   }
+
+  /* 🚀 PERFORMANCE: 3D Transform & Hardware Acceleration */
+  .preserve-3d {
+    transform-style: preserve-3d;
+  }
+
+  .backface-hidden {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+
+  .perspective-1000 {
+    perspective: 1000px;
+    -webkit-perspective: 1000px;
+  }
+
+  /* 🚀 PERFORMANCE: Force GPU acceleration for smooth animations */
+  .gpu-accelerated {
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: transform;
+  }
+
+  /* 🚀 PERFORMANCE: Smooth scrolling with momentum */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 🚀 PERFORMANCE: Mask for fade effect without blur */
+  .mask-linear-fade {
+    mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+  }
 }
 
 @layer components {

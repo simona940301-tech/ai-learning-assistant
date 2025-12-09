@@ -16,16 +16,15 @@ export const Card: React.FC<CardProps> = ({ data, onSwipe, active, isImportant, 
     const [isFlipped, setIsFlipped] = useState(false);
     const [showHint, setShowHint] = useState(false);
 
-    // Motion values for drag
+    // Motion values for drag - 🚀 OPTIMIZED: Reduced useTransform calls
     const x = useMotionValue(0);
     const rotate = useTransform(x, [-200, 200], [-15, 15]);
-    // Extended opacity range to allow card to fly off screen visibly
-    // Fade out starts at 400px, complete at 900px
-    const opacity = useTransform(x, [-900, -400, 0, 400, 900], [0, 1, 1, 1, 0]);
 
-    // Background overlays for swipe feedback
-    const rejectOpacity = useTransform(x, [-150, -50], [0.8, 0]);
-    const likeOpacity = useTransform(x, [50, 150], [0, 0.8]);
+    // 🚀 OPTIMIZED: Simplified opacity - remove complex calculations
+    const opacity = useTransform(x, [-600, 0, 600], [0, 1, 0]);
+
+    // 🚀 OPTIMIZED: Use CSS-based overlays instead of motion values for better performance
+    const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
 
     // Manual drag detection to distinguish between Click and Drag
     const isDragging = React.useRef(false);
@@ -34,11 +33,25 @@ export const Card: React.FC<CardProps> = ({ data, onSwipe, active, isImportant, 
         isDragging.current = true;
     };
 
-    const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    const handleDrag = () => {
+        // 🚀 OPTIMIZED: Update swipe direction during drag for visual feedback
+        const xVal = x.get();
+        if (xVal > 50) {
+            setSwipeDirection('right');
+        } else if (xVal < -50) {
+            setSwipeDirection('left');
+        } else {
+            setSwipeDirection(null);
+        }
+    };
+
+    const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
         // Small timeout to prevent the subsequent click from firing immediately
         setTimeout(() => {
             isDragging.current = false;
         }, 150);
+
+        setSwipeDirection(null); // Reset direction
 
         if (!active) return;
         const threshold = 100;
@@ -56,27 +69,29 @@ export const Card: React.FC<CardProps> = ({ data, onSwipe, active, isImportant, 
 
     return (
         <motion.div
+            drag={active ? 'x' : false}
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.5}
+            onDragStart={handleDragStart}
+            onDrag={handleDrag}
+            onDragEnd={handleDragEnd}
+            onClick={handleClick}
+            className={cn(
+                "absolute w-[80vw] max-w-[340px] h-[64vh] max-h-[600px] perspective-1000 touch-none cursor-grab active:cursor-grabbing will-change-transform",
+                !active && "pointer-events-none"
+            )}
+            whileHover={{ scale: active ? 1.02 : 1 }}
+            whileTap={{ scale: active ? 0.98 : 1 }}
             style={{
                 x,
                 rotate,
                 opacity,
                 top: '50%',
                 left: '50%',
-                marginTop: '-32vh', // Centering based on new height
-                marginLeft: 'max(-170px, -40vw)'
+                marginTop: '-32vh',
+                marginLeft: 'max(-170px, -40vw)',
+                transform: 'translateZ(0)' // 🚀 Force hardware acceleration
             }}
-            drag={active ? 'x' : false}
-            dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={0.7}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-            onClick={handleClick}
-            className={cn(
-                "absolute w-[80vw] max-w-[340px] h-[64vh] max-h-[600px] perspective-1000 touch-none cursor-grab active:cursor-grabbing",
-                !active && "pointer-events-none"
-            )}
-            whileHover={{ scale: active ? 1.02 : 1 }}
-            whileTap={{ scale: active ? 0.98 : 1 }}
         >
             <motion.div
                 className="relative w-full h-full preserve-3d transition-transform duration-200"
@@ -102,8 +117,7 @@ export const Card: React.FC<CardProps> = ({ data, onSwipe, active, isImportant, 
                             e.stopPropagation();
                             setShowHint(!showHint);
                         }}
-                        rejectOpacity={rejectOpacity}
-                        likeOpacity={likeOpacity}
+                        swipeDirection={swipeDirection}
                         isImportant={isImportant}
                         toggleImportant={toggleImportant}
                     />
@@ -128,31 +142,40 @@ interface CardFrontProps {
     data: Word;
     showHint: boolean;
     toggleHint: (e: React.MouseEvent) => void;
-    rejectOpacity: any; // MotionValue
-    likeOpacity: any; // MotionValue
-    isImportant?: boolean; // 🎯 New
-    toggleImportant?: () => void; // 🎯 New
+    swipeDirection: 'left' | 'right' | null; // 🚀 OPTIMIZED: CSS-based feedback
+    isImportant?: boolean;
+    toggleImportant?: () => void;
 }
 
-const CardFront: React.FC<CardFrontProps> = ({ data, showHint, toggleHint, rejectOpacity, likeOpacity, isImportant, toggleImportant }) => (
+const CardFront: React.FC<CardFrontProps> = ({ data, showHint, toggleHint, swipeDirection, isImportant, toggleImportant }) => (
     <div className={cn(
         "w-full h-full rounded-3xl overflow-hidden shadow-2xl relative",
         "bg-[#111111]", // 🎯 #111111 Dark Background
         "border border-white/5", // Subtle border
         "flex flex-col items-center justify-between p-6"
     )}>
-        {/* Noise Texture Overlay (Optional - Simulated with CSS if possible, else just bg) */}
-        <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
+        {/* 🚀 OPTIMIZED: Removed external noise texture for better performance */}
+        {/* Use CSS noise pattern instead */}
+        <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
+             style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 400 400\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\'/%3E%3C/svg%3E")' }}
+        />
 
-        {/* Swipe Feedback Overlay - REVIEW (Red/Orange) */}
-        <motion.div style={{ opacity: rejectOpacity }} className="absolute inset-0 z-10 bg-orange-500/10 pointer-events-none" />
-        {/* Swipe Feedback Overlay - MASTER (Green/Blue) */}
-        <motion.div style={{ opacity: likeOpacity }} className="absolute inset-0 z-10 bg-emerald-500/10 pointer-events-none" />
+        {/* 🚀 OPTIMIZED: CSS-based swipe feedback - no motion values */}
+        <div className={cn(
+            "absolute inset-0 z-10 pointer-events-none transition-opacity duration-150",
+            "bg-orange-500/10",
+            swipeDirection === 'left' ? 'opacity-80' : 'opacity-0'
+        )} />
+        <div className={cn(
+            "absolute inset-0 z-10 pointer-events-none transition-opacity duration-150",
+            "bg-emerald-500/10",
+            swipeDirection === 'right' ? 'opacity-80' : 'opacity-0'
+        )} />
 
         {/* Top Bar */}
         <div className="w-full flex justify-between items-start z-20">
             {/* Level Capsule */}
-            <div className="px-3 py-1 rounded-full border border-white/10 bg-white/5 backdrop-blur-md flex items-center gap-2">
+            <div className="px-3 py-1 rounded-full border border-white/10 bg-white/[0.08] flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#C8A46A]" /> {/* Champagne Dot */}
                 <span className="text-[11px] font-medium text-white/60 uppercase tracking-wider">
                     {data.level || 'Level 1'}
@@ -203,7 +226,7 @@ const CardFront: React.FC<CardFrontProps> = ({ data, showHint, toggleHint, rejec
                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
-                        className="mt-8 p-4 rounded-xl bg-[#C8A46A]/10 border border-[#C8A46A]/20 backdrop-blur-sm text-center max-w-[85%]"
+                        className="mt-8 p-4 rounded-xl bg-[#C8A46A]/10 border border-[#C8A46A]/20 text-center max-w-[85%]"
                     >
                         <p className="text-sm font-medium text-[#C8A46A]/90 leading-relaxed">
                             "{data.example_en.replace(new RegExp(data.text, 'gi'), '_____')}"
@@ -261,7 +284,7 @@ const CardBack = ({ data }: { data: Word }) => (
         </div>
 
         {/* Definition - Highlight */}
-        <div className="mb-6 z-10 rounded-2xl p-5 bg-white/5 border border-white/5 backdrop-blur-md">
+        <div className="mb-6 z-10 rounded-2xl p-5 bg-white/[0.08] border border-white/5">
             <span className="text-[10px] font-bold uppercase tracking-widest mb-2 block text-zinc-500">定義</span>
             <p className="text-lg font-medium leading-relaxed text-zinc-200">
                 {data.definition_zh}

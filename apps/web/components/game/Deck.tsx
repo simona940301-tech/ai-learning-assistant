@@ -92,8 +92,8 @@ export const Deck: React.FC = () => {
         );
     }
 
-    // Determine which cards to render
-    const visibleCards = words.slice(currentIndex, currentIndex + 3).reverse();
+    // 🚀 OPTIMIZED: Only render 2 cards for better performance (current + 1 behind)
+    const visibleCards = words.slice(currentIndex, currentIndex + 2).reverse();
 
     return (
         <div className="relative w-full h-[60vh] flex items-center justify-center px-4">
@@ -101,26 +101,37 @@ export const Deck: React.FC = () => {
             <div className="absolute top-[-60px] right-4 z-50">
                 <button
                     onClick={() => setIsExiting(true)}
-                    className="p-3 bg-white/80 dark:bg-zinc-800/80 backdrop-blur-md rounded-full text-zinc-500 hover:text-red-500 transition-colors shadow-sm"
+                    className="p-3 bg-white/80 dark:bg-zinc-800/90 rounded-full text-zinc-500 hover:text-red-500 transition-colors shadow-sm"
                 >
                     <RotateCcw className="w-5 h-5 opacity-0 absolute" /> {/* Hidden but keeps layout if needed? No, just use X */}
                     <span className="text-xs font-bold">Exit</span>
                 </button>
             </div>
 
-            {/* Card Stack */}
-            <div className="relative w-full h-full flex items-center justify-center">
-                <AnimatePresence>
+            {/* Card Stack - 🚀 OPTIMIZED with hardware acceleration */}
+            <div className="relative w-full h-full flex items-center justify-center will-change-transform">
+                <AnimatePresence mode="popLayout">
                     {visibleCards.map((word, index) => {
                         const isTop = word.id === words[currentIndex].id;
+                        const cardIndex = visibleCards.length - 1 - index; // 0 for top, 1 for behind
                         return (
-                            <div
+                            <motion.div
                                 key={word.id}
                                 className="absolute top-0 left-0 right-0 bottom-0 flex items-center justify-center"
+                                initial={false}
+                                animate={{
+                                    scale: isTop ? 1 : 0.95,
+                                    y: isTop ? 0 : 12,
+                                    opacity: isTop ? 1 : 0.5,
+                                }}
+                                transition={{
+                                    type: 'spring',
+                                    stiffness: 300,
+                                    damping: 30,
+                                }}
                                 style={{
-                                    zIndex: index, // Reverse order: 0 is bottom
-                                    scale: isTop ? 1 : 0.92 - (visibleCards.length - 1 - index) * 0.04,
-                                    y: isTop ? 0 : (visibleCards.length - 1 - index) * 12,
+                                    zIndex: index,
+                                    willChange: 'transform, opacity',
                                 }}
                             >
                                 <Card
@@ -131,7 +142,7 @@ export const Deck: React.FC = () => {
                                     isImportant={importantQueue.includes(word.id)} // 🎯 Pass status
                                     toggleImportant={() => toggleImportant(word.id)} // 🎯 Pass action
                                 />
-                            </div>
+                            </motion.div>
                         );
                     })}
                 </AnimatePresence>
