@@ -42,7 +42,7 @@ export default function LyricalFlowPage() {
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-50"
+                className="absolute top-0 left-0 right-0 pt-[calc(env(safe-area-inset-top)+1.5rem)] px-6 pb-6 flex justify-between items-center z-50"
             >
                 <button
                     onClick={() => router.back()}

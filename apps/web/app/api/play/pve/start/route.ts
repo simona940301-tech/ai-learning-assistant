@@ -55,6 +55,11 @@ export async function POST(req: NextRequest) {
             // Extract explanation (already handled in fetchPveQuestions)
             const explanation = q.explanation;
 
+            // 🔍 DEBUG: Track explanation in formatted questions
+            if (!explanation) {
+                console.warn('[PVE Start] ⚠️ Question missing explanation:', { id: q.id, text: q.question_text?.substring(0, 50) })
+            }
+
             return {
                 id: String(q.id),
                 question_text: (q.question_text || '').trim(),
@@ -66,6 +71,13 @@ export async function POST(req: NextRequest) {
                 explanation: explanation, // Include explanation for frontend
             }
         }).filter(q => q.question_text.length > 0 && q.options.length >= 2)
+
+        // 🔍 DEBUG: Log final API response stats
+        console.log('[PVE Start] Formatted questions stats:', {
+            total: questions.length,
+            withExplanation: questions.filter(q => q.explanation).length,
+            withoutExplanation: questions.filter(q => !q.explanation).length
+        })
 
         if (questions.length === 0) {
             return NextResponse.json({ error: 'No questions available' }, { status: 500 })

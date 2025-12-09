@@ -16,9 +16,10 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabaseBrowserClient } from '@/lib/supabase'
 import { PlayMockProvider } from '@/lib/play-context'
-import { Check, X } from 'lucide-react'
+import { Check, X, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PremiumLoader } from '@/components/ui/premium-loader'
+import ReactMarkdown from 'react-markdown'
 
 /**
  * STEP 2 — 快速測驗 (Challenge with AI Coach)
@@ -295,6 +296,14 @@ export default function OnboardingChallengePage() {
               questions: fetchedQuestions.map(q => ({ id: q.id, difficulty: q.difficulty }))
             })
           }
+
+          // 🔍 DEBUG: Track explanation availability in onboarding questions
+          console.log('[Challenge] Questions explanation stats:', {
+            total: fetchedQuestions.length,
+            withExplanation: fetchedQuestions.filter(q => q.explanation).length,
+            withoutExplanation: fetchedQuestions.filter(q => !q.explanation).length,
+            questionIds: fetchedQuestions.map(q => ({ id: q.id, hasExplanation: !!q.explanation }))
+          })
 
           setQuestions(fetchedQuestions)
 
@@ -704,11 +713,22 @@ export default function OnboardingChallengePage() {
                           })}
                         </div>
                         {question?.explanation && (
-                          <div className="bg-[#F8F5E8] rounded-xl p-4 border border-[#E0D0B8]">
-                            <p className="text-[13px] font-medium text-[#5D4037] mb-1">📖 詳細解析</p>
-                            <p className="text-[13px] text-[#8B6F47] leading-relaxed">
-                              {question.explanation}
-                            </p>
+                          <div className="mt-4 bg-[#FFF8E1] rounded-xl p-5 border-l-4 border-[#FFB74D] shadow-sm">
+                            <div className="prose prose-sm max-w-none text-[#795548] prose-headings:text-[#5D4037] prose-strong:text-[#E65100] prose-a:text-[#5B7CFF] prose-p:leading-relaxed prose-li:marker:text-[#FFB74D]">
+                              <ReactMarkdown
+                                components={{
+                                  p: (props) => <p className="mb-3 last:mb-0 leading-relaxed font-medium whitespace-pre-wrap" {...props} />,
+                                  ul: (props) => <ul className="list-disc pl-4 mb-3 space-y-1.5" {...props} />,
+                                  ol: (props) => <ol className="list-decimal pl-4 mb-3 space-y-1.5" {...props} />,
+                                  li: (props) => <li className="pl-1 leading-relaxed" {...props} />,
+                                  strong: (props) => <strong className="font-bold text-[#E65100]" {...props} />,
+                                  code: (props) => <code className="bg-[#FFECB3] px-1.5 py-0.5 rounded text-[#E65100] font-mono text-xs" {...props} />,
+                                  br: () => <br />,
+                                }}
+                              >
+                                {question.explanation}
+                              </ReactMarkdown>
+                            </div>
                           </div>
                         )}
                       </div>

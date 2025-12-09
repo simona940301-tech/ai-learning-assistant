@@ -75,6 +75,14 @@ export function PVEResultModal({ isOpen, onClose, onPlayAgain }: PVEResultModalP
 
         const wrongQuestions = wrongQuestionsRaw.filter((q): q is WrongQuestion => q !== null)
 
+        // 🔍 DEBUG: Track explanation availability in wrong questions
+        console.log('[PVE Result] Wrong questions explanation stats:', {
+            total: wrongQuestions.length,
+            withExplanation: wrongQuestions.filter(q => q.explanation).length,
+            withoutExplanation: wrongQuestions.filter(q => !q.explanation).length,
+            questionIds: wrongQuestions.map(q => ({ id: q.id, hasExplanation: !!q.explanation }))
+        })
+
         const correctCount = totalQuestions - wrongQuestions.length
         const accuracy = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0
 
@@ -378,27 +386,20 @@ export function PVEResultModal({ isOpen, onClose, onPlayAgain }: PVEResultModalP
                                         {/* Explanation */}
                                         {question.explanation && (
                                             <div className="mt-4 bg-[#FFF8E1] rounded-xl p-5 border-l-4 border-[#FFB74D] shadow-sm">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <div className="p-1.5 bg-[#FFB74D]/20 rounded-md">
-                                                        <Sparkles className="w-4 h-4 text-[#F57C00]" />
-                                                    </div>
-                                                    <p className="text-[14px] font-bold text-[#E65100]">AI 詳解</p>
-                                                </div>
-                                                <div className="pl-1">
-                                                    <div className="prose prose-sm max-w-none text-[#795548] prose-headings:text-[#5D4037] prose-strong:text-[#E65100] prose-a:text-[#5B7CFF] prose-p:leading-relaxed prose-li:marker:text-[#FFB74D]">
-                                                        <ReactMarkdown
-                                                            components={{
-                                                                p: (props) => <p className="mb-2 last:mb-0 leading-relaxed font-medium" {...props} />,
-                                                                ul: (props) => <ul className="list-disc pl-4 mb-2 space-y-1" {...props} />,
-                                                                ol: (props) => <ol className="list-decimal pl-4 mb-2 space-y-1" {...props} />,
-                                                                li: (props) => <li className="pl-1" {...props} />,
-                                                                strong: (props) => <strong className="font-bold text-[#E65100]" {...props} />,
-                                                                code: (props) => <code className="bg-[#FFECB3] px-1 py-0.5 rounded text-[#E65100] font-mono text-xs" {...props} />,
-                                                            }}
-                                                        >
-                                                            {question.explanation}
-                                                        </ReactMarkdown>
-                                                    </div>
+                                                <div className="prose prose-sm max-w-none text-[#795548] prose-headings:text-[#5D4037] prose-strong:text-[#E65100] prose-a:text-[#5B7CFF] prose-p:leading-relaxed prose-li:marker:text-[#FFB74D]">
+                                                    <ReactMarkdown
+                                                        components={{
+                                                            p: (props) => <p className="mb-3 last:mb-0 leading-relaxed font-medium whitespace-pre-wrap" {...props} />,
+                                                            ul: (props) => <ul className="list-disc pl-4 mb-3 space-y-1.5" {...props} />,
+                                                            ol: (props) => <ol className="list-decimal pl-4 mb-3 space-y-1.5" {...props} />,
+                                                            li: (props) => <li className="pl-1 leading-relaxed" {...props} />,
+                                                            strong: (props) => <strong className="font-bold text-[#E65100]" {...props} />,
+                                                            code: (props) => <code className="bg-[#FFECB3] px-1.5 py-0.5 rounded text-[#E65100] font-mono text-xs" {...props} />,
+                                                            br: () => <br />,
+                                                        }}
+                                                    >
+                                                        {question.explanation}
+                                                    </ReactMarkdown>
                                                 </div>
                                             </div>
                                         )}

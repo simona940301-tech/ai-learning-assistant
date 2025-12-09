@@ -47,7 +47,12 @@ interface DailyMissionData {
     rewards_claimed: boolean
 }
 
+import { useAuth } from '@/lib/auth-context'
+import { usePlay } from '@/lib/play-context'
+
 export function DailyMissionWidgetV2() {
+    const { user } = useAuth()
+    const { userStatus } = usePlay()
     const [data, setData] = useState<DailyMissionData | null>(null)
     const [loading, setLoading] = useState(true)
     const [claiming, setClaiming] = useState(false)
@@ -128,10 +133,14 @@ export function DailyMissionWidgetV2() {
     // Dynamic Greeting based on time of day
     const getGreeting = () => {
         const hour = new Date().getHours()
-        if (hour >= 5 && hour < 12) return '早安'
-        if (hour >= 12 && hour < 18) return '午安'
-        if (hour >= 18 && hour < 22) return '晚安'
-        return '夜深了'
+        let greeting = '早安'
+        if (hour >= 5 && hour < 12) greeting = '早安'
+        else if (hour >= 12 && hour < 18) greeting = '午安'
+        else if (hour >= 18 && hour < 22) greeting = '晚安'
+        else greeting = '夜深了'
+
+        const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0]
+        return userName ? `${greeting}，${userName}` : greeting
     }
 
     // Dynamic Default Text based on state
@@ -140,7 +149,7 @@ export function DailyMissionWidgetV2() {
         if (data?.rewards_claimed) return "明天繼續加油"
         if (hunger < 30) return "我好餓..."
         return getGreeting()
-    }, [data?.all_completed, data?.rewards_claimed, hunger])
+    }, [data?.all_completed, data?.rewards_claimed, hunger, user])
 
     const handleChickClick = () => {
         // Open Interaction Modal
@@ -202,10 +211,22 @@ export function DailyMissionWidgetV2() {
                         </span>
                     </div>
 
-                    {/* Title */}
-                    <h3 className="text-[20px] font-semibold text-[#4A2E05] leading-tight">
-                        今日任務
-                    </h3>
+                    {/* Title & Gold Coins Row */}
+                    <div className="flex items-center gap-3">
+                        <h3 className="text-[20px] font-semibold text-[#4A2E05] leading-tight">
+                            今日任務
+                        </h3>
+
+                        {/* Minimalist Gold Coin Display */}
+                        <div className="flex items-center gap-1 bg-[#F5E6CC]/40 px-2 py-0.5 rounded-full border border-[#E6D0A0]/30">
+                            <div className="flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gradient-to-br from-yellow-300 to-amber-500 shadow-sm text-[8px] font-bold text-white">
+                                $
+                            </div>
+                            <span className="text-[11px] font-medium text-[#8B5E3C] tabular-nums leading-none">
+                                {userStatus?.walletBalance?.toLocaleString() || 0}
+                            </span>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Right: The Stage for Chick */}

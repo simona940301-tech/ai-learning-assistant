@@ -74,6 +74,9 @@
     --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
     --shadow-card-hover: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 
+    /* 🎯 SOTA Mobile Fix: Dynamic Viewport Height */
+    --app-height: 100dvh;
+
     /* App-specific heights */
     --ask-input-dock-height: 40px;
     /* 🎯 Phase A: 極簡設計 56px → 40px */
@@ -85,7 +88,13 @@
     /* 📱 内容底部留白公式: TabBar高度 + 底部安全区 + 额外间距 */
     --content-bottom-padding: calc(var(--tab-bar-height) + env(safe-area-inset-bottom, 0px) + 16px);
 
-    /* Safe-area insets for mobile devices (notch, home indicator) */
+    /* 🎯 SOTA: Safe Area Insets - Shorthand Variables */
+    --sat: env(safe-area-inset-top, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+    --sal: env(safe-area-inset-left, 0px);
+    --sar: env(safe-area-inset-right, 0px);
+
+    /* Legacy: Full names for backward compatibility */
     --safe-area-inset-top: env(safe-area-inset-top, 0px);
     --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
     --safe-area-inset-left: env(safe-area-inset-left, 0px);
@@ -144,10 +153,11 @@
    🎯 Full-Screen App Architecture
    ============================================ */
 
-  /* 讓整個文件高度 = 視窗高度，並關掉瀏覽器自己的捲動條 */
+  /* 🎯 SOTA Mobile Fix: 使用 100dvh 動態視窗高度 (自動處理瀏覽器工具列) */
   html,
   body {
-    height: 100%;
+    height: 100dvh;
+    /* 🎯 CRITICAL: dvh = dynamic viewport height, 自動扣除 Safari 底部網址列 */
     margin: 0;
     padding: 0;
     overflow: hidden;
@@ -262,17 +272,13 @@
 
   /* 🎯 SOTA: Dynamic Viewport Height (自動扣除 Safari 底部網址列) */
   .h-screen-mobile {
-    height: 100vh;
-    /* Fallback for older browsers */
     height: 100dvh;
-    /* SOTA: Dynamic viewport height */
+    /* 🎯 SOTA: Dynamic viewport height (modern standard) */
   }
 
   .min-h-screen-mobile {
-    min-height: 100vh;
-    /* Fallback */
     min-height: 100dvh;
-    /* SOTA */
+    /* 🎯 SOTA: Dynamic viewport height (modern standard) */
   }
 }
 
@@ -438,11 +444,6 @@
 /* 禁用 GPU 加速 - 動畫結束後移除 will-change */
 .gpu-accelerated-off {
   will-change: auto;
-}
-
-/* 圖片異步解碼優化 - 在 HTML 中使用 decoding="async" */
-img[decoding="async"] {
-  /* 瀏覽器會在背景線程解碼圖片，不阻塞主線程 */
 }
 
 /* 虛擬化列表容器優化 */

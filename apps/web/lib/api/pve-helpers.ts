@@ -222,8 +222,7 @@ export async function fetchPveQuestions(
                         correct_answer, 
                         difficulty_level, 
                         subject, 
-                        knowledge_tags,
-                        question_explanations!left(explanation_text)
+                        knowledge_tags
                     `)
                     .overlaps('knowledge_tags', tags)
                     .eq('is_active', true)
@@ -232,8 +231,53 @@ export async function fetchPveQuestions(
                 console.log('[PVE Helper] Weakness questions found:', wQuestions?.length || 0)
 
                 if (wQuestions && wQuestions.length > 0) {
-                    // 🎯 SOTA FIX: Type assertion for strict typing
-                    weaknessQuestions = wQuestions as DBQuestionRow[]
+                    // 🎯 SOTA FIX: Fetch explanations for weakness questions (including option_analysis)
+                    const weaknessIds = wQuestions.map(q => q.id)
+                    const { data: weaknessExplanations } = await db
+                        .from('question_explanations')
+                        .select('question_id, explanation_text, option_analysis')
+                        .in('question_id', weaknessIds)
+
+                    const weaknessExplMap = new Map<string, string>()
+                    if (weaknessExplanations) {
+                        weaknessExplanations.forEach((expl: any) => {
+                            let fullExplanation = expl.explanation_text || ''
+
+                            // Append option_analysis if exists
+                            if (expl.option_analysis && typeof expl.option_analysis === 'object') {
+                                const optionAnalysis = expl.option_analysis
+
+                                // Check for A, B, C, D keys
+                                const optionKeys = ['A', 'B', 'C', 'D'].filter(key => optionAnalysis[key])
+
+                                if (optionKeys.length > 0) {
+                                    fullExplanation += '\n\n**選項分析：**\n'
+                                    optionKeys.forEach(key => {
+                                        fullExplanation += `\n**選項 ${key}**：${optionAnalysis[key]}`
+                                    })
+                                } else {
+                                    const otherKeys = Object.keys(optionAnalysis).filter(
+                                        key => key !== 'corePoint' && key !== 'translation' && optionAnalysis[key]
+                                    )
+
+                                    if (otherKeys.length > 0) {
+                                        fullExplanation += '\n\n**補充說明：**\n'
+                                        otherKeys.forEach(key => {
+                                            fullExplanation += `\n**${key}**：${optionAnalysis[key]}`
+                                        })
+                                    }
+                                }
+                            }
+
+                            weaknessExplMap.set(expl.question_id, fullExplanation)
+                        })
+                    }
+
+                    // Merge explanations into weakness questions
+                    weaknessQuestions = wQuestions.map((q: any) => ({
+                        ...q,
+                        explanation: weaknessExplMap.get(q.id) || undefined
+                    })) as DBQuestionRow[]
                 }
             } else {
                 console.log('[PVE Helper] No weak tags found, skipping weakness questions')
@@ -246,9 +290,11 @@ export async function fetchPveQuestions(
 
     console.log('[PVE Helper] Querying seed_questions with:', { subject, numQuestions, is_active: true })
 
-    // 🎯 PROPER FIX: Use Supabase JS client with RLS fixed via JWT claims
-    // RLS policies now use auth.jwt() instead of table lookups, preventing recursion
-    // This allows safe client-to-DB access for mobile apps
+    // 🎯 SOTA FIX: Supabase LEFT JOIN syntax is broken for this relationship
+    // Instead of using question_explanations!left(explanation_text) which returns empty arrays,
+    // we fetch questions and explanations separately, then merge them
+    // This is more reliable and follows best practices for complex joins
+
     let query = db.from('seed_questions')
         .select(`
             id, 
@@ -260,15 +306,13 @@ export async function fetchPveQuestions(
             correct_answer, 
             difficulty_level, 
             subject, 
-            knowledge_tags,
-            question_explanations!left(explanation_text)
+            knowledge_tags
         `)
 
     if (subject) query = query.eq('subject', subject)
 
     const { data: questions, error } = await query
         .eq('is_active', true)
-        // .order('difficulty_level', { ascending: true }) // 🎯 Optimization: Remove ordering to speed up query on large datasets
         .limit(numQuestions * 5) // Fetch slightly more to ensure randomization
 
     console.log('[PVE Helper] Query completed!', { questionCount: questions?.length, hasError: !!error })
@@ -288,17 +332,78 @@ export async function fetchPveQuestions(
         }
     }
 
+    // 🎯 SOTA FIX: Fetch explanations separately for all question IDs
+    // Also fetch option_analysis which is a separate JSON column
+    const questionIds = questions.map(q => q.id)
+    const { data: explanations, error: explError } = await db
+        .from('question_explanations')
+        .select('question_id, explanation_text, option_analysis')
+        .in('question_id', questionIds)
+
+    if (explError) {
+        console.warn('[PVE Helper] Failed to fetch explanations:', explError)
+    }
+
+    // Create a map for O(1) lookup and merge explanation_text with option_analysis
+    const explanationMap = new Map<string, string>()
+    if (explanations) {
+        explanations.forEach((expl: any) => {
+            let fullExplanation = expl.explanation_text || ''
+
+            // 🎯 SOTA FIX: Append option_analysis if it exists
+            if (expl.option_analysis && typeof expl.option_analysis === 'object') {
+                const optionAnalysis = expl.option_analysis
+
+                // Check if this is the structured format with A, B, C, D keys
+                const optionKeys = ['A', 'B', 'C', 'D'].filter(key => optionAnalysis[key])
+
+                if (optionKeys.length > 0) {
+                    // Has option-specific analysis
+                    fullExplanation += '\n\n**選項分析：**\n'
+                    optionKeys.forEach(key => {
+                        fullExplanation += `\n**選項 ${key}**：${optionAnalysis[key]}`
+                    })
+                } else {
+                    // Check for other structured fields (excluding corePoint and translation which are already in explanation_text)
+                    const otherKeys = Object.keys(optionAnalysis).filter(
+                        key => key !== 'corePoint' && key !== 'translation' && optionAnalysis[key]
+                    )
+
+                    if (otherKeys.length > 0) {
+                        fullExplanation += '\n\n**補充說明：**\n'
+                        otherKeys.forEach(key => {
+                            fullExplanation += `\n**${key}**：${optionAnalysis[key]}`
+                        })
+                    }
+                }
+            }
+
+            explanationMap.set(expl.question_id, fullExplanation)
+        })
+    }
+
+    console.log('[PVE Helper] Explanations fetched:', {
+        total: explanations?.length || 0,
+        questionCount: questions.length,
+        coverage: questions.length > 0 ? Math.round((explanations?.length || 0) / questions.length * 100) : 0,
+        withOptionAnalysis: explanations?.filter((e: any) => e.option_analysis).length || 0
+    })
+
     // Continue with normal processing
     const grouped: Record<number, QuestionRow[]> = {}
     for (const row of questions as DBQuestionRow[]) {
         const diff = row.difficulty_level || 3
         grouped[diff] = grouped[diff] || []
 
-        // Extract explanation (joined array or single)
-        let explanation = row.explanation_text
-        if (Array.isArray(row.question_explanations) && row.question_explanations.length > 0) {
-            explanation = row.question_explanations[0].explanation_text
-        }
+        // 🎯 SOTA FIX: Get explanation from our separate query
+        const explanation = explanationMap.get(row.id) || undefined
+
+        // 🔍 DEBUG: Track explanation extraction
+        console.log('[PVE Helper] Question explanation status:', {
+            questionId: row.id,
+            hasExplanation: !!explanation,
+            explanationPreview: explanation ? `${explanation.substring(0, 50)}...` : null
+        })
 
         const questionRow: QuestionRow = {
             ...row,
@@ -318,6 +423,19 @@ export async function fetchPveQuestions(
                 selectedQuestions[i] = wQ as QuestionRow
             }
         }
+    }
+
+    // 🔍 DEBUG: Verify explanations in final selection
+    const explanationStats = {
+        total: selectedQuestions.length,
+        withExplanation: selectedQuestions.filter(q => q.explanation).length,
+        withoutExplanation: selectedQuestions.filter(q => !q.explanation).length
+    }
+    console.log('[PVE Helper] Final question selection explanation stats:', explanationStats)
+    if (explanationStats.withoutExplanation > 0) {
+        console.warn('[PVE Helper] ⚠️ Some questions missing explanations:',
+            selectedQuestions.filter(q => !q.explanation).map(q => q.id)
+        )
     }
 
     return {

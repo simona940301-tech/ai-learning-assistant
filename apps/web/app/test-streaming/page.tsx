@@ -91,7 +91,7 @@ export default function TestStreamingPage() {
 
         <style jsx>{`
           .test-streaming-page {
-            min-height: 100vh;
+            min-height: 100dvh;
             background: #f9fafb;
             padding: 24px;
           }
