@@ -69,7 +69,13 @@ export function BottomSheet({
                         </div>
 
                         {/* Content */}
-                        <div className="flex-1 overflow-y-auto px-4 pb-8">
+                        <div
+                            className="flex-1 overflow-y-auto px-4"
+                            style={{
+                                // 🎯 SOTA Mobile Fix: 底部 padding 包含 safe-area，适配 iOS Home Indicator
+                                paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))',
+                            }}
+                        >
                             {children}
                         </div>
                     </motion.div>

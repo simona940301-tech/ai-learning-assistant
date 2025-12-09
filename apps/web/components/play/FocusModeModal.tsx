@@ -7,6 +7,7 @@ import Image from 'next/image'
 import { toast } from 'sonner'
 
 interface FocusModeModalProps {
+    isOpen: boolean
     onClose: () => void
 }
 
@@ -15,7 +16,7 @@ const MIN_DURATION = 5 // 最小 5 分鐘
 const MAX_DURATION = 120 // 最大 120 分鐘
 const DEFAULT_DURATION = 25 // 預設 25 分鐘
 
-export function FocusModeModal({ onClose }: FocusModeModalProps) {
+export function FocusModeModal({ isOpen, onClose }: FocusModeModalProps) {
     const [selectedMinutes, setSelectedMinutes] = useState(DEFAULT_DURATION)
     const [customMinutes, setCustomMinutes] = useState('')
     const [timeLeft, setTimeLeft] = useState(DEFAULT_DURATION * 60)
@@ -279,6 +280,8 @@ export function FocusModeModal({ onClose }: FocusModeModalProps) {
 
     const currentMinutes = customMinutes ? parseInt(customMinutes, 10) : selectedMinutes
     const isValidTime = !timeError && currentMinutes >= MIN_DURATION && currentMinutes <= MAX_DURATION
+
+    if (!isOpen) return null
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#F9F5EF]/96 backdrop-blur-sm">

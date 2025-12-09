@@ -90,7 +90,8 @@ export function AnswerCardV2({
                 <button
                   key={i}
                   onMouseEnter={() => onHoverCitation?.(citation)}
-                  className="rounded-lg border border-border/50 px-2.5 py-1 text-[11px] bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
+                  onClick={() => onHoverCitation?.(citation)} // 🎯 Mobile: Tap to show citation
+                  className="rounded-lg border border-border/50 px-2.5 py-1 text-[11px] bg-muted/30 hover:bg-muted/50 active:bg-muted/60 transition-colors cursor-pointer"
                   title={`頁面 ${citation.page_index + 1}，位置 ${citation.start}-${citation.end}`}
                 >
                   <span className="opacity-70">頁 {citation.page_index + 1}</span>

@@ -62,7 +62,7 @@ const GAME_MODE_DEFAULTS: Record<GameModeFlag, boolean> = {
 
   // ⏸️ 暫時關閉進行修復 (disabled by default, 可透過環境變數啟用)
   // 設定 NEXT_PUBLIC_ENABLE_SYSTEM_BATTLE=true 來啟用
-  SYSTEM_BATTLE: false,  // 系統對戰 - PVE API 修復中
+  SYSTEM_BATTLE: true,  // 系統對戰 - 已復原
   CUSTOM_BATTLE: false,  // 自訂對戰（PVP）
   UGC_MODE: false,       // 內容貢獻
   PRACTICE_MODE: false,  // 無限練習

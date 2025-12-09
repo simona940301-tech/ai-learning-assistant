@@ -11,6 +11,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { supabaseBrowser as supabase } from '@/lib/supabase'
+import { submitPracticeAnswer } from '@/app/actions/play'
 
 
 interface Question {
@@ -228,7 +229,12 @@ export function InfinitePracticeRoom({ roomCode }: InfinitePracticeRoomProps) {
 
         setAnswers(prev => ({ ...prev, [questionId]: option }))
 
-        // Local Streak Logic
+        // 1. Optimistic Update (Instant Feedback)
+        // Store previous state for rollback
+        const previousParticipants = [...participants]
+        const previousStreak = streakCount
+
+        // Local Streak Logic (Visual)
         let newStreak = isCorrect ? streakCount + 1 : 0
         setStreakCount(newStreak)
 
@@ -238,58 +244,60 @@ export function InfinitePracticeRoom({ roomCode }: InfinitePracticeRoomProps) {
             setTimeout(() => setShowStreakFire(false), 1500)
         }
 
-        // Update progress in database
-        if (roomId && user?.id) {
-            const index = questions.findIndex(q => q.id === questionId)
-            try {
-                // Get current progress first to be safe, or use atomic update if possible
-                // For simplicity/speed in this MVP, we calculate locally based on assumption
-                // Ideally we use an RPC for atomic updates
-
-                const currentParticipant = participants.find(p => p.user_id === user?.id)
-                const currentNet = currentParticipant?.net_progress || 0
-                const currentStreakDb = currentParticipant?.current_streak || 0
-
-                let newNet = currentNet
-                let newStreakDb = isCorrect ? currentStreakDb + 1 : 0
-
-                if (isCorrect) {
-                    newNet += 1
-                } else {
-                    // Penalty logic: if 3 consecutive wrongs (we need to track wrongs locally or in DB)
-                    // Simplified: -1 for every wrong if we want high pressure, 
-                    // or -1 for every 3 wrongs. User said "e.g. 3 wrongs = -1".
-                    // Since we reset streak on wrong, we can't easily track "consecutive wrongs" without another field.
-                    // For now, let's implement a simpler penalty: -1 for every wrong answer to keep it "Live Race" style (Mario Kart style setbacks)
-                    // OR stick to user request: "連錯 3 次". We need a `consecutive_wrongs` field.
-                    // Let's stick to "Net Progress = Correct - Penalty".
-                    // Let's just do +1 for correct, and maybe -1 if they get it wrong to keep it simple and "net".
-                    // User said: "current_net_progress +1. 連錯懲罰機制 (例如：連錯 3 次，current_net_progress -1)."
-                    // I'll implement: +1 for correct. For wrong, I won't deduct immediately unless I track consecutive wrongs.
-                    // Let's just do +1 for correct.
-                    if (newNet > 0 && !isCorrect) {
-                        // Optional: small penalty
+        // Optimistic Participant Update
+        if (user?.id) {
+            setParticipants(prev => prev.map(p => {
+                if (p.user_id === user.id) {
+                    return {
+                        ...p,
+                        current_question_index: p.current_question_index + 1,
+                        correct_count: p.correct_count + (isCorrect ? 1 : 0),
+                        net_progress: p.net_progress + (isCorrect ? 1 : 0),
+                        current_streak: isCorrect ? p.current_streak + 1 : 0
                     }
                 }
+                return p
+            }))
+        }
 
-                await supabase
-                    .from('practice_participants')
-                    .update({
-                        current_question_index: index + 1,
-                        correct_count: (currentParticipant?.correct_count || 0) + (isCorrect ? 1 : 0),
-                        net_progress: newNet + (isCorrect ? 1 : 0), // Simple +1 for correct
-                        current_streak: newStreakDb,
-                        last_active_at: new Date().toISOString()
-                    })
-                    .eq('room_id', roomId)
-                    .eq('user_id', user?.id)
+        // 2. Server Action (Secure Update)
+        if (roomId && user?.id) {
+            try {
+                const result = await submitPracticeAnswer(roomId, questionId, option)
+
+                if (!result.success) {
+                    console.error('Submit answer failed:', result.error)
+                    // Rollback on failure
+                    setParticipants(previousParticipants)
+                    setStreakCount(previousStreak)
+                    toast.error('連線不穩定，分數更新失敗')
+                } else if (result.newScore) {
+                    // Update with authoritative server state (optional, relying on realtime is also fine/better)
+                    // But updating here ensures we match server logic immediately
+                    setParticipants(prev => prev.map(p => {
+                        if (p.user_id === user.id) {
+                            return {
+                                ...p,
+                                current_streak: result.newScore!.current_streak,
+                                net_progress: result.newScore!.net_progress,
+                                correct_count: result.newScore!.correct_count,
+                                // current_question_index is handled by optimistic + realtime usually
+                            }
+                        }
+                        return p
+                    }))
+                }
 
             } catch (error) {
-                console.error('Failed to update progress:', error)
+                console.error('Failed to submit answer:', error)
+                // Rollback
+                setParticipants(previousParticipants)
+                setStreakCount(previousStreak)
             }
         }
 
-        // Auto-save to error book if wrong
+        // Auto-save to error book if wrong (Client-side trigger ok for MVP, or move to server)
+        // Kept client-side for now as it calls a separate API
         if (!isCorrect && roomId) {
             const question = questions.find(q => q.id === questionId)
             if (question) {

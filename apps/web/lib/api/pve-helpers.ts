@@ -12,6 +12,9 @@ export interface DBQuestionRow {
     difficulty_level: number
     subject: string
     knowledge_tags: string[] | null
+    // Supabase join result
+    question_explanations?: { explanation_text: string }[] | null
+    explanation_text?: string // Fallback or direct
 }
 
 // Legacy type for compatibility
@@ -30,6 +33,7 @@ export type QuestionRow = {
     subject: string
     knowledge_tags?: string[]
     skill_tags?: string[]
+    explanation?: string
 }
 
 export function generateFallbackQuestions(count: number) {
@@ -81,30 +85,37 @@ export function pickQuestions(grouped: Record<number, QuestionRow[]>, difficulty
     const selected: QuestionRow[] = []
     let current = difficulty
 
+    // 🎯 Simplified robust selection
     while (selected.length < count) {
-        const bucket = grouped[current] || []
-        if (bucket.length === 0) {
-            // Try adjacent difficulties
-            current = current > difficulty ? current - 1 : current + 1
-            if (current < 1) current = 1
-            if (current > 5) current = 5
+        // Simple round-robin strategy across difficulties if exact match not found
+        let found = false
 
-            // If we've tried searching and still stuck or looping, break to avoid infinite loop
-            // Simple check: if we are at bounds and still empty
-            if ((current === 1 || current === 5) && (!grouped[1] || grouped[1].length === 0) && (!grouped[5] || grouped[5].length === 0)) {
-                break; // Safety break
-            }
-
-            // Additional safety: if all buckets empty, break
-            const totalAvailable = Object.values(grouped).reduce((sum, list) => sum + list.length, 0);
-            if (totalAvailable === 0) break;
-
-            continue
+        // 1. Try exact difficulty
+        if (grouped[current] && grouped[current].length > 0) {
+            const bucket = grouped[current]
+            const randomIndex = Math.floor(Math.random() * bucket.length)
+            selected.push(bucket.splice(randomIndex, 1)[0])
+            found = true
         }
 
-        const randomIndex = Math.floor(Math.random() * bucket.length)
-        const question = bucket.splice(randomIndex, 1)[0]
-        if (question) selected.push(question)
+        // 2. If not found, look for ANY question
+        if (!found) {
+            const allKeys = Object.keys(grouped).map(Number)
+            const availableKeys = allKeys.filter(k => grouped[k].length > 0)
+
+            if (availableKeys.length === 0) break; // No more questions
+
+            // Pick random difficulty that has questions
+            const randomKey = availableKeys[Math.floor(Math.random() * availableKeys.length)]
+            const bucket = grouped[randomKey]
+            const randomIndex = Math.floor(Math.random() * bucket.length)
+            selected.push(bucket.splice(randomIndex, 1)[0])
+        }
+
+        // Move difficulty for next pick (oscillate)
+        // logic: 3 -> 4 -> 2 -> 5 -> 1
+        // Simplified: just random jitter for variety
+        current = Math.min(5, Math.max(1, current + (Math.random() > 0.5 ? 1 : -1)))
     }
 
     return selected
@@ -128,13 +139,17 @@ export async function fetchPveQuestions(
 
     if (userId) {
         try {
-            const { data: proficiencyData } = await db
-                .rpc('get_latest_user_proficiency', { p_user_id: userId })
+            // 🎯 SOTA FIX: Add timeout for proficiency check to prevent hanging
+            const proficiencyPromise = db.rpc('get_latest_user_proficiency', { p_user_id: userId })
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Proficiency timeout')), 2000))
+
+            const { data: proficiencyData } = await Promise.race([proficiencyPromise, timeoutPromise]) as any
 
             if (proficiencyData && proficiencyData.length > 0) {
                 const userProficiency = proficiencyData[0]
                 baselineDifficulty = Math.min(5, Math.max(1, Math.ceil(userProficiency.overall_proficiency / 20)))
             } else {
+                // Fallback to profile level
                 const { data: profile } = await db
                     .from('profiles')
                     .select('level')
@@ -146,7 +161,7 @@ export async function fetchPveQuestions(
             }
             console.log('[PVE Helper] Proficiency Check Complete. Baseline:', baselineDifficulty)
         } catch (e) {
-            console.warn('Error fetching proficiency:', e)
+            console.warn('[PVE Helper] Error fetching proficiency (using default):', e)
         }
 
         // Dynamic Difficulty Adjustment (DDA)
@@ -172,27 +187,60 @@ export async function fetchPveQuestions(
     let weaknessQuestions: any[] = []
     if (userId) {
         try {
-            const { data: weakTags } = await db.rpc('get_weakest_tags', {
+            console.log('[PVE Helper] Fetching weakest tags for user:', userId)
+
+            // 🎯 FIX: Add timeout protection for RPC call
+            const weakTagsPromise = db.rpc('get_weakest_tags', {
                 p_user_id: userId,
                 p_limit: 2
             })
 
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Weakness tags timeout')), 2000)
+            )
+
+            const { data: weakTags } = await Promise.race([
+                weakTagsPromise,
+                timeoutPromise
+            ]) as any
+
+            console.log('[PVE Helper] Weak tags result:', { count: weakTags?.length })
+
             if (weakTags && weakTags.length > 0) {
                 const tags = weakTags.map((t: any) => t.tag)
+                console.log('[PVE Helper] Querying weakness questions for tags:', tags)
+
                 const { data: wQuestions } = await db
                     .from('seed_questions')
-                    .select('id, question_text, option_a, option_b, option_c, option_d, correct_answer, difficulty_level, subject, knowledge_tags')
+                    .select(`
+                        id, 
+                        question_text, 
+                        option_a, 
+                        option_b, 
+                        option_c, 
+                        option_d, 
+                        correct_answer, 
+                        difficulty_level, 
+                        subject, 
+                        knowledge_tags,
+                        question_explanations!left(explanation_text)
+                    `)
                     .overlaps('knowledge_tags', tags)
                     .eq('is_active', true)
                     .limit(5)
+
+                console.log('[PVE Helper] Weakness questions found:', wQuestions?.length || 0)
 
                 if (wQuestions && wQuestions.length > 0) {
                     // 🎯 SOTA FIX: Type assertion for strict typing
                     weaknessQuestions = wQuestions as DBQuestionRow[]
                 }
+            } else {
+                console.log('[PVE Helper] No weak tags found, skipping weakness questions')
             }
         } catch (err) {
-            console.warn('[Weakness Sniper] Failed:', err)
+            console.warn('[Weakness Sniper] Failed or timeout:', err)
+            // Continue without weakness questions
         }
     }
 
@@ -202,14 +250,26 @@ export async function fetchPveQuestions(
     // RLS policies now use auth.jwt() instead of table lookups, preventing recursion
     // This allows safe client-to-DB access for mobile apps
     let query = db.from('seed_questions')
-        .select('id, question_text, option_a, option_b, option_c, option_d, correct_answer, difficulty_level, subject, knowledge_tags')
+        .select(`
+            id, 
+            question_text, 
+            option_a, 
+            option_b, 
+            option_c, 
+            option_d, 
+            correct_answer, 
+            difficulty_level, 
+            subject, 
+            knowledge_tags,
+            question_explanations!left(explanation_text)
+        `)
 
     if (subject) query = query.eq('subject', subject)
 
     const { data: questions, error } = await query
         .eq('is_active', true)
-        .order('difficulty_level', { ascending: true })
-        .limit(numQuestions * 3)
+        // .order('difficulty_level', { ascending: true }) // 🎯 Optimization: Remove ordering to speed up query on large datasets
+        .limit(numQuestions * 5) // Fetch slightly more to ensure randomization
 
     console.log('[PVE Helper] Query completed!', { questionCount: questions?.length, hasError: !!error })
 
@@ -233,7 +293,19 @@ export async function fetchPveQuestions(
     for (const row of questions as DBQuestionRow[]) {
         const diff = row.difficulty_level || 3
         grouped[diff] = grouped[diff] || []
-        grouped[diff].push(row as QuestionRow)
+
+        // Extract explanation (joined array or single)
+        let explanation = row.explanation_text
+        if (Array.isArray(row.question_explanations) && row.question_explanations.length > 0) {
+            explanation = row.question_explanations[0].explanation_text
+        }
+
+        const questionRow: QuestionRow = {
+            ...row,
+            knowledge_tags: row.knowledge_tags || undefined,
+            explanation: explanation
+        }
+        grouped[diff].push(questionRow)
     }
 
     let selectedQuestions = pickQuestions({ ...grouped }, baselineDifficulty, numQuestions)

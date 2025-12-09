@@ -31,7 +31,12 @@ export default function AppLayout({
       </Suspense>
 
       {/* 🎯 Full-Screen App: 吃滿整個視窗，使用 100dvh 處理動態視口 */}
-      <div className="flex h-[100dvh] w-full flex-col bg-background text-foreground">
+      <div
+        className="flex h-[100dvh] w-full flex-col bg-background text-foreground"
+        style={{
+          overscrollBehavior: 'none', // 🎯 SOTA: Prevent rubber-band scroll
+        }}
+      >
         <AuthGuard requireAuth={true}>
           <AskProvider>
             <PlayProvider>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseClient } from '@/lib/api/auth'
+import { grantBattleFoodReward } from '@/lib/chick/rewards'
 
 export async function POST(req: NextRequest) {
     try {
@@ -33,6 +34,15 @@ export async function POST(req: NextRequest) {
         // Award coins/ELO transaction logic could go here or be a separate RPC
         // For now, assuming simple update
 
+        // Check user and grant rewards
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (user) {
+            const isWin = winnerId === user.id
+            const { success, bowlsGranted } = await grantBattleFoodReward(supabase, user.id, isWin)
+            console.log(`[PVE Finish] Rewards granted for ${user.id}: Win=${isWin}, Bowls=${bowlsGranted}, Success=${success}`)
+        }
+
         return NextResponse.json({ success: true })
 
     } catch (error) {
@@ -40,3 +50,4 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: false }, { status: 500 })
     }
 }
+

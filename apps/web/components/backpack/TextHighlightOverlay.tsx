@@ -77,7 +77,15 @@ export function TextHighlightOverlay({
             className="pointer-events-auto"
             onMouseEnter={() => setHoveredHighlightId(ann.id)}
             onMouseLeave={() => setHoveredHighlightId(null)}
+            onTouchStart={() => setHoveredHighlightId(ann.id)} // 🎯 Mobile: Touch to show delete button
             onClick={(e) => {
+              // 🎯 Mobile: Tap to toggle hover state
+              if (hoveredHighlightId === ann.id) {
+                setHoveredHighlightId(null)
+              } else {
+                setHoveredHighlightId(ann.id)
+              }
+
               if (onClick && rects.length > 0) {
                 e.stopPropagation()
                 // Calculate bounding box of all rects for the anchor

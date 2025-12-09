@@ -122,82 +122,82 @@ export async function generateAnalysisStream(
        - 選項長度要平衡，不要讓正確答案明顯特別長或特別短。
 
 
-## 核心規則 (CRITICAL)
-1. **多文件綜合 (Synthesis)**:
-   - 你會收到多份文件，每份文件都有 \`<document index="N" filename="...">\` 標籤。
-   - **絕對禁止**只總結第一份文件。
-   - 必須**交叉比對**所有文件的內容。如果不同文件提到相同概念，請合併說明；如果有衝突或互補，請明確指出。
-   - **重要**: 不要在內容文字中加入來源標註 (如 "來源: xxx.pdf")，請使用結構化的 sources 欄位。
+    ## 核心規則 (CRITICAL)
+    1. **多文件綜合 (Synthesis)**:
+       - 你會收到多份文件，每份文件都有 \`<document index="N" filename="...">\` 標籤。
+       - **絕對禁止**只總結第一份文件。
+       - 必須**交叉比對**所有文件的內容。如果不同文件提到相同概念，請合併說明；如果有衝突或互補，請明確指出。
+       - **重要**: 不要在內容文字中加入來源標註 (如 "來源: xxx.pdf")，請使用結構化的 sources 欄位。
 
-2. **動態豐富度 (Dynamic Richness)**:
-   - **請根據輸入文件的內容長度與深度，自由調整輸出的豐富度。**
-   - 如果輸入文件很長且細節豐富，請生成**更長、更詳細**的摘要與概念解析，不要受限於簡短的格式。
-   - 確保所有重要細節都被涵蓋，不要過度簡化。
+    2. **動態豐富度 (Dynamic Richness)**:
+       - **請根據輸入文件的內容長度與深度，自由調整輸出的豐富度。**
+       - 如果輸入文件很長且細節豐富，請生成**更長、更詳細**的摘要與概念解析，不要受限於簡短的格式。
+       - 確保所有重要細節都被涵蓋，不要過度簡化。
 
-3. **內容長度 (Length Requirement)**:
-   - **禁止生成簡短的摘要**。
-   - 每個核心概念的解釋必須**詳盡**，包含例子與脈絡。
-   - 目標是讓學生讀完後能夠完全理解該概念，而不僅僅是看到定義。
+    3. **內容長度 (Length Requirement)**:
+       - **禁止生成簡短的摘要**。
+       - 每個核心概念的解釋必須**詳盡**，包含例子與脈絡。
+       - 目標是讓學生讀完後能夠完全理解該概念，而不僅僅是看到定義。
 
-4. **目標受眾**: 台灣高中生 (學測/分科測驗標準)。
-5. **語言**: 繁體中文 (英文科除外)。
-6. **格式**: 嚴格遵守 Markdown 格式。
+    4. **目標受眾**: 台灣高中生 (學測/分科測驗標準)。
+    5. **語言**: 繁體中文 (英文科除外)。
+    6. **格式**: 嚴格遵守 Markdown 格式。
 
-## 輸出結構 (Output Structure)
+    ## 輸出結構 (Output Structure)
 
-### 1. Subject & Topics
-- 科目：準確判斷 (如：數學A、物理、歷史)
-- 單元：列出所有文件涵蓋的章節範圍
+    ### 1. Subject & Topics
+    - 科目：準確判斷 (如：數學A、物理、歷史)
+    - 單元：列出所有文件涵蓋的章節範圍
 
-### 2. Summary (Markdown)
-# 核心摘要 (綜合觀點)
-- 這是一份跨文件的綜合摘要。
-- 主題重點：列出跨文件的核心主題 (數量不限，視內容豐富度而定，通常 3-8 點)。
-- 整合性：說明這些文件如何共同構成一個完整的知識體系。
-- **注意**: 不要在摘要文字中加入 "(來源: xxx.pdf)" 這類標註。
+    ### 2. Summary (Markdown)
+    # 核心摘要 (綜合觀點)
+    - 這是一份跨文件的綜合摘要。
+    - 主題重點：列出跨文件的核心主題 (數量不限，視內容豐富度而定，通常 3-8 點)。
+    - 整合性：說明這些文件如何共同構成一個完整的知識體系。
+    - **注意**: 不要在摘要文字中加入 "(來源: xxx.pdf)" 這類標註。
 
-### 3. Key Concepts (Cross-Document)
-- concept: 核心知識點
-- explanation: 定義與詳細說明 (需整合多來源，若原文內容豐富，請提供詳盡解釋)。**不要在 explanation 文字中加入來源標註**。
-- importance: 高/中/低
-- curriculumCode: 課綱代碼 (如: 數A-11-1)
-- sources: 來源文件列表 (如: ["math_ch1.pdf", "math_ch2.pdf"])，若該概念出現在多份文件中請全部列出。**使用此欄位來標註來源，而非在文字中標註**。
+    ### 3. Key Concepts (Cross-Document)
+    - concept: 核心知識點
+    - explanation: 定義與詳細說明 (需整合多來源，若原文內容豐富，請提供詳盡解釋)。**不要在 explanation 文字中加入來源標註**。
+    - importance: 高/中/低
+    - curriculumCode: 課綱代碼 (如: 數A-11-1)
+    - sources: 來源文件列表 (如: ["math_ch1.pdf", "math_ch2.pdf"])，若該概念出現在多份文件中請全部列出。**使用此欄位來標註來源，而非在文字中標註**。
 
-### 4. Exam Prediction (Hybrid + Style Mimicry)
-- **Reflect Style**: 必須參考上述【真題範例】的風格來出題。
-- 必須包含至少 1 個 **跨章節題組 (Question Set)**。
-- 題目設計應測試學生整合不同文件資訊的能力。
-- 格式要求：
-  * type: "question_set"
-  * context: 跨章節的情境引文
-  * questions: 2-3 子題
-  * type: "multiple_choice"
-  * options: [{"label": "A", "text": "...", "isCorrect": false}, ...] (必須是物件陣列)
-  * difficulty: Easy/Medium/Hard
+    ### 4. Exam Prediction (Hybrid + Style Mimicry)
+    - **Reflect Style**: 必須參考上述【真題範例】的風格來出題。
+    - 必須包含至少 1 個 **跨章節題組 (Question Set)**。
+    - 題目設計應測試學生整合不同文件資訊的能力。
+    - 格式要求：
+      * type: "question_set"
+      * context: 跨章節的情境引文
+      * questions: 2-3 子題
+      * type: "multiple_choice"
+      * options: [{"label": "A", "text": "...", "isCorrect": false}, ...] (必須是物件陣列)
+      * difficulty: Easy/Medium/Hard
 
-## 範例 (Example Output)
-(請直接輸出 JSON，不要包含 markdown code block)
-{
-  "subject": "物理",
-  "topics": ["牛頓運動定律", "萬有引力"],
-  "summary": "# 核心摘要\\n\\n本文綜合了牛頓三大運動定律與萬有引力定律，探討物體運動的基本原理。這些定律構成了古典力學的基礎，對理解日常生活中的運動現象至關重要。",
-  "keyConcepts": [
+    ## 範例 (Example Output)
+    (請直接輸出 JSON，不要包含 markdown code block)
     {
-      "concept": "F=ma",
-      "explanation": "牛頓第二運動定律指出，物體的加速度與作用力成正比，與質量成反比。這個定律是解決力學問題的核心工具。",
-      "importance": "高",
-      "curriculumCode": "物理-1-2",
-      "sources": ["ch1.pdf", "ch2.pdf"]
-    }
-  ],
-  "sources": ["ch1.pdf", "ch2.pdf"],
-  "examPrediction": [...]
-}`
+      "subject": "物理",
+      "topics": ["牛頓運動定律", "萬有引力"],
+      "summary": "# 核心摘要\\n\\n本文綜合了牛頓三大運動定律與萬有引力定律，探討物體運動的基本原理。這些定律構成了古典力學的基礎，對理解日常生活中的運動現象至關重要。",
+      "keyConcepts": [
+        {
+          "concept": "F=ma",
+          "explanation": "牛頓第二運動定律指出，物體的加速度與作用力成正比，與質量成反比。這個定律是解決力學問題的核心工具。",
+          "importance": "高",
+          "curriculumCode": "物理-1-2",
+          "sources": ["ch1.pdf", "ch2.pdf"]
+        }
+      ],
+      "sources": ["ch1.pdf", "ch2.pdf"],
+      "examPrediction": [...]
+    }`
 
     const prompt = `${systemPrompt}
 
-## 待分析文件 (DOCUMENTS TO ANALYZE)
-${contextText}`
+    ## 待分析文件 (DOCUMENTS TO ANALYZE)
+    ${contextText}`
 
     console.log('[StreamAnalysis] 🎯 Model config:', {
         model: modelParams.model,

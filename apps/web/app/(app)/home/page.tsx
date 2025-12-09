@@ -152,7 +152,13 @@ export default function HomePage() {
   return (
     <div className="min-h-full bg-background">
       {/* 🎯 頂尖修復：移除重複的 pb-20/pb-24，由 Layout 統一處理 */}
-      <main className="mx-auto max-w-lg px-4 py-6 bg-[#FFFBF0] min-h-full">
+      <main
+        className="mx-auto max-w-lg px-4 py-6 bg-[#FFFBF0] min-h-full"
+        style={{
+          // 🎯 SOTA Mobile Fix: 使用 CSS 变量动态计算底部留白，适配所有设备
+          paddingBottom: 'var(--content-bottom-padding)',
+        }}
+      >
         {isLoading ? (
           <div className="space-y-4">
             <div className="flex items-center gap-4">

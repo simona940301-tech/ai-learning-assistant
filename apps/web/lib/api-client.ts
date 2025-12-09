@@ -137,7 +137,12 @@ async function withAuthorizationHeader(request: Request): Promise<Request> {
     }
   }
 
-  return new Request(request, { headers })
+  // CRITICAL: Preserve credentials option to ensure cookies are sent
+  // This is required for API routes that use cookie-based session management
+  return new Request(request, {
+    headers,
+    credentials: request.credentials || 'include'
+  })
 }
 
 async function getAccessToken(): Promise<string | null> {

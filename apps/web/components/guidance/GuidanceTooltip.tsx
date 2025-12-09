@@ -20,6 +20,14 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
 import type { GuidanceItem } from '@/lib/guidance/guidance-engine'
 
+const palette = {
+  surface: 'rgba(255, 249, 236, 0.82)',
+  surfaceAlt: 'rgba(255, 243, 220, 0.72)',
+  accent: '#FED168',
+  border: 'rgba(254, 209, 104, 0.55)',
+  text: '#5D4037',
+}
+
 interface GuidanceTooltipProps {
   item: GuidanceItem
   onDismiss: (dismissalType: 'permanent' | 'session') => void
@@ -119,8 +127,10 @@ export function GuidanceTooltip({
             <div
               className="absolute inset-0 rounded-2xl"
               style={{
-                background: 'radial-gradient(circle, rgba(254, 209, 104, 0.25) 0%, rgba(254, 209, 104, 0.08) 50%, transparent 100%)',
-                boxShadow: '0 0 20px rgba(254, 209, 104, 0.3), inset 0 0 20px rgba(254, 209, 104, 0.1)',
+                background: 'radial-gradient(circle at 50% 50%, rgba(254, 209, 104, 0.22) 0%, rgba(254, 209, 104, 0.08) 45%, transparent 75%)',
+                boxShadow: '0 0 0 1px rgba(254, 209, 104, 0.25), 0 18px 40px rgba(93, 64, 55, 0.14)',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
                 animation: 'gentlePulse 3s ease-in-out infinite',
               }}
             />
@@ -139,9 +149,12 @@ export function GuidanceTooltip({
                 <div
                   className="whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium shadow-md"
                   style={{
-                    background: '#FED168',
-                    color: '#5D4037',
-                    border: '1px solid rgba(93, 64, 55, 0.1)',
+                    background: 'linear-gradient(125deg, rgba(254, 209, 104, 0.92), rgba(255, 236, 195, 0.85))',
+                    color: palette.text,
+                    border: '1px solid rgba(93, 64, 55, 0.12)',
+                    boxShadow: '0 12px 35px rgba(93, 64, 55, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.5)',
+                    backdropFilter: 'blur(10px)',
+                    WebkitBackdropFilter: 'blur(10px)',
                   }}
                 >
                   {item.copy}
@@ -225,19 +238,44 @@ export function GuidanceTooltip({
           >
             {/* 🎨 極簡暖色氣泡 */}
             <div
-              className="relative flex items-center gap-2 rounded-2xl px-4 py-3 shadow-lg"
+              className="relative flex items-start gap-3 overflow-hidden rounded-3xl px-5 py-4 shadow-2xl"
               style={{
-                background: '#FFFDF5',
-                border: '1.5px solid #E0D0B8',
+                background: `linear-gradient(135deg, ${palette.surface}, ${palette.surfaceAlt})`,
+                border: `1.5px solid ${palette.border}`,
+                boxShadow: '0 18px 48px rgba(52, 35, 21, 0.18), 0 1px 0 rgba(255, 255, 255, 0.55)',
+                backdropFilter: 'blur(14px)',
+                WebkitBackdropFilter: 'blur(14px)',
+                minWidth: 240,
+                maxWidth: 360,
               }}
             >
+              <div
+                className="pointer-events-none absolute inset-0 opacity-90"
+                style={{
+                  background: 'radial-gradient(circle at 16% 24%, rgba(254, 209, 104, 0.2), transparent 32%), radial-gradient(circle at 88% 6%, rgba(82, 133, 85, 0.14), transparent 28%)',
+                }}
+              />
+
+              <div
+                className="relative mt-0.5 h-8 w-1 rounded-full"
+                style={{
+                  background: 'linear-gradient(180deg, rgba(254, 209, 104, 0.85), rgba(82, 133, 85, 0.5))',
+                  boxShadow: '0 10px 28px rgba(254, 209, 104, 0.32)',
+                }}
+              />
+
               {/* Content */}
-              <span
-                className="text-sm font-medium"
-                style={{ color: '#5D4037' }}
-              >
-                {item.copy}
-              </span>
+              <div className="relative flex flex-1 items-start gap-2">
+                <span
+                  className="text-sm font-semibold leading-snug"
+                  style={{
+                    color: palette.text,
+                    textShadow: '0 1px 0 rgba(255, 255, 255, 0.75)',
+                  }}
+                >
+                  {item.copy}
+                </span>
+              </div>
 
               {/* Dismiss button */}
               {item.dismissalOption !== 'none' && (
@@ -248,10 +286,12 @@ export function GuidanceTooltip({
                       onDismiss(item.dismissalOption === 'permanent' ? 'permanent' : 'session')
                     }, 200)
                   }}
-                  className="flex h-6 w-6 items-center justify-center rounded-full transition-all hover:scale-110"
+                  className="relative flex h-7 w-7 items-center justify-center rounded-full transition-all hover:scale-110"
                   style={{
-                    background: '#FED168',
-                    color: '#5D4037',
+                    background: 'rgba(254, 209, 104, 0.82)',
+                    color: palette.text,
+                    border: '1px solid rgba(93, 64, 55, 0.08)',
+                    boxShadow: '0 10px 28px rgba(52, 35, 21, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.7)',
                   }}
                   aria-label="關閉提示"
                 >
@@ -266,33 +306,34 @@ export function GuidanceTooltip({
                   width: 0,
                   height: 0,
                   borderStyle: 'solid',
+                  filter: 'drop-shadow(0 8px 24px rgba(52, 35, 21, 0.16))',
                   ...(item.position === 'top' && {
                     bottom: -6,
                     left: '50%',
                     transform: 'translateX(-50%)',
                     borderWidth: '6px 6px 0 6px',
-                    borderColor: '#FFFDF5 transparent transparent transparent',
+                    borderColor: `${palette.surface} transparent transparent transparent`,
                   }),
                   ...(item.position === 'bottom' && {
                     top: -6,
                     left: '50%',
                     transform: 'translateX(-50%)',
                     borderWidth: '0 6px 6px 6px',
-                    borderColor: 'transparent transparent #FFFDF5 transparent',
+                    borderColor: `transparent transparent ${palette.surface} transparent`,
                   }),
                   ...(item.position === 'left' && {
                     right: -6,
                     top: '50%',
                     transform: 'translateY(-50%)',
                     borderWidth: '6px 0 6px 6px',
-                    borderColor: 'transparent transparent transparent #FFFDF5',
+                    borderColor: `transparent transparent transparent ${palette.surface}`,
                   }),
                   ...(item.position === 'right' && {
                     left: -6,
                     top: '50%',
                     transform: 'translateY(-50%)',
                     borderWidth: '6px 6px 6px 0',
-                    borderColor: 'transparent #FFFDF5 transparent transparent',
+                    borderColor: `transparent ${palette.surface} transparent transparent`,
                   }),
                 }}
               />

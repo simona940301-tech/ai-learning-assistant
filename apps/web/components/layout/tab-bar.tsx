@@ -10,7 +10,7 @@ const tabs = [
   { name: 'Play', href: '/play', icon: Play },
   { name: 'Ask', href: '/ask', icon: MessageCircleQuestion },
   { name: 'Backpack', href: '/backpack', icon: Backpack },
-  { name: 'Profile', href: '/profile', icon: User },
+  { name: 'Profile', href: '/home', icon: User }, // 🎯 Fixed: Point to /home (profile merged into home)
 ]
 
 export function TabBar() {
@@ -18,15 +18,16 @@ export function TabBar() {
 
   return (
     <nav
-      className="flex-shrink-0 border-t border-border bg-background/98 backdrop-blur-xl"
+      className="fixed bottom-0 inset-x-0 z-50 border-t border-border bg-background/98 backdrop-blur-xl"
       style={{
         // 🎯 頂尖修復：使用 calc 確保 TabBar 緊貼底部
         // safe-area-inset-bottom 僅在有 Home Indicator 的設備上生效
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        backgroundColor: 'hsl(var(--background))', // 🎯 SOTA: Prevent white flash
       }}
     >
-      {/* 🎯 內部容器：固定高度，確保在所有設備上一致 */}
-      <div className="mx-auto flex h-14 w-full items-center justify-around px-4 sm:h-16 sm:max-w-2xl lg:max-w-3xl">
+      {/* 🎯 內部容器：固定高度，使用 CSS 变量确保响应式 */}
+      <div className="mx-auto flex h-14 sm:h-16 w-full items-center justify-around px-4">
         {tabs.map((tab) => {
           const isActive = pathname?.startsWith(tab.href)
           const Icon = tab.icon
@@ -36,22 +37,33 @@ export function TabBar() {
               key={tab.name}
               href={tab.href}
               className={cn(
-                "flex min-w-[64px] flex-1 flex-col items-center justify-center gap-1 rounded-lg py-2 px-3 transition-all duration-150 active:scale-95",
+                "relative flex min-w-[64px] flex-1 flex-col items-center justify-center gap-1 py-1 px-1 transition-all duration-300",
                 isActive
-                  ? "text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "text-[#6A4A3C]" // Active Color (Brownish)
+                  : "text-muted-foreground hover:text-foreground/80"
               )}
               aria-label={tab.name}
               aria-current={isActive ? 'page' : undefined}
             >
               <Icon
-                className="h-5 w-5 sm:h-6 sm:w-6"
-                strokeWidth={isActive ? 2 : 1.75}
+                className={cn(
+                  "h-6 w-6 transition-all duration-300",
+                  isActive ? "scale-110" : "scale-100 opacity-70"
+                )}
+                strokeWidth={isActive ? 2.5 : 1.8} // Thicker icon when active
                 aria-hidden="true"
               />
-              <span className="text-xs font-medium leading-none sm:text-sm">
+              <span className={cn(
+                "text-[10px] font-medium leading-none transition-all duration-300",
+                isActive ? "font-bold" : "font-medium"
+              )}>
                 {tab.name}
               </span>
+
+              {/* 🎯 Minimalist Active Indicator (2px line) */}
+              {isActive && (
+                <span className="absolute -bottom-1 h-[3px] w-5 rounded-full bg-[#6A4A3C]" />
+              )}
             </Link>
           )
         })}

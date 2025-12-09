@@ -703,11 +703,6 @@ export default function OnboardingChallengePage() {
                             )
                           })}
                         </div>
-                        <div className="text-[13px] text-[#8B6F47] mb-3 flex items-center gap-2">
-                          <span>你選了 <span className="text-[#DC2626]">{result.answerSelected}</span></span>
-                          <span>→</span>
-                          <span>正確答案 <span className="text-[#528555]">{question?.correctAnswer}</span></span>
-                        </div>
                         {question?.explanation && (
                           <div className="bg-[#F8F5E8] rounded-xl p-4 border border-[#E0D0B8]">
                             <p className="text-[13px] font-medium text-[#5D4037] mb-1">📖 詳細解析</p>

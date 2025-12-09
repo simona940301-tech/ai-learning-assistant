@@ -15,13 +15,14 @@ interface SystemBattleModalProps {
 }
 
 export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
-  const { systemMode, setSystemMode, checkEnergy, startMatch, setIsPveTransitioning } = usePlay()
+  const { systemMode, setSystemMode, checkEnergy, startMatch } = usePlay()
 
   const [showMatchmaking, setShowMatchmaking] = useState(false)
   const [selectedSubject, setSelectedSubject] = useState<string | undefined>('english')
   const [timeLimit, setTimeLimit] = useState<20 | 30 | 45 | 60>(20) // 預設 20 秒
   const [quickSubject, setQuickSubject] = useState('english')
   const [quickTimeLimit, setQuickTimeLimit] = useState<20 | 30 | 45 | 60>(20)
+  const [isPveTransitioning, setIsPveTransitioning] = useState(false)
   const hasStartedRef = useRef(false)
 
   // 🎯 MVP 階段：只保留 AI 訓練模式
@@ -107,11 +108,15 @@ export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
 
       // 🎯 關鍵修改：啟動過渡動畫
       console.log('[SystemBattleModal] 🚀 Starting PVE transition overlay')
+      setIsPveTransitioning(true)
+
+      // Artificial delay for the animation to be seen
+      await new Promise(resolve => setTimeout(resolve, 2000))
 
       // PVE 現在使用 HTTP-only 模式，不需要 WS 連接
 
 
-      setIsPveTransitioning(true)
+
 
       const startResult = await startMatch({
         type: 'PVE_TRAINING',
@@ -128,12 +133,13 @@ export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
       // 不要立即清空 systemMode，等到 ROUND_STARTED 時才清空
       // 這樣才能正確檢測 PVE 模式
       onClose()
+      // Note: isPveTransitioning will be unmounted with the modal
     } catch (error) {
       console.error('[SystemBattleModal] Failed to start PVE match', error)
       toast.error('啟動失敗，請稍後再試')
+      setIsPveTransitioning(false)
     } finally {
       hasStartedRef.current = false
-      setIsPveTransitioning(false) // 失敗時關閉過渡動畫
     }
   }
 
@@ -143,6 +149,112 @@ export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
       setSystemMode('PVE_TRAINING')
     }
   }, [modes.length, setSystemMode, systemMode])
+
+
+
+  // VS Transition Overlay
+  if (isPveTransitioning) {
+    return (
+      <Dialog open={true} onOpenChange={() => { }}>
+        <DialogContent className="max-w-full h-screen p-0 border-none bg-transparent shadow-none" hideCloseButton>
+          <motion.div
+            className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#FAF6E9]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            {/* Background Elements */}
+            <div className="absolute inset-0 overflow-hidden">
+              <motion.div
+                className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-[#FED168]/20 rounded-full blur-3xl"
+                animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              />
+              <motion.div
+                className="absolute bottom-[-10%] right-[-5%] w-[500px] h-[500px] bg-[#5B7CFF]/20 rounded-full blur-3xl"
+                animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+              />
+            </div>
+
+            <div className="relative w-full max-w-lg aspect-square flex items-center justify-center">
+              {/* VS Text */}
+              <motion.div
+                className="absolute z-20 text-[120px] font-black italic text-[#5D4037]"
+                initial={{ scale: 0, opacity: 0, rotate: -20 }}
+                animate={{ scale: 1, opacity: 1, rotate: 0 }}
+                transition={{
+                  type: "spring",
+                  stiffness: 300,
+                  damping: 20,
+                  delay: 0.2
+                }}
+              >
+                <span className="relative">
+                  VS
+                  <motion.span
+                    className="absolute -inset-2 text-[#FED168] -z-10 blur-sm"
+                    animate={{ opacity: [0.5, 1, 0.5] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  >
+                    VS
+                  </motion.span>
+                </span>
+              </motion.div>
+
+              {/* Player Avatar Circle */}
+              <motion.div
+                className="absolute left-4 top-1/4 w-32 h-32 md:w-40 md:h-40 bg-white rounded-full border-4 border-[#5B7CFF] shadow-xl overflow-hidden z-10"
+                initial={{ x: -100, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                transition={{ type: "spring", damping: 20, delay: 0.1 }}
+              >
+                {/* Placeholder for User Avatar - Using generic icon or actual avatar if available */}
+                <div className="w-full h-full bg-[#E8F5E9] flex items-center justify-center">
+                  <User className="w-16 h-16 text-[#528555]" />
+                </div>
+              </motion.div>
+
+              {/* AI Avatar Circle */}
+              <motion.div
+                className="absolute right-4 bottom-1/4 w-32 h-32 md:w-40 md:h-40 bg-white rounded-full border-4 border-[#FED168] shadow-xl overflow-hidden z-10"
+                initial={{ x: 100, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                transition={{ type: "spring", damping: 20, delay: 0.3 }}
+              >
+                <div className="w-full h-full bg-[#FFF3E0] flex items-center justify-center">
+                  <Bot className="w-16 h-16 text-[#F57C00]" />
+                </div>
+              </motion.div>
+
+              {/* Connecting Line (Lightning/Zap effect simplified) */}
+              <svg className="absolute inset-0 w-full h-full z-0 pointer-events-none" viewBox="0 0 400 400">
+                <motion.path
+                  d="M 100 150 L 300 250"
+                  stroke="#5D4037"
+                  strokeWidth="4"
+                  strokeDasharray="10 10"
+                  initial={{ pathLength: 0, opacity: 0 }}
+                  animate={{ pathLength: 1, opacity: 0.2 }}
+                  transition={{ duration: 0.5, delay: 0.5 }}
+                />
+              </svg>
+            </div>
+
+            {/* Loading Text */}
+            <motion.div
+              className="mt-12 text-[#5D4037] text-xl font-bold tracking-wider"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+            >
+              配對中...
+            </motion.div>
+          </motion.div>
+        </DialogContent>
+      </Dialog>
+    )
+  }
 
   if (systemMode === 'PVE_TRAINING') {
     return (

@@ -9,6 +9,7 @@ import { detectSubject } from '@/lib/utils/detect-subject'
 import { RAGMarkdownRenderer } from './RAGMarkdownRenderer'
 import { cn } from '@/lib/utils'
 import { GSATAnalysisSchema } from '@/lib/schemas/gsat-analysis-schema'
+import { formatFullContent } from '@/lib/utils/analysis-formatter'
 import { SubjectSelectionDialog, type SubjectTag } from './SubjectSelectionDialog'
 
 interface ProgressiveAnalysisCardProps {
@@ -365,7 +366,10 @@ export default function ProgressiveAnalysisCard({
         setSaveSuccess(false)
 
         try {
-            const note_md = analysis.structuredNotes || analysis.quickSummary || ''
+            const note_md = formatFullContent(analysis, {
+                includeKeyConcepts: true,
+                includeExamPredictions: true
+            })
 
             const response = await fetch('/api/backpack/save', {
                 method: 'POST',

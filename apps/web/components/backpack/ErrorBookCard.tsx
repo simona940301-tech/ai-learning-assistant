@@ -50,17 +50,17 @@ export function ErrorBookCard({
               onToggleSelect?.()
             }}
             className={cn(
-              'flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg border-2 transition-colors',
+              'flex-shrink-0 w-5 h-5 flex items-center justify-center rounded-lg border-2 transition-colors',
               isSelected
                 ? 'border-primary bg-primary text-primary-foreground'
                 : 'border-border bg-muted'
             )}
           >
-            {isSelected && <Check className="h-5 w-5" />}
+            {isSelected && <Check className="h-3 w-3" />}
           </div>
         ) : (
-          <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-muted">
-            <FileText className="h-5 w-5 text-muted-foreground" strokeWidth={1.75} />
+          <div className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded-lg bg-muted">
+            <FileText className="h-3 w-3 text-muted-foreground" strokeWidth={1.75} />
           </div>
         )}
 

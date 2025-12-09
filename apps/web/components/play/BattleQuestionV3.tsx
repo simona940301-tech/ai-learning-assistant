@@ -153,8 +153,9 @@ export function BattleQuestionV3({
   // Determine if it's PVE (System Battle)
   const isPVE = systemMode === 'PVE_TRAINING' || systemMode === 'WEAKNESS_BATTLE'
 
-  // 🎮 對手隨機選擇fairy（在對戰開始時選擇一次）
-  const [opponentPresetId] = useState(() => getRandomOpponentFairy().id)
+  // 🎮 對手隨機選擇fairy（優先使用 battleState 中的穩定 ID）
+  const [localPresetId] = useState(() => getRandomOpponentFairy().id)
+  const opponentPresetId = battleState?.opponentAvatar || localPresetId
 
   // UI State
   const [selectedAnswer, setSelectedAnswer] = useState<OptionLetter | null>(null)

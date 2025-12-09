@@ -77,7 +77,13 @@
     /* App-specific heights */
     --ask-input-dock-height: 40px;
     /* 🎯 Phase A: 極簡設計 56px → 40px */
-    --tab-bar-height: 64px;
+
+    /* 📱 Mobile First: TabBar 高度變數 - 響應式定義 */
+    /* Mobile: 56px (h-14), Desktop: 64px (h-16) */
+    --tab-bar-height: 56px;
+
+    /* 📱 内容底部留白公式: TabBar高度 + 底部安全区 + 额外间距 */
+    --content-bottom-padding: calc(var(--tab-bar-height) + env(safe-area-inset-bottom, 0px) + 16px);
 
     /* Safe-area insets for mobile devices (notch, home indicator) */
     --safe-area-inset-top: env(safe-area-inset-top, 0px);
@@ -89,9 +95,19 @@
     --companion: 42 98% 70%;
     --companion-foreground: 14 26% 29%;
     --companion-glow: 42 98% 70% / 0.3;
+
+    /* 🎯 SOTA Mobile Fix: Prevent white space during overscroll */
+    background-color: hsl(var(--background));
   }
 
   /* 🎯 Removed redundant .dark block (Issue #1.4.1) - Enforces light theme only */
+
+  /* 📱 响应式 TabBar 高度: 桌面端使用 64px */
+  @media (min-width: 640px) {
+    :root {
+      --tab-bar-height: 64px;
+    }
+  }
 }
 
 /* 🚀 SOTA: Safe Area Utilities for iOS Notch & Home Indicator */
@@ -142,6 +158,8 @@
     /* Optimize for touch devices */
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
+    background-color: hsl(var(--background));
+    /* 🎯 SOTA: Prevent white flash */
   }
 
   /* 防止水平捲動條出現 */

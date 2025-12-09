@@ -39,6 +39,11 @@ const PracticeSourceModal = preloadOnInteraction(
   { ssr: false }
 )
 
+// 🚧 未實現的組件 - 臨時佔位
+const ChestModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => null
+const EditorModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => null
+const PracticeSetupModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => null
+
 const BattleResultModal = preloadOnInteraction(
   () => import('@/components/play/BattleResultModal').then(m => ({ default: m.BattleResultModal })),
   { ssr: false }
@@ -65,10 +70,7 @@ const DailyMissionWidgetV2 = preloadOnIdle(
   { ssr: false }
 )
 
-const TamagotchiWidget = preloadOnIdle(
-  () => import('@/components/companion/tamagotchi-widget').then(m => ({ default: m.TamagotchiWidget })),
-  { ssr: false }
-)
+
 
 // WsStatusIndicator removed
 
@@ -76,6 +78,7 @@ const TamagotchiWidget = preloadOnIdle(
 // 靜態導入（不需要預取）
 import { BattleQuestionV3 } from '@/components/play/BattleQuestionV3'
 import { BattleTransitionOverlay } from '@/components/play/BattleTransitionOverlay'
+import { PVEResultModal } from '@/components/play/PVEResultModal'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { normalizeBattleOptions, normalizeBattleText } from '@/lib/battle-text'
 import { useGuidance, useErrorCorrection } from '@/lib/guidance/useGuidance'
@@ -89,6 +92,7 @@ import {
   calculateComboMilestoneBonus,
   generateRNGBonus,
 } from '@/components/play/BattleQuestionV3'
+import { useAIOpponent } from '@/hooks/useAIOpponent'
 
 // ============================================
 // Shared Design Components
@@ -127,41 +131,41 @@ function ModeCard({
     onClick()
   }
 
+  // 格式化顯示字串
+  const costDisplay = energyCost !== undefined ? `🪶 ${energyCost}` : ''
+  const timeDisplay = estimatedTime === '無限' || estimatedTime === '無限制'
+    ? <span className="text-[11px] font-normal text-muted-foreground/50">∞ 無時間限制</span>
+    : estimatedTime ? `⏱ ${estimatedTime}` : ''
+
   return (
     <button
       type="button"
       onClick={handleClick}
       data-mode-card={modeId}
-      className="flex w-full items-center gap-3 rounded-[24px] border border-border bg-card px-4 py-2.5 text-left text-card-foreground transition hover:-translate-y-0.5 hover:bg-accent"
+      className="group relative flex w-full flex-col items-center justify-center gap-2.5 overflow-hidden rounded-[18px] border border-border/40 bg-card px-4 py-5 transition-all active:scale-[0.98] hover:border-border/60"
     >
-      {/* 左側：Icon - 縮小 */}
-      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${accent}`}>
-        <Icon className="h-5 w-5" />
+      {/* Top: Icon - Centered, Smaller & Lighter */}
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${accent}`}>
+        <Icon className="h-5 w-5" strokeWidth={1.5} />
       </div>
 
-      {/* 中間：標題與描述 - 縮小 */}
-      <div className="flex-1 min-w-0">
-        <p className="text-base font-semibold tracking-tight">{label}</p>
-        <p className="text-xs text-muted-foreground">{description}</p>
+      {/* Middle: Title & Description - Centered */}
+      <div className="flex flex-col items-center gap-0.5 text-center">
+        <p className="text-[16px] font-semibold text-foreground/90">{label}</p>
+        <p className="text-[11px] font-normal text-muted-foreground/60 line-clamp-1">{description}</p>
       </div>
 
-      {/* 右側：羽毛與時間（與描述同高） - 羽毛放大 3 倍 */}
-      {(energyCost !== undefined || estimatedTime) && (
-        <div className="flex shrink-0 flex-col items-end gap-1.5 text-xs text-muted-foreground">
-          {energyCost !== undefined && (
-            <span className="flex items-center gap-1">
-              <img src="/featherpoint.png" alt="羽毛" className="object-contain" style={{ width: '48px', height: '48px' }} />
-              <span className="font-medium">{energyCost}</span>
-            </span>
-          )}
-          {estimatedTime && (
-            <span className="flex items-center gap-1">
-              <span className="text-base">⏱️</span>
-              <span>{estimatedTime}</span>
-            </span>
-          )}
-        </div>
-      )}
+      {/* Bottom: Info - Centered, Outline Style */}
+      <div className="mt-1 flex items-center justify-center gap-2.5 text-[11px]">
+        {costDisplay && (
+          <span className="font-medium border border-border/30 px-1.5 py-0.5 rounded-md text-muted-foreground/70">{costDisplay}</span>
+        )}
+        {timeDisplay && (
+          <div className="flex items-center">
+            {timeDisplay}
+          </div>
+        )}
+      </div>
     </button>
   )
 }
@@ -186,8 +190,7 @@ function PlayPageContent() {
     openChest,
     pveCountdown,
     setPveCountdown,
-    isPveTransitioning,
-    setIsPveTransitioning,
+
     startMatch,
     checkEnergy,
     advancePveRound
@@ -197,6 +200,7 @@ function PlayPageContent() {
   const [isEditorModalOpen, setEditorModalOpen] = useState(false)
   const [isPracticeSourceModalOpen, setIsPracticeSourceModalOpen] = useState(false)
   const [isPracticeSetupModalOpen, setPracticeSetupModalOpen] = useState(false)
+  const [showPVEResult, setShowPVEResult] = useState(false)
 
 
   // 🎯 引導系統：自動檢測 T04 (Onboarding 完成後) 和 T01 (停留過久)
@@ -227,7 +231,7 @@ function PlayPageContent() {
         ; (async () => {
           const energy = await checkEnergy()
           if (!energy.success) {
-            trackEnergyError() // 🎯 觸發引導: "體力用完了? 完成任務獲取體力!"
+            trackEnergyError() // 🎯 觸發引導: \"體力用完了? 完成任務獲取體力!\"
             alert(energy.message || '羽毛不足，無法開始新手戰')
             return
           }
@@ -241,7 +245,7 @@ function PlayPageContent() {
             return
           }
 
-          setIsPveTransitioning(true)
+          // setIsPveTransitioning(true) - Removed for direct start
           const result = await startMatch({
             type: 'PVE_TRAINING',
             subject: 'english',
@@ -251,7 +255,7 @@ function PlayPageContent() {
 
           if (!result.ok) {
             alert(result.error || '啟動失敗，請稍後再試')
-            setIsPveTransitioning(false)
+            // setIsPveTransitioning(false) - Removed for direct start
           }
 
           // Clear query param to avoid re-triggering on refresh
@@ -260,7 +264,7 @@ function PlayPageContent() {
           router.replace(`/play?${newParams.toString()}`)
         })()
     }
-  }, [searchParams, battleState?.isInBattle, startMatch, router, setIsPveTransitioning, checkEnergy, trackEnergyError])
+  }, [searchParams, battleState?.isInBattle, startMatch, router, checkEnergy, trackEnergyError])
 
 
   // 如果沒有用戶狀態，檢查是否應該跳過（Supabase 未配置時）
@@ -309,9 +313,89 @@ function PlayPageContent() {
     return () => clearTimeout(timer)
   }, [pveCountdown, setPveCountdown])
 
-  // 🎯 移除前端自動進題邏輯，完全依賴後端的 ROUND_STARTED 消息
-  // 這樣可以避免前端 timer 和後端消息之間的競態條件
-  // 後端會在 ROUND_RESOLVED 後自動發送下一題的 ROUND_STARTED
+  // 🎯 Use AI Opponent Hook for PVE battles
+  const aiCurrentQuestion = battleState?.isInBattle && battleState?.questionList?.length > 0
+    ? battleState.questionList[battleState.currentQuestionIndex]
+    : null
+
+  const isPVEActive = Boolean(
+    battleState?.isInBattle &&
+    battleState?.matchType === 'PVE_TRAINING' &&
+    aiCurrentQuestion &&
+    !battleState?.playerHasAnswered &&
+    !battleState?.opponentAnswer
+  )
+
+  const aiOpponent = useAIOpponent(
+    aiCurrentQuestion?.id,
+    (aiCurrentQuestion?.correct_answer || aiCurrentQuestion?.correctAnswer || 'A') as 'A' | 'B' | 'C' | 'D',
+    aiCurrentQuestion?.difficulty || 3,
+    isPVEActive,
+    {
+      minDelayMs: 8000,
+      randomDelayMs: 8000,
+      correctRate: 0.65,
+    }
+  )
+
+  // Update battle state when AI opponent status/answer changes
+  useEffect(() => {
+    if (!isPVEActive) return
+    if (!battleState) return
+
+    // Update opponent status and answer
+    setBattleState(prev => {
+      if (!prev) return prev
+
+      const updates: Partial<BattleState> = {}
+      const isPlayerDone = prev.playerHasAnswered
+
+      // 🎯 Fog of War Logic:
+      // If AI has a result but player hasn't answered, mask the status as 'locked' (Ready)
+      // This hides the 'hit'/'miss' result and prevents score leaks
+      let exposedStatus = aiOpponent.status
+      if (!isPlayerDone && (aiOpponent.status === 'hit' || aiOpponent.status === 'miss')) {
+        exposedStatus = 'locked'
+      }
+
+      // Update status if changed
+      if (prev.opponentStatus !== exposedStatus) {
+        updates.opponentStatus = exposedStatus
+      }
+
+      // Update answer if changed (BattleQuestionV3 handles masking the specific letter)
+      if (aiOpponent.answer && prev.opponentAnswer !== aiOpponent.answer) {
+        updates.opponentAnswer = aiOpponent.answer
+      }
+
+      // Update score ONLY if status is revealed (hit/miss)
+      // This prevents players from guessing the result based on score changes
+      if (aiOpponent.score > 0 && (exposedStatus === 'hit' || exposedStatus === 'miss')) {
+        // We need to ensure we don't add the score multiple times
+        // Check if we already processed this question's score?
+        // Actually, we can check if the previous status was 'locked' or 'thinking'
+        // If it was already 'hit'/'miss', we assume score was added.
+        // BUT, since we use `prev.opponentStatus`, this check is safe:
+        // If prev was 'locked' and now 'hit', we add score.
+        // If prev was 'hit' and now 'hit', we don't enter this block (if we checked keys).
+        // Wait, the block below runs even if status didn't change?
+        // No, we should couple score update with status change to be safe, or check if score makes sense.
+        // Better yet: Only add score if `prev.opponentStatus` was NOT hit/miss
+        const wasRevealed = prev.opponentStatus === 'hit' || prev.opponentStatus === 'miss'
+
+        if (!wasRevealed) {
+          const isCorrect = aiOpponent.status === 'hit' // Use real status for score calc
+          updates.player2Score = prev.player2Score + aiOpponent.score
+          updates.player2Streak = isCorrect ? (prev.player2Streak || 0) + 1 : 0
+        }
+      }
+
+      // Only update if there are changes
+      if (Object.keys(updates).length === 0) return prev
+
+      return { ...prev, ...updates }
+    })
+  }, [aiOpponent.status, aiOpponent.answer, aiOpponent.score, isPVEActive, battleState?.playerHasAnswered])
 
   // 如果正在載入，顯示載入狀態
   if (isLoadingStatus) {
@@ -387,14 +471,13 @@ function PlayPageContent() {
 
   const showPveCountdownOverlay = typeof pveCountdown === 'number' && pveCountdown > 0
 
-  // 🎯 新增：顯示 PVE 過渡動畫（從按下開始到收到 MATCH_FOUND）
-  const showPveTransitionOverlay = isPveTransitioning && !battleState?.isInBattle
+
 
   // PVP 的轉場畫面（匹配成功後的等待畫面）
   const isPveMatch = true // Always PVE since we removed PVP
   const showMatchTransitionOverlay =
     !showPveCountdownOverlay &&
-    !showPveTransitionOverlay && // 不與 PVE 過渡動畫重疊
+    // !showPveTransitionOverlay && // 不與 PVE 過渡動畫重疊
     !isPveMatch && // 如果是 PVE，不顯示轉場
     Boolean(battleState?.matchId && !battleState?.isInBattle)
 
@@ -489,19 +572,20 @@ function PlayPageContent() {
       const handleAnswer = (answer: 'A' | 'B' | 'C' | 'D' | null, timeRemaining: number) => {
         if (!battleState) return
 
-        const upsertAnswerRecords = (prev: BattleState, userAnswer: 'A' | 'B' | 'C' | 'D' | null) => {
+        const upsertAnswerRecords = (prev: BattleState, userAnswer: 'A' | 'B' | 'C' | 'D' | null, isCorrect: boolean) => {
           const records = [...(prev.answerRecords ?? [])]
           const idx = records.findIndex(r => r.questionId === question.id)
           if (idx >= 0) {
             records[idx] = {
               ...records[idx],
               userAnswer,
+              isCorrect,
             }
           } else {
             records.push({
               questionId: question.id,
               userAnswer,
-              isCorrect: null,
+              isCorrect,
             })
           }
           return records
@@ -513,7 +597,7 @@ function PlayPageContent() {
             return {
               ...prev,
               playerHasAnswered: true,
-              answerRecords: upsertAnswerRecords(prev, null),
+              answerRecords: upsertAnswerRecords(prev, null, false),
             }
           })
           return
@@ -552,6 +636,21 @@ function PlayPageContent() {
           }
         }
 
+        // 🚀 SOTA: Zero-Wait Protocol - Instant Resolve AI
+        // 如果 AI 還沒回答，強制它立即結算 ("Speed Blitz")
+        let currentAiScore = battleState.player2Score
+        let currentAiStreak = battleState.player2Streak || 0
+
+        if (aiOpponent.status === 'thinking' && !battleState.opponentAnswer) {
+          console.log('[PlayPage] ⚡️ SPEED BLITZ! Forcing AI to answer immediately.')
+          aiOpponent.resolveNow()
+
+          // 注意：因為 State Update 是非同步的，這裡的 aiOpponent.score 可能還是舊的
+          // 在下一次 render 會同步，但為了即時計算，我們這裡不做額外加分操作
+          // 而是在上面的 useEffect 監聽 aiOpponent 變化時處理
+          // 但為了讓 UX 感覺是「同時」的，我們相信 useAIOpponent 的內部狀態更新會很快反映
+        }
+
         // 計算最終分數
         const finalScore = isCorrect
           ? Math.round(base * speedCoef * comboCoef) + rngBonus + firstCorrectBonus + comboMilestoneBonus
@@ -565,15 +664,41 @@ function PlayPageContent() {
             player1Streak: newStreak,
             player1Score: prev.player1Score + finalScore,
             playerHasAnswered: true,
-            answerRecords: upsertAnswerRecords(prev, answer),
+            answerRecords: upsertAnswerRecords(prev, answer, isCorrect),
           }
         })
 
+        // PVE: Check if this was the last question
+        // 🎯 FIX: Ensure correct index calculation (length - 1 is the last index)
+        const totalQuestions = battleState.questionList.length
+        const currentIdx = battleState.currentQuestionIndex
+        const isLastQuestion = currentIdx >= totalQuestions - 1
 
-        // PVE: 自動進入下一題
-        setTimeout(() => {
-          advancePveRound()
-        }, 2000)
+        console.log('[PlayPage] 🏁 Checking end game:', {
+          currentIdx,
+          totalQuestions,
+          isLastQuestion
+        })
+
+        if (isLastQuestion) {
+          // Show result modal immediately (Zero-Wait)
+          console.log('[PlayPage] 🏆 Match finished (local), show result')
+          setTimeout(() => {
+            // 🎯 FIX: End battle state to allow result modal to show
+            setBattleState(prev => prev ? { ...prev, isInBattle: false } : null)
+            setShowPVEResult(true)
+          }, 1500) // 縮短等待時間 (2s -> 1.5s)
+        } else {
+          // 🚀 Zero-Wait: 加速進入下一題 (2s -> 1.2s)
+          // 給予玩家足夠時間看到 AI 的結果（因為被強制顯示了），然後迅速下一題
+          console.log('[PlayPage] ⏭️ Advancing to next question (Turbo)')
+          setTimeout(() => {
+            // Double check validation before advancing
+            if (currentIdx < totalQuestions - 1) {
+              advancePveRound()
+            }
+          }, 1200)
+        }
 
         // 背景提交答案（樂觀更新，不等待結果）
         fetch('/api/play/pve/submit-answer', {
@@ -585,7 +710,10 @@ function PlayPageContent() {
             answer,
             isCorrect,
             timeRemaining,
-            score: finalScore
+            score: finalScore,
+            // 🎯 For Ready Score calculation
+            difficulty: question.difficulty,
+            subject: 'english' // PVE currently defaults to english, or user selected subject
           })
         }).catch(err => console.error('[PlayPage] Background submit error:', err))
       }
@@ -707,141 +835,76 @@ function PlayPageContent() {
   // Filter mode cards based on feature flags
   const modeCards = allModeCards.filter((card) => isGameModeEnabled(card.flagId))
 
-
-
+  // Use first 3 modes for the rhythm grid layout
+  const gridModes = modeCards.slice(0, 3)
 
   return (
-    <>
-      {/* Mobile-first: 減少 padding，確保在 360×800、390×844 等尺寸下完整顯示 */}
-      {/* 🎯 頂尖修復：移除重複 pb-20/pb-24，由 Layout 統一處理 */}
-      <div className="mx-auto max-w-3xl px-4 py-4 md:py-10">
-        <div className="space-y-4 md:space-y-6">
-          {/* 主標題區 - 極簡主義，保留大量留白 */}
-          <div className="space-y-2 pt-4 text-center">
-            <motion.h1
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-[22px] md:text-[24px] font-semibold tracking-tight text-[#6A4A3C]"
-            >
-              知識對戰
-            </motion.h1>
-            <motion.p
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.05 }}
-              className="text-[16px] text-[#8F6E58]"
-            >
-              選擇你的對戰模式，開始挑戰
-            </motion.p>
-          </div>
+    // Magazine Layout Background: Beige Gradient
+    <main
+      className="min-h-screen w-full bg-gradient-to-b from-[#EBE5D5] to-[#F5F2EA]"
+      style={{
+        // 🎯 SOTA Mobile Fix: 使用 CSS 变量动态计算底部留白，适配所有设备
+        paddingBottom: 'var(--content-bottom-padding)',
+      }}
+    >
+      <div className="mx-auto max-w-md px-4 pt-2">
+        {/* Hero: Daily Mission (Dashboard) */}
+        <section className="mb-6">
+          <DailyMissionWidgetV2 />
+        </section>
 
+        {/* Tools: Rhythm Grid (2 Squares + 1 Rectangle) */}
+        <section className="grid grid-cols-2 gap-3">
+          {gridModes.map((mode, index) => {
+            const isFullWidth = index === 2 // The 3rd item (Focus) is full width
+            return (
+              <div key={mode.id} className={isFullWidth ? "col-span-2" : "col-span-1"}>
+                <ModeCard
+                  label={mode.label}
+                  description={mode.description}
+                  icon={mode.icon}
+                  onClick={mode.onClick}
+                  accent={mode.accent}
+                  modeId={mode.id}
+                  onRecordOperation={recordOperation}
+                  energyCost={mode.energyCost}
+                  estimatedTime={mode.estimatedTime}
+                />
+              </div>
+            )
+          })}
+        </section>
 
+        {/* PVE Result Modal */}
+        <PVEResultModal
+          isOpen={showPVEResult}
+          onClose={() => {
+            setShowPVEResult(false)
+            setBattleState(null)
+          }}
+          onPlayAgain={() => {
+            setShowPVEResult(false)
+            setBattleState(null)
+            // 重新開始 PVE 對戰 - 觸發 Focus 模式
+            setFocusModalOpen(true)
+          }}
+        />
 
-          <div className="mx-auto mt-6 flex w-full max-w-lg flex-col gap-3">
-            <div data-widget="daily-mission">
-              <DailyMissionWidgetV2 />
-            </div>
-            {modeCards.map((card, index) => (
-              <motion.div
-                key={card.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-              >
-                <ModeCard {...card} modeId={card.id} onRecordOperation={recordOperation} />
-              </motion.div>
-            ))}
-          </div>
-        </div>
+        {/* Battle Modals - Controlled by activeModal state */}
+        {activeModal === 'SYSTEM' && (
+          <SystemBattleModal onClose={closeModal} />
+        )}
+
+        {/* Other Modals */}
+        <ChestModal isOpen={isChestModalOpen} onClose={() => setChestModalOpen(false)} />
+        <FocusModeModal isOpen={isFocusModalOpen} onClose={() => setFocusModalOpen(false)} />
+        <EditorModal isOpen={isEditorModalOpen} onClose={() => setEditorModalOpen(false)} />
+        <PracticeSourceModal
+          isOpen={isPracticeSourceModalOpen}
+          onClose={() => setIsPracticeSourceModalOpen(false)}
+        />
       </div>
-
-      <Dialog open={isChestModalOpen} onOpenChange={setChestModalOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>寶箱背包</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            {progression?.chests?.length ? (
-              progression.chests.map((chest) => (
-                <Card key={chest.id} className="border border-border bg-card p-3 text-card-foreground">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-semibold">{chest.chestType} Chest</div>
-                      <div className="text-xs text-muted-foreground">{chest.source}</div>
-                    </div>
-                    <Button size="sm" variant="secondary" onClick={() => openChest(chest.id)}>
-                      開啟
-                    </Button>
-                  </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                    {chest.rewards?.gold && <span>Gold +{chest.rewards.gold}</span>}
-                    {chest.rewards?.xp && <span>XP +{chest.rewards.xp}</span>}
-                    {chest.rewards?.buff && <span>Buff x{chest.rewards.buff.multiplier}</span>}
-                  </div>
-                </Card>
-              ))
-            ) : (
-              <p className="text-center text-sm text-muted-foreground">目前沒有寶箱</p>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <AnimatePresence>
-        {activeModal === 'SYSTEM' && <SystemBattleModal onClose={closeModal} />}
-        {activeModal === 'CUSTOM' && <CustomBattleModal onClose={closeModal} />}
-        {activeModal === 'UGC_CONTRACT' && <UGCContractModal onClose={closeModal} />}
-        {activeModal === 'BATTLE_RESULT' && (
-          <GamifiedMatchResultModal onClose={closeModal} />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showPveCountdownOverlay && (
-          <BattleTransitionOverlay
-            key="pve-countdown"
-            variant="pve-countdown"
-            countdown={pveCountdown}
-            matchId={battleState?.matchId ?? null}
-            questionCount={battleState?.questionList.length || 0}
-            enableSkip={canSkipCountdown}
-            onSkipCountdown={handleSkipCountdown}
-          />
-        )}
-        {!showPveCountdownOverlay && showPveTransitionOverlay && (
-          <BattleTransitionOverlay
-            key="pve-transition"
-            variant="syncing"
-            countdown={null}
-            matchId={battleState?.matchId ?? null}
-            questionCount={battleState?.questionList.length || 0}
-            onSkipCountdown={() => setIsPveTransitioning(false)}
-          />
-        )}
-        {!showPveCountdownOverlay && !showPveTransitionOverlay && showMatchTransitionOverlay && (
-          // Dead code removed for PVP sync overlay
-          null
-        )}
-
-      </AnimatePresence>
-
-      {/* 系統對戰不再顯示大廳確認UI，直接開始遊戲 */}
-
-      <TamagotchiWidget />
-
-      <AnimatePresence>
-        {isFocusModalOpen && <FocusModeModal onClose={() => setFocusModalOpen(false)} />}
-        {isEditorModalOpen && <EditorGameModal isOpen={isEditorModalOpen} onClose={() => setEditorModalOpen(false)} />}
-        {isPracticeSourceModalOpen && (
-          <PracticeSourceModal
-            isOpen={isPracticeSourceModalOpen}
-            onClose={() => setIsPracticeSourceModalOpen(false)}
-          />
-        )}
-        {isPracticeSetupModalOpen && <PracticeRoomSetupModal isOpen={isPracticeSetupModalOpen} onClose={() => setPracticeSetupModalOpen(false)} />}
-      </AnimatePresence>
-
-    </>
+    </main>
   )
 }
 

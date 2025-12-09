@@ -114,7 +114,7 @@ export function UGCReviewModal({ onClose }: UGCReviewModalProps) {
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[90dvh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>UGC 題目審核</DialogTitle>
         </DialogHeader>

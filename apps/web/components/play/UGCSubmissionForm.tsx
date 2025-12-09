@@ -85,7 +85,7 @@ export function UGCSubmissionForm({ onClose, onSubmit }: UGCSubmissionFormProps)
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>創建自訂題目</DialogTitle>
         </DialogHeader>

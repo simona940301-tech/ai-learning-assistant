@@ -131,7 +131,7 @@ export function ContractBrowseModal({ onClose }: ContractBrowseModalProps) {
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>瀏覽合約</DialogTitle>
         </DialogHeader>

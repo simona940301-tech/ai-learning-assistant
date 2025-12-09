@@ -159,7 +159,9 @@ export function GamifiedMatchResultModal({ onClose }: GamifiedMatchResultModalPr
 
         let answersData: any = { success: false }
         for (let i = 0; i < retries; i++) {
-          const answersRes = await fetch(`/api/play/battle/answers?matchId=${postMatchInsights.matchId}`)
+          const answersRes = await fetch(`/api/play/battle/answers?matchId=${postMatchInsights.matchId}`, {
+            credentials: 'include'
+          })
           answersData = await answersRes.json()
           console.log(`[GamifiedMatchResultModal] 答題記錄 (第 ${i + 1} 次嘗試):`, answersData)
 
@@ -186,7 +188,9 @@ export function GamifiedMatchResultModal({ onClose }: GamifiedMatchResultModalPr
           return
         }
 
-        const detailsRes = await fetch(`/api/play/questions/details?ids=${wrongQuestionIds.join(',')}`)
+        const detailsRes = await fetch(`/api/play/questions/details?ids=${wrongQuestionIds.join(',')}`, {
+          credentials: 'include'
+        })
         const detailsData = await detailsRes.json()
 
         if (!detailsData.success || !detailsData.questions) {

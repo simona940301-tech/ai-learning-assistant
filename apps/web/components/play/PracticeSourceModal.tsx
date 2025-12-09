@@ -125,7 +125,7 @@ export function PracticeSourceModal({ isOpen, onClose }: PracticeSourceModalProp
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+            <DialogContent className="max-w-lg max-h-[85dvh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>選擇練習來源</DialogTitle>
                     <DialogDescription>選擇你想要練習的題目來源</DialogDescription>

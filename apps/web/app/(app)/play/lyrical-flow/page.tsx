@@ -12,10 +12,32 @@ import { motion } from 'framer-motion';
 
 export default function LyricalFlowPage() {
     const router = useRouter();
-    const { gameStatus, setArtists, setLevels, startGame } = useGameStore();
+    const {
+        gameStatus,
+        setArtists,
+        setLevels,
+        startGame,
+        generateSessionId,
+        loadSavedVocabularyIds,
+    } = useGameStore();
+
+    // 🎯 Initialize session and load saved vocabulary on mount
+    React.useEffect(() => {
+        generateSessionId();
+        loadSavedVocabularyIds();
+    }, [generateSessionId, loadSavedVocabularyIds]);
 
     return (
-        <div className="relative w-full h-screen bg-gradient-to-br from-zinc-50 to-zinc-100 dark:from-zinc-950 dark:to-zinc-900 overflow-hidden flex flex-col items-center justify-center touch-none overscroll-y-none">
+        <div
+            className="relative w-full overflow-hidden flex flex-col items-center justify-center"
+            style={{
+                height: '100dvh', // 🎯 SOTA: Dynamic viewport height (excludes browser UI)
+                touchAction: 'none', // 🎯 SOTA: Disable browser pan/zoom gestures
+                overscrollBehavior: 'none', // 🎯 SOTA: Disable pull-to-refresh
+                WebkitOverflowScrolling: 'touch', // Smooth scrolling on iOS
+                backgroundColor: 'hsl(var(--background))' // Minimalist solid background
+            }}
+        >
             {/* Minimal Header */}
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
@@ -29,8 +51,12 @@ export default function LyricalFlowPage() {
                     <X className="w-6 h-6 text-zinc-600 dark:text-zinc-400" />
                 </button>
 
-                <div className="px-4 py-2 rounded-full bg-white/50 dark:bg-zinc-800/50 backdrop-blur-md text-sm font-medium text-zinc-600 dark:text-zinc-400 border border-zinc-200/50 dark:border-zinc-700/50">
-                    Lyrical Flow
+                <div className="px-4 py-2 rounded-full backdrop-blur-md text-sm font-medium border" style={{
+                    backgroundColor: 'hsl(var(--card) / 0.5)',
+                    color: 'hsl(var(--foreground))',
+                    borderColor: 'hsl(var(--border))'
+                }}>
+                    歌詞學習
                 </div>
 
                 <div className="w-10" /> {/* Spacer for centering */}
@@ -53,10 +79,6 @@ export default function LyricalFlowPage() {
 
                 {gameStatus === 'review' && <ReviewMode />}
             </div>
-
-            {/* Ambient Background Elements */}
-            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
         </div>
     );
 }

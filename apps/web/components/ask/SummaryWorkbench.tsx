@@ -4,6 +4,7 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { Sparkles, Loader2, AlertCircle, MessageSquare, Check, Menu, FileText } from 'lucide-react'
 import { FileUploader } from '@/components/ask/file-uploader'
 import { Button } from '@/components/ui/button'
+import { TutorialBubble } from '@/components/ui/tutorial-bubble'
 import { useAsk } from '@/lib/ask-context'
 import { cn } from '@/lib/utils'
 import ProgressiveAnalysisCard from '@/components/ask/ProgressiveAnalysisCard'
@@ -58,52 +59,7 @@ class ClassificationError extends Error {
 }
 
 
-/**
- * Format full analysis content for saving
- */
-const formatFullContent = (
-    analysis: FileAnalysis,
-    options: {
-        includeKeyConcepts: boolean
-        includeExamPredictions: boolean
-    } = { includeKeyConcepts: true, includeExamPredictions: true }
-): string => {
-    let md = ''
-
-    // 1. Summary (always included)
-    const summary = analysis.structuredNotes || analysis.quickSummary
-    if (summary) {
-        md += summary + '\n\n'
-    }
-
-    // 2. Core Concepts (optional)
-    if (options.includeKeyConcepts && analysis.coreConcepts && analysis.coreConcepts.length > 0) {
-        md += '---\n\n## 🔑 關鍵概念\n\n'
-        analysis.coreConcepts.forEach((c) => {
-            md += `### ${c.concept}\n${c.explanation}\n`
-            if (c.importance) md += `**重要性**: ${c.importance}\n`
-            md += '\n'
-        })
-    }
-
-    // 3. Exam Predictions (optional)
-    if (options.includeExamPredictions && analysis.examPredictions && analysis.examPredictions.length > 0) {
-        md += '---\n\n## 📝 考題預測\n\n'
-        analysis.examPredictions.forEach((q, i) => {
-            md += `### 題目 ${i + 1}\n${q.questionText}\n\n`
-            if (q.options && q.options.length > 0) {
-                q.options.forEach((opt) => {
-                    md += `- ${opt.label}. ${opt.text}\n`
-                })
-                md += '\n'
-            }
-            if (q.correctAnswer) md += `**答案**: ${q.correctAnswer}\n`
-            if (q.explanation) md += `**解析**: ${q.explanation}\n\n`
-        })
-    }
-
-    return md
-}
+import { formatFullContent } from '@/lib/utils/analysis-formatter'
 
 /**
  * SummaryWorkbench Component
@@ -764,7 +720,7 @@ export function SummaryWorkbench({ onMenuOpen }: SummaryWorkbenchProps = {}) {
             const data = await response.json()
 
             if (!response.ok) {
-                throw new Error(data.message || '保存失敗')
+                throw new Error(data.message || data.error || '保存失敗')
             }
 
             console.log('[SummaryWorkbench] ✅ Saved to backpack:', data)
@@ -939,6 +895,13 @@ export function SummaryWorkbench({ onMenuOpen }: SummaryWorkbenchProps = {}) {
                     <div className="space-y-6">
                         {/* File Uploader */}
                         <FileUploader />
+                        <TutorialBubble
+                            featureKey="summary_upload_hint"
+                            message={`第一步：\n請先上傳你的講義或筆記檔案`}
+                            position="center"
+                            trigger={attachedFiles.length === 0}
+                            className="bg-zinc-800/90"
+                        />
 
                         {/* Action Button */}
                         <div className="flex flex-col items-center gap-4">
@@ -1219,6 +1182,13 @@ export function SummaryWorkbench({ onMenuOpen }: SummaryWorkbenchProps = {}) {
                                                     </>
                                                 )}
                                             </Button>
+                                            <TutorialBubble
+                                                featureKey="summary_save_hint"
+                                                message={`分析完成！\n點擊這裡將重點筆記存入書包`}
+                                                position="relative"
+                                                className="absolute bottom-full mb-4 left-1/2 -translate-x-1/2 w-max"
+                                                trigger={!!analysisContent}
+                                            />
                                         </div>
                                     </motion.div>
                                 )}

@@ -12,13 +12,19 @@ interface GameState {
     words: Word[];
     currentIndex: number;
     mistakeQueue: string[]; // ids of words swiped left
-    favorites: string[]; // ids of bookmarked words
+    favorites: string[]; // ids of bookmarked words (session-based)
     swipeHistory: { wordId: string; direction: 'left' | 'right' }[];
     sessionCounter: number; // tracks cards swiped in current session
 
     gameStatus: 'artist-selection' | 'level-selection' | 'playing' | 'review';
     selectedArtists: string[];
     selectedLevels: string[];
+
+    // 🎯 Vocabulary Notebook State
+    sessionId: string; // Unique session ID for source tracking
+    savedVocabularyIds: Set<string>; // Track saved word texts (for deduplication)
+    captureModalOpen: boolean; // Control VocabularyCaptureModal
+    importantQueue: string[]; // 🎯 Track words marked as important (Star)
 
     // Actions
     setArtists: (artists: string[]) => void;
@@ -28,7 +34,15 @@ interface GameState {
     swipe: (direction: 'left' | 'right') => void;
     handleFlowControlSwipe: (direction: 'left' | 'right') => void; // New action for the Flow Control Card
     bookmark: (wordId: string) => void;
+    toggleImportant: (wordId: string) => void; // 🎯 Action to toggle important status
     restartGame: () => void;
+
+    // 🎯 Vocabulary Notebook Actions
+    generateSessionId: () => string; // Generate UUID for session
+    loadSavedVocabularyIds: () => Promise<void>; // Load saved word IDs from API
+    markWordsAsSaved: (wordTexts: string[]) => void; // Mark words as saved
+    openCaptureModal: () => void; // Open vocabulary capture modal
+    closeCaptureModal: () => void; // Close vocabulary capture modal
 }
 
 const SESSION_LIMIT = 20;
@@ -57,6 +71,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     selectedArtists: [],
     selectedLevels: [],
 
+    // 🎯 Vocabulary Notebook State
+    sessionId: '',
+    savedVocabularyIds: new Set(),
+    captureModalOpen: false,
+    importantQueue: [],
+
     setArtists: (artists) => set({ selectedArtists: artists, gameStatus: 'level-selection' }),
     setLevels: (levels) => set({ selectedLevels: levels }),
 
@@ -76,13 +96,15 @@ export const useGameStore = create<GameState>((set, get) => ({
                 ? selectedLevels.map(Number)
                 : [1];
 
-            // Fetch words from Supabase (using singleton client)
-            // Limit to 100 random words (using random sorting RPC would be better, but for MVP fetch and shuffle locally)
-            const { data, error } = await supabase
-                .from('words')
-                .select('*')
-                .in('level', levels)
-                .limit(100);
+            const { data: { user } } = await supabase.auth.getUser();
+
+            // 🚀 SOTA Optimization: Server-side Sampling & Status Check
+            // Use RPC to fetch randomized words with 'is_saved' status in one go.
+            const { data, error } = await supabase.rpc('get_random_words_with_status', {
+                p_user_id: user?.id,
+                p_levels: levels,
+                p_limit: 20 // Optimized batch size (user can load more by swiping 'Right' on flow card)
+            });
 
             if (error) throw error;
 
@@ -98,12 +120,9 @@ export const useGameStore = create<GameState>((set, get) => ({
                 return;
             }
 
-            // ✅ 使用正確的 Fisher-Yates shuffle
-            const shuffled = fisherYatesShuffle(data);
-
-            // ✅ 優化：使用 map 直接轉換，避免不必要的中間變量
-            const mappedWords: Word[] = shuffled.map(w => ({
-                id: w.id || crypto.randomUUID(), // Ensure ID
+            // Map RPC result to Word interface
+            const mappedWords: Word[] = data.map((w: any) => ({
+                id: w.id || crypto.randomUUID(),
                 text: w.text,
                 pos: w.pos,
                 level: `Level ${w.level}`,
@@ -113,28 +132,32 @@ export const useGameStore = create<GameState>((set, get) => ({
                     artist: w.lyric_match.artist,
                     song: w.lyric_match.song_title,
                     line: w.lyric_match.lyric_snippet
-                } : undefined
+                } : undefined,
+                is_saved: w.is_saved // From RPC
             }));
 
-            // ✅ 優化：使用 flatMap 減少迭代次數
-            let finalWords = mappedWords;
-            if (mappedWords.length < 20) {
-                // 重複 3 次，但使用更高效的方式
-                finalWords = Array(3).fill(null).flatMap((_, repeatIdx) =>
-                    mappedWords.map((w, idx) => ({
-                        ...w,
-                        id: `${w.id}-${repeatIdx}-${idx}`
-                    }))
-                );
-            }
+            // Infinite Flow Logic:
+            // Since we use RPC random sampling, we don't need to duplicate the array locally for "fake infinite".
+            // We just let the user swipe. When they hit the FlowControlCard, we trigger 'loadWords' again
+            // and the DB gives us a FRESH random batch. This is TRUE infinite flow.
 
             set({
-                words: finalWords,
+                words: mappedWords, // No client-side shuffling or duplication needed
                 currentIndex: 0,
                 mistakeQueue: [],
                 swipeHistory: [],
                 sessionCounter: 0,
-                gameStatus: 'playing'
+                gameStatus: 'playing',
+                importantQueue: [] // Reset important queue on new load? Or keep it? kept per session usually. 
+                // But loadWords is called for "Next Batch". We probably want to KEEP importantQueue across batches 
+                // if we want to summary at the very end. 
+                // HOWEVER, the "Session Recap" happens every 20 words.
+                // So resetting here is probably correct for the "Batch Recap".
+                // User said: "allow them to save words they feel are important".
+                // If they swipe 20, get recap, save some. Then continue.
+                // If they exit early, get recap.
+                // So resetting on `loadWords` (which is New Batch) makes sense IF `loadWords` is only called for new batch.
+                // Wait, `loadWords` is also called on `startGame`.
             });
 
         } catch (err) {
@@ -181,11 +204,20 @@ export const useGameStore = create<GameState>((set, get) => ({
             // If we want TRUE infinite scroll where we just keep going through the big list:
             // we should just reset `sessionCounter` to 0. Use `loadWords` only if near end.
 
+            // 🎯 FIX: We need to clear queues between batches if we are summarizing per batch.
+            // If Flow Control appears, user saw summary. 
+            // "Mastered" and "To Review" counts are based on `mistakeQueue` and `sessionCounter`.
+            // So we SHOULD reset them for the next batch.
+
             const { words, currentIndex } = get();
 
             // If we have plenty of words left, just reset session counter.
             if (currentIndex < words.length - 20) {
-                set({ sessionCounter: 0 });
+                set({
+                    sessionCounter: 0,
+                    mistakeQueue: [], // Reset for next batch stats
+                    importantQueue: [] // Reset for next batch stats
+                });
             } else {
                 // If running low, reload (which resets to start of list effectively looping)
                 get().loadWords();
@@ -208,6 +240,17 @@ export const useGameStore = create<GameState>((set, get) => ({
         });
     },
 
+    toggleImportant: (wordId) => {
+        set((state) => {
+            const isImportant = state.importantQueue.includes(wordId);
+            return {
+                importantQueue: isImportant
+                    ? state.importantQueue.filter(id => id !== wordId)
+                    : [...state.importantQueue, wordId]
+            };
+        });
+    },
+
     restartGame: () => {
         // Reuse loadWords to restart logic
         get().loadWords();
@@ -216,10 +259,42 @@ export const useGameStore = create<GameState>((set, get) => ({
             gameStatus: 'playing',
             currentIndex: 0,
             mistakeQueue: [],
+            importantQueue: [],
             swipeHistory: [],
             sessionCounter: 0,
             selectedArtists: [],
             selectedLevels: []
         });
-    }
+    },
+
+    // 🎯 Vocabulary Notebook Actions Implementation
+    generateSessionId: () => {
+        const timestamp = Date.now();
+        const randomId = Math.random().toString(36).substring(2, 10);
+        const sessionId = `lyrical-flow-${timestamp}-${randomId}`;
+        set({ sessionId });
+        return sessionId;
+    },
+
+    loadSavedVocabularyIds: async () => {
+        // 🗑️ DEPRECATED: This massive fetch is no longer needed.
+        // The RPC 'get_random_words_with_status' handles this efficiently per batch.
+        // We keep the method signature empty to avoid breaking components calling it,
+        // but it performs no action.
+        console.log('[useGameStore] loadSavedVocabularyIds skipped (Optimized)');
+    },
+
+    markWordsAsSaved: (wordTexts: string[]) => {
+        // Update local state is_saved flag
+        set(state => ({
+            words: state.words.map(w =>
+                wordTexts.includes(w.text) ? { ...w, is_saved: true } : w
+            ),
+            // Also update Set for legacy components if any
+            savedVocabularyIds: new Set([...state.savedVocabularyIds, ...wordTexts])
+        }));
+    },
+
+    openCaptureModal: () => set({ captureModalOpen: true }),
+    closeCaptureModal: () => set({ captureModalOpen: false }),
 }));

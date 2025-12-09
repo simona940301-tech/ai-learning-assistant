@@ -249,7 +249,7 @@ export function BattleResultModal({
             <DialogTitle>對戰結果</DialogTitle>
             <DialogDescription id="battle-result-description">顯示本場勝負、獎勵與戰後建議</DialogDescription>
           </DialogHeader>
-          <div className="flex max-h-[calc(100vh-4rem)] flex-col bg-gradient-to-b from-[#05070E] to-[#101525] text-white">
+          <div className="flex max-h-[calc(100dvh-4rem)] flex-col bg-gradient-to-b from-[#05070E] to-[#101525] text-white">
             <div className="relative border-b border-white/10 px-6 py-5">
               <div className="flex items-center justify-between">
                 <p className="text-xs uppercase tracking-[0.3em] text-white/60">Layered Celebration</p>

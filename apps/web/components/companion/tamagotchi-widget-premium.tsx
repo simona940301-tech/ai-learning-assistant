@@ -306,7 +306,11 @@ export function TamagotchiWidget() {
                     variants={containerVariants}
                     onMouseEnter={() => setIsHovered(true)}
                     onMouseLeave={() => setIsHovered(false)}
-                    onClick={() => {/* openBottomSheet() - Temporarily disabled */}}
+                    onClick={() => {
+                        // 🎯 Mobile: Tap to toggle hover state
+                        setIsHovered(!isHovered)
+                        /* openBottomSheet() - Temporarily disabled */
+                    }}
                     className="pointer-events-auto relative flex h-24 w-24 items-center justify-center focus:outline-none"
                     aria-label="Open Chick Companion"
                     style={{ willChange: 'transform' }}

@@ -52,6 +52,9 @@ export async function POST(req: NextRequest) {
 
             const uniqueOptions = Array.from(new Set(options));
 
+            // Extract explanation (already handled in fetchPveQuestions)
+            const explanation = q.explanation;
+
             return {
                 id: String(q.id),
                 question_text: (q.question_text || '').trim(),
@@ -60,6 +63,7 @@ export async function POST(req: NextRequest) {
                 difficulty: q.difficulty_level || q.difficulty || 3,
                 time_limit: timeLimit,
                 skill_tags: q.skill_tags || q.knowledge_tags || [],
+                explanation: explanation, // Include explanation for frontend
             }
         }).filter(q => q.question_text.length > 0 && q.options.length >= 2)
 

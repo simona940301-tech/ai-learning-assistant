@@ -27,6 +27,27 @@ export async function POST(req: NextRequest) {
                 score_awarded: score
             })
 
+        // 🎯 Update User Answers for Ready Score (Dream School)
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+            // Estimate response time (default 30s limit if unknown)
+            const responseTimeMs = Math.max(0, (30 - (timeRemaining || 0)) * 1000)
+
+            await supabase.from('user_answers').insert({
+                user_id: user.id,
+                question_id: questionId,
+                is_correct: isCorrect,
+                metadata: {
+                    subject: body.subject || 'english',
+                    difficulty: body.difficulty || 3,
+                    response_time_ms: responseTimeMs,
+                    source: 'pve_match'
+                }
+            }).then(({ error }) => {
+                if (error) console.error('[PVE Submit] user_answers insert failed:', error)
+            })
+        }
+
         if (error) {
             // Fallback: Update match_history's current score
             await supabase.rpc('increment_match_score', {

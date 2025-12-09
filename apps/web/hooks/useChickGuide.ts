@@ -48,18 +48,16 @@ export function useChickGuide() {
     setQueue((prev) => [...prev, config])
   }
 
-  const node = current ? (
-    <ChickGuide
-      key={current.id}
-      targetSelector={current.targetSelector}
-      message={current.message}
-      priority={current.priority}
-      onDismiss={() => {
-        markSeen(current.id)
-        setCurrent(null)
-      }}
-    />
-  ) : null
+  const handleDismiss = () => {
+    if (current) {
+      markSeen(current.id)
+      setCurrent(null)
+    }
+  }
 
-  return { showGuide, guideNode: node }
+  return {
+    showGuide,
+    currentGuide: current,
+    dismissGuide: handleDismiss
+  }
 }

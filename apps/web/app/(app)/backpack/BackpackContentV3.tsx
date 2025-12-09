@@ -9,7 +9,7 @@ import { ErrorBookCard } from '@/components/backpack/ErrorBookCard'
 import { QuestionSetCard } from '@/components/backpack/QuestionSetCard'
 import { TypeTabs } from '@/components/backpack/TypeTabs'
 import { Button } from '@/components/ui/button'
-import { Plus, Book, Store, Edit2, Trash2, X, Sparkles, CheckSquare } from 'lucide-react'
+import { Plus, Book, Store, Edit2, Trash2, X, Sparkles, CheckSquare, BookText } from 'lucide-react'
 import { useAsk } from '@/lib/ask-context'
 import type { BackpackFile } from '@/lib/types'
 import { NoteViewerModal } from '@/components/backpack/NoteViewerModal'
@@ -75,6 +75,7 @@ export function BackpackContentV3() {
   const [items, setItems] = useState<BackpackFile[]>([])
   const [errorBookItems, setErrorBookItems] = useState<any[]>([])
   const [questionSetItems, setQuestionSetItems] = useState<any[]>([])
+  const [vocabularyCount, setVocabularyCount] = useState(0) // 🎯 Vocabulary count
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showUpload, setShowUpload] = useState(false)
@@ -144,6 +145,22 @@ export function BackpackContentV3() {
       setLoading(false)
     }
   }, [contentType])
+
+  // 🎯 Load vocabulary count
+  useEffect(() => {
+    const loadVocabularyCount = async () => {
+      try {
+        const response = await fetch('/api/vocabulary/list?limit=1', { credentials: 'include' })
+        const data = await response.json().catch(() => ({}))
+        if (response.ok && data.stats) {
+          setVocabularyCount(data.stats.total_words || 0)
+        }
+      } catch (error) {
+        console.error('Failed to load vocabulary count:', error)
+      }
+    }
+    loadVocabularyCount()
+  }, [])
 
   // 🚀 NEW: Load more function for infinite scroll
   const loadMore = useCallback(() => {
@@ -334,7 +351,13 @@ export function BackpackContentV3() {
   // Folder View (Second Layer)
   if (!selectedSubject) {
     return (
-      <div className="mx-auto max-w-lg min-h-full bg-background">
+      <div
+        className="mx-auto max-w-lg min-h-full bg-background"
+        style={{
+          // 🎯 SOTA Mobile Fix: 预留 TabBar 空间，防止内容被遮挡
+          paddingBottom: 'var(--content-bottom-padding)',
+        }}
+      >
         {/* Header with Title */}
 
 
@@ -344,6 +367,35 @@ export function BackpackContentV3() {
         {/* Second Layer: Folder List */}
         <div className="px-4 py-4">
           <div className="space-y-3">
+            {/* 🎯 Vocabulary Notebook Entry (Note mode only) */}
+            {contentType === 'note' && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                onClick={() => router.push('/backpack/vocabulary')}
+                className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 p-4 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02]"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-white/20 backdrop-blur-sm">
+                      <Sparkles className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-white font-bold text-base">單字本</h3>
+                      <p className="text-white/80 text-xs mt-0.5">
+                        {vocabularyCount > 0 ? `已收藏 ${vocabularyCount} 個單字` : '開始收集生字'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-white/60 group-hover:text-white transition-colors">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
             {subjects.map((subject) => (
               <FolderCard
                 key={subject.id}
@@ -378,7 +430,13 @@ export function BackpackContentV3() {
   const subjectInfo = subjects.find((s) => s.id === selectedSubject)
 
   return (
-    <div className="mx-auto max-w-lg min-h-full bg-background">
+    <div
+      className="mx-auto max-w-lg min-h-full bg-background"
+      style={{
+        // 🎯 SOTA Mobile Fix: 预留 TabBar 空间，防止内容被遮挡
+        paddingBottom: 'var(--content-bottom-padding)',
+      }}
+    >
       {/* Header with Title */}
 
 

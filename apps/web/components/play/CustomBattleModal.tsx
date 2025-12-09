@@ -177,7 +177,7 @@ export function CustomBattleModal({ onClose }: CustomBattleModalProps) {
   if (customMode === 'CREATE_ROOM') {
     return (
       <Dialog open={true} onOpenChange={onClose}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-md max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>創建房間</DialogTitle>
             <DialogDescription>創建自訂對戰房間，設置房間名稱、學科和題目來源</DialogDescription>

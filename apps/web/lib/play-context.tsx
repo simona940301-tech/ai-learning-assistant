@@ -1,9 +1,11 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { supabaseBrowser } from '@/lib/supabase'
 import { ProfileRepo } from '@/lib/dal/profile-repo'
+import { getRandomOpponentFairy } from '@/lib/avatar/presets'
 
 // ============================================
 // Types
@@ -23,6 +25,7 @@ export interface Question {
   timeLimit?: number
   skill_tags?: string[]
   skillTags?: string[]
+  explanation?: string
 }
 
 export interface AnswerRecord {
@@ -45,6 +48,7 @@ export interface BattleState {
   playerHasAnswered: boolean
   opponentStatus: OpponentStatus
   opponentAnswer: 'A' | 'B' | 'C' | 'D' | null
+  opponentAvatar?: string // 對手頭像 ID
   hasShield?: boolean
   ddaBand?: 'low' | 'target' | 'high' // DDA 難度區間（根據答題結果推斷）
   answerRecords?: AnswerRecord[] // 追蹤答題記錄
@@ -185,9 +189,7 @@ export interface PlayContextType {
   pveCountdown: number | null
   setPveCountdown: React.Dispatch<React.SetStateAction<number | null>>
 
-  // PVE transition state (waiting for MATCH_FOUND)
-  isPveTransitioning: boolean
-  setIsPveTransitioning: React.Dispatch<React.SetStateAction<boolean>>
+
 
   // Progression
   progression: ProgressionStatus | null
@@ -229,7 +231,7 @@ export function PlayProvider({ children }: { children: React.ReactNode }) {
   const [arousalLevel, setArousalLevel] = useState(0)
   const [postMatchInsights, setPostMatchInsights] = useState<PostMatchInsights | null>(null)
   const [pveCountdown, setPveCountdown] = useState<number | null>(null)
-  const [isPveTransitioning, setIsPveTransitioning] = useState(false)
+
   const [progression, setProgression] = useState<ProgressionStatus | null>(null)
 
   // ============================================
@@ -502,7 +504,7 @@ export function PlayProvider({ children }: { children: React.ReactNode }) {
 
       console.log('[PlayProvider] 🚀 Starting PVE match via HTTP:', { type, subject, timeLimit, origin })
       setBattleFlow('QUEUEING')
-      setIsPveTransitioning(true)
+
 
       try {
         const response = await fetch('/api/play/pve/start', {
@@ -521,6 +523,9 @@ export function PlayProvider({ children }: { children: React.ReactNode }) {
         if (!data.success) throw new Error(data.error || 'Unknown error')
 
         // Initialize Battle State directly
+        // 🎯 FIX: Generate a stable opponent avatar for the match
+        const stableOpponentAvatar = getRandomOpponentFairy().id
+
         setBattleState({
           matchId: data.matchId,
           matchType: type,
@@ -533,28 +538,29 @@ export function PlayProvider({ children }: { children: React.ReactNode }) {
           player2Streak: 0,
           playerHasAnswered: false,
           answerRecords: [],
-          opponentStatus: 'idle',
+          opponentStatus: 'thinking', // AI starts thinking immediately
           opponentAnswer: null, // 🎯 FIX: Required field for BattleState type
+          opponentAvatar: stableOpponentAvatar, // 🎯 FIX: Stable Avatar
           roundStartedAt: Date.now(),
           roundExpiresAt: Date.now() + (timeLimit || 20) * 1000
         })
 
         setBattleFlow('IN_BATTLE')
-        setIsPveTransitioning(false)
+
         console.log('[PlayProvider] ✅ PVE Match started locally with', data.questions.length, 'questions')
         return { ok: true }
 
       } catch (err: any) {
         console.error('[PlayProvider] PVE Start Error:', err)
         setBattleFlow('IDLE')
-        setIsPveTransitioning(false)
+
         return { ok: false, error: '無法啟動對戰，請稍後再試' }
       }
     }
 
     // PvP is currently disabled
     return { ok: false, error: 'PVP 對戰功能即將推出' }
-  }, [checkEnergy, setIsPveTransitioning, user?.id])
+  }, [checkEnergy, user?.id])
 
   // Auto-confirm Lobby removed
 
@@ -684,7 +690,7 @@ export function PlayProvider({ children }: { children: React.ReactNode }) {
           currentQuestionIndex: nextIndex,
           playerHasAnswered: false,
           opponentAnswer: null, // Reset opponent
-          opponentStatus: 'thinking',
+          opponentStatus: 'thinking', // AI starts thinking immediately
           roundStartedAt: Date.now(),
           roundExpiresAt: Date.now() + (prev.questionList[nextIndex].timeLimit || 20) * 1000
         }
@@ -693,8 +699,7 @@ export function PlayProvider({ children }: { children: React.ReactNode }) {
     postMatchInsights,
     pveCountdown,
     setPveCountdown,
-    isPveTransitioning,
-    setIsPveTransitioning,
+
     progression,
     refreshProgression: fetchProgressionStatus,
     openChest,
@@ -744,8 +749,7 @@ export function createMockPlayContextValue(overrides: Partial<PlayContextType> =
     setPostMatchInsights: noopDispatch,
     pveCountdown: null,
     setPveCountdown: noopDispatch,
-    isPveTransitioning: false,
-    setIsPveTransitioning: noopDispatch,
+
     progression: null,
     refreshProgression: asyncNoop,
     openChest: asyncNoop,

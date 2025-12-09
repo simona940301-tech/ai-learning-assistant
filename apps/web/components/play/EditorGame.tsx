@@ -275,7 +275,7 @@ export function EditorGame({ onComplete }: { onComplete?: (score: number, total:
     const totalCount = Object.keys(ANSWER_KEY).length
 
     return (
-        <div className="flex flex-col h-full max-h-[80vh] gap-6">
+        <div className="flex flex-col h-full max-h-[80dvh] gap-6">
             {/* Header Stats */}
             <div className="flex items-center justify-between px-1">
                 <div className="flex gap-4 text-sm text-muted-foreground">

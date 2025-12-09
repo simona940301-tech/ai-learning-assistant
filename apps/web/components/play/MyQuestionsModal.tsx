@@ -108,7 +108,7 @@ export function MyQuestionsModal({ onClose }: MyQuestionsModalProps) {
   if (selectedQuestion) {
     return (
       <Dialog open={true} onOpenChange={() => setSelectedQuestion(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>題目詳情</DialogTitle>
           </DialogHeader>
@@ -191,7 +191,7 @@ export function MyQuestionsModal({ onClose }: MyQuestionsModalProps) {
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>我的自創題目</DialogTitle>
           <DialogDescription>管理你創建的所有題目</DialogDescription>

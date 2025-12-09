@@ -1,11 +1,17 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle2, Gift, Loader2, Sparkles, Sword, BookOpen, Heart, Brain, Star } from 'lucide-react'
+import { CheckCircle2, Gift, Loader2, Sparkles, Sword, BookOpen, Heart, Brain, Star, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { toast } from 'sonner'
+import Image from 'next/image'
+import { useChickStore } from '@/src/store/chickStore'
+import { getChickImagePath } from '@/components/chick/chickImage'
+import type { ChickState } from '@/packages/server/chick/types'
+import { ChickInteractionModal } from '@/components/chick/ChickInteractionModal'
+import { ChickInteractionManager } from '@/components/chick/ChickInteractionManager'
 
 interface BonusItem {
     type: string
@@ -45,6 +51,14 @@ export function DailyMissionWidgetV2() {
     const [data, setData] = useState<DailyMissionData | null>(null)
     const [loading, setLoading] = useState(true)
     const [claiming, setClaiming] = useState(false)
+    const [showBubble, setShowBubble] = useState(false)
+    const [bubbleText, setBubbleText] = useState('')
+    const [isInteractionOpen, setIsInteractionOpen] = useState(false)
+
+    // Chick Store
+    const { iq, fatigue, emotionState, hunger, interact } = useChickStore()
+    const chickState: ChickState = { iq, fatigue, emotionState }
+    const imgSrc = getChickImagePath(chickState)
 
     useEffect(() => {
         fetchMissions()
@@ -76,8 +90,6 @@ export function DailyMissionWidgetV2() {
 
             if (res.ok) {
                 const result = await res.json()
-
-                // Check for bonus items
                 const bonusItems = data.missions
                     .filter(m => m.reward.bonus_item)
                     .map(m => m.reward.bonus_item?.name)
@@ -101,6 +113,8 @@ export function DailyMissionWidgetV2() {
                     }
                 )
                 setData(prev => prev ? { ...prev, rewards_claimed: true } : null)
+                // Trigger chick happy jump
+                void interact('poke')
             } else {
                 toast.error('領取失敗，請稍後再試')
             }
@@ -111,282 +125,215 @@ export function DailyMissionWidgetV2() {
         }
     }
 
+    // Dynamic Greeting based on time of day
+    const getGreeting = () => {
+        const hour = new Date().getHours()
+        if (hour >= 5 && hour < 12) return '早安'
+        if (hour >= 12 && hour < 18) return '午安'
+        if (hour >= 18 && hour < 22) return '晚安'
+        return '夜深了'
+    }
+
+    // Dynamic Default Text based on state
+    const defaultText = useMemo(() => {
+        if (data?.all_completed && !data?.rewards_claimed) return "太棒了！"
+        if (data?.rewards_claimed) return "明天繼續加油"
+        if (hunger < 30) return "我好餓..."
+        return getGreeting()
+    }, [data?.all_completed, data?.rewards_claimed, hunger])
+
+    const handleChickClick = () => {
+        // Open Interaction Modal
+        setIsInteractionOpen(true)
+
+        // Also show a quick happy bubble
+        setBubbleText("Cheep cheep!")
+        setShowBubble(true)
+        setTimeout(() => setShowBubble(false), 2000)
+    }
+
     if (loading) {
         return (
-            <div className="rounded-[24px] border border-border bg-card p-5">
-                <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 animate-pulse rounded-full bg-muted" />
-                    <div className="flex-1 space-y-2">
-                        <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-                        <div className="h-3 w-32 animate-pulse rounded bg-muted" />
-                    </div>
-                </div>
-            </div>
+            <div className="rounded-[20px] bg-[#FFF9EB] p-5 h-64 animate-pulse" />
         )
     }
 
-    // Show "Come back tomorrow" message if no data or rewards claimed
-    if (!data || data.rewards_claimed) {
-        return (
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="relative overflow-hidden rounded-[24px] border border-border/50 bg-card/50 p-5"
-            >
-                <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted/50">
-                        <Sparkles className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <div>
-                        <h3 className="text-sm font-semibold text-foreground">
-                            {data?.rewards_claimed ? '今日任務已完成！' : '每日任務'}
-                        </h3>
-                        <p className="text-xs text-muted-foreground">
-                            {data?.rewards_claimed ? '明天再來挑戰新任務' : '載入中...'}
-                        </p>
-                    </div>
-                </div>
-            </motion.div>
-        )
-    }
+    if (!data) return null
 
     const allCompleted = data.missions.every(m => m.is_completed)
     const progress = (data.missions.filter(m => m.is_completed).length / data.missions.length) * 100
 
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`
-                relative overflow-hidden rounded-[24px] border p-5 shadow-lg
-                transition-all duration-500
-                ${allCompleted
-                    ? 'border-primary bg-gradient-to-br from-card via-primary/5 to-card animate-pulse-glow'
-                    : 'border-border/50 bg-card'
-                }
-            `}
-        >
-            {/* Golden Glow Effect when All Completed */}
-            {allCompleted && (
-                <motion.div
-                    className="absolute inset-0 rounded-[24px] opacity-30"
-                    animate={{
-                        boxShadow: [
-                            '0 0 20px hsl(42, 98%, 70%)',
-                            '0 0 40px hsl(42, 98%, 70%)',
-                            '0 0 20px hsl(42, 98%, 70%)',
-                        ],
-                    }}
-                    transition={{
-                        duration: 2,
-                        repeat: Infinity,
-                        ease: 'easeInOut',
-                    }}
-                />
-            )}
+    // Format Date: Dec 09, Mon
+    const today = new Date()
+    const dateStr = today.toLocaleDateString('en-US', { month: 'short', day: '2-digit', weekday: 'short' })
 
-            {/* Header */}
-            <div className="relative z-10 mb-4 flex items-center justify-between">
-                <div className="flex items-center gap-2">
+    return (
+        <div
+            className="relative overflow-hidden rounded-[20px]"
+            style={{
+                background: '#FFFCF5',
+                padding: '16px 16px 20px'
+            }}
+        >
+            <ChickInteractionManager />
+            <ChickInteractionModal
+                isOpen={isInteractionOpen}
+                onClose={() => setIsInteractionOpen(false)}
+            />
+
+            {/* 1. Header Area - Dashboard Style */}
+            <div className="relative mb-5 flex justify-between items-start z-10">
+                {/* Left: Info */}
+                <div className="flex flex-col">
+                    {/* Greeting + Progress */}
+                    <div className="flex items-baseline gap-2 mb-1">
+                        <AnimatePresence mode="wait">
+                            <motion.span
+                                key={defaultText}
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                className="text-[15px] font-normal text-[#8B7355]"
+                            >
+                                {defaultText}
+                            </motion.span>
+                        </AnimatePresence>
+                        <span className="text-[13px] font-medium text-[#B88C55]/60">
+                            {Math.round(progress)}% 完成
+                        </span>
+                    </div>
+
+                    {/* Title */}
+                    <h3 className="text-[20px] font-semibold text-[#4A2E05] leading-tight">
+                        今日任務
+                    </h3>
+                </div>
+
+                {/* Right: The Stage for Chick */}
+                <div className="relative h-[100px] w-[90px] mr-2">
+                    {/* Shadow Base - Contact Shadow */}
+                    <div className="absolute bottom-2 left-1/2 h-1.5 w-10 -translate-x-1/2 rounded-[100%] bg-[#8B5E3C] opacity-20 blur-[1px]" />
+
+                    {/* Chick with Sticker Effect */}
                     <motion.div
-                        className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/20"
-                        animate={allCompleted ? {
-                            scale: [1, 1.1, 1],
-                            rotate: [0, 5, -5, 0]
-                        } : {}}
-                        transition={{
-                            duration: 2,
-                            repeat: allCompleted ? Infinity : 0,
-                            ease: 'easeInOut'
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleChickClick}
+                        className="relative h-full w-full cursor-pointer"
+                        style={{
+                            filter: 'drop-shadow(0 2px 0 #fff) drop-shadow(0 -2px 0 #fff) drop-shadow(2px 0 0 #fff) drop-shadow(-2px 0 0 #fff) drop-shadow(0 4px 6px rgba(0,0,0,0.05))'
                         }}
                     >
-                        <Sparkles className="h-5 w-5 text-primary" />
+                        <Image
+                            src={imgSrc}
+                            alt="Chick Commander"
+                            fill
+                            className="object-contain"
+                            priority
+                        />
                     </motion.div>
-                    <div>
-                        <h3 className="text-base font-bold text-foreground">今日任務</h3>
-                        <p className="text-xs text-muted-foreground">
-                            {allCompleted ? '✨ 全部完成！領取獎勵' : '完成所有任務領取大獎'}
-                        </p>
-                    </div>
-                </div>
-                <div className="text-right">
-                    <div className={`text-sm font-bold transition-colors ${
-                        allCompleted ? 'text-accent' : 'text-primary'
-                    }`}>
-                        {Math.round(progress)}%
-                    </div>
-                </div>
-            </div>
 
-            {/* Progress Bar with Enhanced Animation */}
-            <div className="relative mb-4">
-                <Progress
-                    value={progress}
-                    className="h-2.5 bg-muted/50"
-                    indicatorClassName={`transition-all duration-700 ${
-                        allCompleted
-                            ? 'bg-gradient-to-r from-primary via-accent to-primary'
-                            : 'bg-primary'
-                    }`}
-                />
-                {allCompleted && (
-                    <motion.div
-                        className="absolute inset-0 h-2.5 rounded-full bg-primary/30"
-                        animate={{ opacity: [0.3, 0.6, 0.3] }}
-                        transition={{ duration: 1.5, repeat: Infinity }}
-                    />
-                )}
-            </div>
-
-            {/* Missions List - Horizontal Layout */}
-            <div className="relative z-10 grid grid-cols-3 gap-2.5">
-                {data.missions.map((mission, index) => (
-                    <motion.div
-                        key={mission.id}
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        className={`
-                            flex flex-col items-center justify-between rounded-xl p-2.5 shadow-sm
-                            transition-all duration-300 min-h-[120px]
-                            ${mission.is_completed
-                                ? 'bg-accent/10 border border-accent/20'
-                                : 'bg-card border border-border/30'
-                            }
-                        `}
-                    >
-                        {/* Icon with Enhanced Styling */}
-                        <motion.div
-                            className={`
-                                flex h-10 w-10 items-center justify-center rounded-xl mb-2
-                                transition-all duration-300
-                                ${mission.is_completed
-                                    ? 'bg-primary text-primary-foreground shadow-md'
-                                    : 'bg-muted/50 text-muted-foreground'
-                                }
-                            `}
-                            animate={mission.is_completed ? { scale: [1, 1.1, 1] } : {}}
-                            transition={{ duration: 0.5 }}
-                        >
-                            {getMissionIcon(mission.type, mission.metadata?.status_icon)}
-                        </motion.div>
-
-                        {/* Mission Details - Centered */}
-                        <div className="flex flex-col items-center text-center flex-1 w-full">
-                            <p className={`text-xs font-semibold mb-1 leading-tight ${
-                                mission.is_completed ? 'text-foreground' : 'text-muted-foreground'
-                            }`}>
-                                {mission.title}
-                            </p>
-                            <p className="text-xs text-muted-foreground mb-1.5">
-                                {mission.current_count}/{mission.target_count}
-                            </p>
-                            {/* Rewards Preview - Compact */}
-                            <div className="flex items-center justify-center gap-1 text-xs flex-wrap">
-                                <span className="text-primary font-medium">
-                                    {mission.reward.xp} XP
-                                </span>
-                                <span className="text-muted-foreground">+</span>
-                                <span className="text-accent font-medium">
-                                    {mission.reward.gold} 金幣
-                                </span>
-                                {mission.reward.bonus_item && (
-                                    <>
-                                        <span className="text-muted-foreground">+</span>
-                                        <span className="text-destructive font-medium flex items-center gap-0.5">
-                                            <Star className="h-2.5 w-2.5" />
-                                            稀有
-                                        </span>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Completion Check - Top Right */}
-                        {mission.is_completed && (
+                    {/* Interactive Toast Bubble */}
+                    <AnimatePresence>
+                        {showBubble && (
                             <motion.div
-                                initial={{ scale: 0, rotate: -180 }}
-                                animate={{ scale: 1, rotate: 0 }}
-                                transition={{ type: 'spring', stiffness: 200 }}
-                                className="absolute top-1.5 right-1.5"
+                                initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.8, y: 10 }}
+                                className="absolute -left-20 bottom-20 z-20 whitespace-nowrap rounded-full bg-white px-3 py-1.5 text-xs font-bold text-[#4A2E05] shadow-md border border-[#FAEAD3]"
                             >
-                                <CheckCircle2 className="h-4 w-4 text-accent" />
+                                {bubbleText}
+                                <div className="absolute -bottom-1 right-8 h-2 w-2 rotate-45 bg-white border-b border-r border-[#FAEAD3]" />
                             </motion.div>
                         )}
-                    </motion.div>
-                ))}
+                    </AnimatePresence>
+                </div>
             </div>
 
-            {/* Claim Button with Enhanced Animation */}
-            <AnimatePresence>
-                {allCompleted && !data.rewards_claimed && (
-                    <motion.div
-                        initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                        animate={{ opacity: 1, height: 'auto', marginTop: 16 }}
-                        exit={{ opacity: 0, height: 0, marginTop: 0 }}
-                        transition={{ duration: 0.4 }}
-                        className="relative z-10"
-                    >
-                        <Button
-                            onClick={handleClaim}
-                            disabled={claiming}
-                            className="
-                                w-full h-12
-                                bg-gradient-to-r from-primary via-primary to-accent
-                                text-primary-foreground font-bold text-base
-                                hover:from-primary/90 hover:to-accent/90
-                                shadow-lg hover:shadow-xl
-                                transition-all duration-300
-                                relative overflow-hidden
-                            "
+            {/* 2. Body Area - 3 Column Grid with "Tile" Style */}
+            <div className="relative z-10">
+                <div className="grid grid-cols-3 gap-3">
+                    {data.missions.map((mission, index) => (
+                        <motion.div
+                            key={mission.id}
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: index * 0.1 }}
+                            className={`
+                                flex flex-col items-center justify-center gap-2 aspect-[4/5] rounded-[16px] transition-all relative overflow-hidden
+                                ${mission.is_completed
+                                    ? 'bg-[#F2F8F2] border border-green-200/50'
+                                    : 'bg-white border border-[rgba(189,164,123,0.22)] shadow-[0_4px_10px_rgba(85,61,41,0.05)]'
+                                }
+                            `}
                         >
-                            {/* Shimmer Effect */}
-                            <motion.div
-                                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                                animate={{ x: ['-100%', '200%'] }}
-                                transition={{
-                                    duration: 2,
-                                    repeat: Infinity,
-                                    repeatDelay: 1
-                                }}
-                            />
+                            {/* Mission Icon */}
+                            <div className={`
+                                flex h-9 w-9 shrink-0 items-center justify-center rounded-full mb-1
+                                ${mission.is_completed
+                                    ? 'bg-green-100/80 text-green-600'
+                                    : 'bg-[#FFF9EB] text-[#D4A057]'
+                                }
+                            `}>
+                                {getMissionIcon(mission.type, mission.metadata?.status_icon)}
+                            </div>
 
-                            {claiming ? (
-                                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                            ) : (
-                                <Gift className="mr-2 h-5 w-5" />
+                            {/* Info */}
+                            <div className="flex flex-col items-center text-center gap-0.5 px-1">
+                                <span className={`text-[12px] font-bold leading-tight ${mission.is_completed ? 'text-green-800' : 'text-[#5D4037]'}`}>
+                                    {mission.title}
+                                </span>
+                                <div className="text-[10px] text-[#9A8C76] font-medium">
+                                    {mission.is_completed ? (
+                                        <CheckCircle2 className="w-3 h-3 text-green-500" />
+                                    ) : (
+                                        <span>{mission.current_count}/{mission.target_count}</span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* XP Reward Badge - Minimal Line Style */}
+                            {!mission.is_completed && (
+                                <div className="absolute top-2 right-2 flex items-center justify-center h-4 px-1.5 rounded-md border border-[#D4A057]/30 bg-white/50 text-[9px] font-medium text-[#B88C55]/70">
+                                    +{mission.reward.xp}
+                                </div>
                             )}
-                            <span className="relative z-10">
-                                {claiming ? '領取中...' : '領取今日獎勵'}
-                            </span>
-                        </Button>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-        </motion.div>
+                        </motion.div>
+                    ))}
+                </div>
+
+                {/* Claim Button Area */}
+                <AnimatePresence>
+                    {allCompleted && !data.rewards_claimed && (
+                        <motion.div
+                            initial={{ height: 0, opacity: 0, marginTop: 0 }}
+                            animate={{ height: 'auto', opacity: 1, marginTop: 16 }}
+                            exit={{ height: 0, opacity: 0, marginTop: 0 }}
+                        >
+                            <Button
+                                onClick={handleClaim}
+                                disabled={claiming}
+                                className="w-full h-12 rounded-xl bg-gradient-to-r from-[#FFB300] to-[#FF6F00] text-white font-bold shadow-lg shadow-orange-200/50 hover:shadow-xl active:scale-98 transition-all"
+                            >
+                                {claiming ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Gift className="mr-2 h-4 w-4" />
+                                )}
+                                {claiming ? '領取中...' : '領取今日大獎'}
+                            </Button>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
+        </div>
     )
 }
 
 function getMissionIcon(type: string, statusIcon?: string) {
-    // Use emoji if provided
-    if (statusIcon) {
-        return <span className="text-lg">{statusIcon}</span>
-    }
-
-    // Default icons based on type
+    if (statusIcon) return <span className="text-xl">{statusIcon}</span>
     switch (type) {
-        case 'play_battle':
-        case 'WEAKNESS_TRAINING':
-            return <Brain className="h-5 w-5" />
-        case 'feed_chick':
-        case 'ENGAGEMENT_SOCIAL':
-            return <Heart className="h-5 w-5" />
-        case 'review_error':
-        case 'RETENTION_STREAK':
-            return <Star className="h-5 w-5" />
-        case 'win_battle':
-            return <Sword className="h-5 w-5" />
-        default:
-            return <Sparkles className="h-5 w-5" />
+        case 'play_battle': return <Sword className="h-4 w-4" />
+        case 'feed_chick': return <Heart className="h-4 w-4" />
+        default: return <Sparkles className="h-4 w-4" />
     }
 }

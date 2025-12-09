@@ -88,7 +88,13 @@ function CommunityPageContent() {
 
   return (
     <>
-      <main className="mx-auto max-w-lg">
+      <main
+        className="mx-auto max-w-lg"
+        style={{
+          // 🎯 SOTA Mobile Fix: 预留 TabBar 空间，防止内容被遮挡
+          paddingBottom: 'var(--content-bottom-padding)',
+        }}
+      >
         {/* Removed Tabs - only showing latest posts */}
         <div className="sticky top-14 z-30 border-b bg-background/80 backdrop-blur-xl">
           <div className="h-12 flex items-center justify-center">

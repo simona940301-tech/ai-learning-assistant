@@ -17,6 +17,7 @@ export interface Word {
     definition_zh: string;
     example_en: string;
     lyric_snippet?: LyricSnippet;
+    is_saved?: boolean;
 }
 
 export interface Progress {

@@ -52,6 +52,7 @@ export async function trackMissionEvent(
         const response = await fetch('/api/missions/progress', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({
                 mission_type: missionType,
                 increment: 1,
@@ -161,7 +162,7 @@ export async function getMissionStatus(): Promise<{
     rewards_claimed: boolean
 } | null> {
     try {
-        const response = await fetch('/api/missions/daily')
+        const response = await fetch('/api/missions/daily', { credentials: 'include' })
         if (!response.ok) return null
 
         return await response.json()

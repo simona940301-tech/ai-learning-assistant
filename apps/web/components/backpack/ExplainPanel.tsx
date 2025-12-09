@@ -36,7 +36,7 @@ export function ExplainPanel({ selectedText, result, loading, onClose }: Explain
           </button>
         </div>
 
-        <div className="p-4 space-y-4 max-h-[calc(100vh-12rem)] overflow-y-auto">
+        <div className="p-4 space-y-4 max-h-[calc(100dvh-12rem)] overflow-y-auto">
           {/* Selected Text */}
           <div className="p-3 bg-zinc-100 dark:bg-zinc-800/50 rounded-lg">
             <p className="text-sm text-zinc-700 dark:text-zinc-300 italic">&quot;{selectedText}&quot;</p>

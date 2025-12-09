@@ -82,7 +82,13 @@ export default function AskPage() {
         </div>
       </div>
 
-      <main className="flex flex-1 flex-col overflow-hidden pt-16">
+      <main
+        className="flex flex-1 flex-col overflow-hidden pt-16"
+        style={{
+          // 🎯 SOTA Mobile Fix: 预留 TabBar 空间，防止内容被遮挡
+          paddingBottom: 'var(--content-bottom-padding)',
+        }}
+      >
         {activeTab === 'solve' ? (
           <Suspense fallback={<div className="flex items-center justify-center min-h-[60vh]">載入中...</div>}>
             <AnySubjectSolver />
