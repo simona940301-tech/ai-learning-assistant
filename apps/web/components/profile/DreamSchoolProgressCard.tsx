@@ -22,6 +22,8 @@ interface DreamSchoolResult {
     academicReadyScore: number
     currentGrade?: number
     requiredGrade?: number
+    totalQuestions?: number // 🎯 For progress tracking
+    isDataSufficient?: boolean // 🎯 Threshold flag
     breakdown: {
         adjFactor: number
         behaviorBoost: number
@@ -290,6 +292,15 @@ export function DreamSchoolProgressCard({
                         </p>
                     </div>
                 </div>
+
+                {/* 🎯 Ultra-Minimalist Progress Indicator */}
+                {data.totalQuestions !== undefined && !data.isDataSufficient && (
+                    <div className="mb-3 flex items-center justify-center gap-2 text-xs text-[#7A6A57]/70">
+                        <span>{data.totalQuestions} / 30 題</span>
+                        <span className="text-[#7A6A57]/40">·</span>
+                        <span className="text-[#7A6A57]/60">完成更多題目以提升精確度</span>
+                    </div>
+                )}
 
                 {/* Progress Bar */}
                 <div className="mb-4">

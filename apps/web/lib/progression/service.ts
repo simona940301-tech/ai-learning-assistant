@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { computeMatchXp } from './xp'
+import { computeMatchXp, computeMatchCoins } from './xp'
 import { levelForXp } from './leveling'
 import { updateStreak } from './streak'
 import { buildChestReward, getTimezoneDayKey } from './utils'
@@ -70,7 +70,20 @@ export async function applyBattleProgression(
   supabase: SupabaseClient,
   payload: BattleProgressionRequest,
 ): Promise<ApplyBattleProgressionResult[]> {
-  if (!payload.participants?.length) return []
+  console.log('[applyBattleProgression] 🚀 Starting with payload:', {
+    hasParticipants: !!payload.participants,
+    participantsLength: payload.participants?.length,
+    matchId: payload.matchId,
+    matchMode: payload.matchMode,
+    participants: JSON.stringify(payload.participants, null, 2)
+  })
+
+  if (!payload.participants?.length) {
+    console.warn('[applyBattleProgression] ⚠️ No participants, returning empty array')
+    return []
+  }
+
+  console.log('[applyBattleProgression] ✅ Participants found:', payload.participants.length)
 
   const milestones = await fetchStreakMilestones(supabase)
   const achievementDefs = await fetchAchievementDefinitions(supabase)
@@ -78,6 +91,13 @@ export async function applyBattleProgression(
   const results: ApplyBattleProgressionResult[] = []
 
   for (const participant of payload.participants) {
+    console.log('[applyBattleProgression] 🔄 Processing participant:', {
+      userId: participant.userId,
+      correctAnswers: participant.correctAnswers,
+      totalQuestions: participant.totalQuestions,
+      didWin: participant.didWin
+    })
+
     const isPvp = participant.isPvp ?? participant.mode === 'PVP'
     const isTutorial = payload.matchMode === 'PVE_TUTORIAL'
     const isPerfectGame =
@@ -85,8 +105,63 @@ export async function applyBattleProgression(
       (participant.correctAnswers >= participant.totalQuestions &&
         participant.totalQuestions > 0)
 
-    const profile = await fetchProfile(supabase, participant.userId)
-    if (!profile) continue
+    let profile = await fetchProfile(supabase, participant.userId)
+
+    // 🎯 CRITICAL FIX: Create profile if it doesn't exist
+    if (!profile) {
+      console.error('[applyBattleProgression] ❌ Profile not found for user:', participant.userId)
+      console.error('[applyBattleProgression] 🔧 Creating default profile with service client...')
+
+      try {
+        // Use service client to bypass RLS
+        const { getServiceSupabaseClient } = await import('@/lib/supabase')
+        const serviceClient = getServiceSupabaseClient()
+
+        const { data: newProfile, error: createError } = await serviceClient
+          .from('profiles')
+          .insert({
+            id: participant.userId,
+            xp: 0,
+            level: 1,
+            streak: 0,
+            best_streak: 0,
+            coins: 0,
+            total_matches: 0,
+            total_wins: 0,
+            total_pve_matches: 0,
+            total_pvp_matches: 0,
+            total_correct_answers: 0,
+            total_questions_answered: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select()
+          .single()
+
+        if (createError || !newProfile) {
+          console.error('[applyBattleProgression] ❌ Failed to create profile:', createError)
+          continue
+        }
+
+        profile = newProfile
+        console.error('[applyBattleProgression] ✅ Profile created successfully:', newProfile.id)
+      } catch (createErr) {
+        console.error('[applyBattleProgression] ❌ Exception creating profile:', createErr)
+        continue
+      }
+    }
+
+    // TypeScript safety: Ensure profile is not null before proceeding
+    if (!profile) {
+      console.error('[applyBattleProgression] ❌ Profile is still null after creation attempt')
+      continue
+    }
+
+    console.log('[applyBattleProgression] ✅ Profile found:', {
+      userId: profile.id,
+      currentXp: profile.xp,
+      currentLevel: profile.level
+    })
 
     const state = await fetchOrCreateProgressionState(supabase, participant.userId, profile)
     const statePayload = (state?.pending_rewards as Record<string, any>) || {}
@@ -113,8 +188,18 @@ export async function applyBattleProgression(
       xpMultiplier: (participant.xpMultiplierOverride ?? activeMultiplier ?? 1) * wellFedMultiplier,
     })
 
+    // Calculate coins with same multiplier as XP
+    const coinsResult = computeMatchCoins({
+      correctAnswers: participant.correctAnswers,
+      totalQuestions: participant.totalQuestions,
+      didWin: participant.didWin,
+      coinsMultiplier: wellFedMultiplier,
+    })
+
     const previousXp = profile.xp || 0
     const newXp = previousXp + xpResult.totalXp
+    const previousCoins = profile.coins || 0
+    const newCoins = previousCoins + coinsResult.totalCoins
     const levelInfo = levelForXp(newXp)
     const leveledUp = levelInfo.level > (profile.level || 1)
 
@@ -152,6 +237,7 @@ export async function applyBattleProgression(
     const profileUpdate: Record<string, any> = {
       xp: newXp,
       level: levelInfo.level,
+      coins: newCoins,
       streak: newStreak,
       best_streak: newBest,
       last_battle_at: now.toISOString(),
@@ -214,6 +300,13 @@ export async function applyBattleProgression(
       await updateEloRatings(supabase, payload.matchId, participant.userId, participant.didWin)
     } catch (eloError) {
       console.warn('[applyBattleProgression] Failed to update Elo ratings:', eloError)
+    }
+
+    // 🎯 SOTA FIX: Save wrong answers to Error Book
+    try {
+      await updateErrorBookFromMatch(supabase, payload.matchId, participant.userId)
+    } catch (errorBookError) {
+      console.warn('[applyBattleProgression] Failed to update Error Book:', errorBookError)
     }
 
     // Update progression state row
@@ -555,6 +648,75 @@ async function updateEloRatings(
         p_won: isCorrect,
         p_expected_score: 0.5 // TODO: Calculate based on difficulty vs current Elo
       })
+    }
+  }
+}
+
+async function updateErrorBookFromMatch(
+  supabase: SupabaseClient,
+  matchId: string,
+  userId: string
+) {
+  // 1. Fetch match history
+  const { data: match } = await supabase
+    .from('match_history')
+    .select('question_list, player1_id, player2_id, player1_answers, player2_answers')
+    .eq('id', matchId)
+    .single()
+
+  if (!match || !match.question_list) return
+
+  // 2. Determine which player is the current user
+  const isPlayer1 = match.player1_id === userId
+  const answers = isPlayer1 ? match.player1_answers : match.player2_answers
+
+  if (!answers || !Array.isArray(answers) || answers.length === 0) return
+
+  const questions = match.question_list as any[]
+  if (!questions || questions.length === 0) return
+
+  // 3. Iterate through questions and find wrong answers
+  for (let i = 0; i < questions.length; i++) {
+    const question = questions[i]
+    const userAnswer = answers[i]
+
+    // Skip if user didn't answer (optional: could count as wrong if timed out?)
+    if (!userAnswer) continue
+
+    const correctAnswer = question.correct_answer?.trim().toUpperCase()
+    const userAns = userAnswer.trim().toUpperCase()
+
+    if (userAns !== correctAnswer) {
+      // 🎯 It's a WRONG answer! Save to Error Book.
+      try {
+        const skills = question.skill_tags || []
+        // Use first skill as primary if available, or 'general'
+        const primarySkillId = skills.length > 0 ? skills[0] : 'general'
+        // Using upsert to update timestamp if already exists
+        await supabase
+          .from('error_book')
+          .upsert({
+            user_id: userId,
+            question_id: question.id,
+            // If question has no ID (e.g. generated), this might fail or be null.
+            // Assuming questions from packs usually have IDs.
+            // If generated on the fly, we rely on skill_id mapping.
+            skill_id: primarySkillId,
+            skill_name: primarySkillId, // Use ID as name if real name not available in tags
+            note_content: '', // Initial empty note
+            mastery_level: 0, // Reset mastery on error
+            status: 'active',
+            knowledge_tags: skills,
+            last_attempted_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id,question_id' // Ensure uniqueness per user-question
+          })
+
+        console.log(`[ErrorBook] Saved wrong answer for question ${question.id}`)
+      } catch (err) {
+        console.error(`[ErrorBook] Failed to save wrong answer for Q ${question.id}:`, err)
+      }
     }
   }
 }

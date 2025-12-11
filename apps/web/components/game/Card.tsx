@@ -3,6 +3,7 @@ import { motion, useMotionValue, useTransform, PanInfo, AnimatePresence } from '
 import { Lightbulb, RotateCcw, Music, Sparkles } from 'lucide-react';
 import { Word } from '../../lib/types/game';
 import { cn } from '../../lib/utils';
+import { Haptics } from '../../lib/utils/haptics'; // 🎯 New
 
 interface CardProps {
     data: Word;
@@ -18,13 +19,15 @@ export const Card: React.FC<CardProps> = ({ data, onSwipe, active, isImportant, 
 
     // Motion values for drag - 🚀 OPTIMIZED: Reduced useTransform calls
     const x = useMotionValue(0);
-    const rotate = useTransform(x, [-200, 200], [-15, 15]);
+    const rotate = useTransform(x, [-200, 200], [-30, 30]);
 
     // 🚀 OPTIMIZED: Simplified opacity - remove complex calculations
     const opacity = useTransform(x, [-600, 0, 600], [0, 1, 0]);
 
-    // 🚀 OPTIMIZED: Use CSS-based overlays instead of motion values for better performance
-    const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
+    // 🚀 OPTIMIZED: CSS-based overlays using motion values directly
+    // This avoids re-rendering the component on every drag frame
+    const rightOpacity = useTransform(x, [50, 150], [0, 1]);
+    const leftOpacity = useTransform(x, [-150, -50], [1, 0]);
 
     // Manual drag detection to distinguish between Click and Drag
     const isDragging = React.useRef(false);
@@ -33,17 +36,7 @@ export const Card: React.FC<CardProps> = ({ data, onSwipe, active, isImportant, 
         isDragging.current = true;
     };
 
-    const handleDrag = () => {
-        // 🚀 OPTIMIZED: Update swipe direction during drag for visual feedback
-        const xVal = x.get();
-        if (xVal > 50) {
-            setSwipeDirection('right');
-        } else if (xVal < -50) {
-            setSwipeDirection('left');
-        } else {
-            setSwipeDirection(null);
-        }
-    };
+    // No handleDrag needed anymore - using MotionValues!
 
     const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
         // Small timeout to prevent the subsequent click from firing immediately
@@ -51,14 +44,21 @@ export const Card: React.FC<CardProps> = ({ data, onSwipe, active, isImportant, 
             isDragging.current = false;
         }, 150);
 
-        setSwipeDirection(null); // Reset direction
-
         if (!active) return;
-        const threshold = 100;
-        if (info.offset.x > threshold) {
+
+        const threshold = 120;
+        const velocity = info.velocity.x;
+
+        // Check if swipe should trigger
+        if (info.offset.x > threshold || velocity > 800) { // 🎯 Higher velocity threshold for "flick"
+            Haptics.medium(); // 🎯 Haptic Feedback
             onSwipe('right');
-        } else if (info.offset.x < -threshold) {
+        } else if (info.offset.x < -threshold || velocity < -800) {
+            Haptics.medium(); // 🎯 Haptic Feedback
             onSwipe('left');
+        } else {
+            // Snap back
+            Haptics.light();
         }
     };
 
@@ -71,13 +71,20 @@ export const Card: React.FC<CardProps> = ({ data, onSwipe, active, isImportant, 
         <motion.div
             drag={active ? 'x' : false}
             dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={0.5}
+            dragElastic={0.6} // 🎯 Balanced resistance
+            // 🎯 Physics: Velocity-based decay with spring snap
+            dragTransition={{
+                bounceStiffness: 800,
+                bounceDamping: 35,
+                power: 0.4, // 🎯 High friction for "heavy" card feel
+                timeConstant: 200
+            }}
             onDragStart={handleDragStart}
-            onDrag={handleDrag}
+            // onDrag={handleDrag} // Removed state update
             onDragEnd={handleDragEnd}
             onClick={handleClick}
             className={cn(
-                "absolute w-[80vw] max-w-[340px] h-[64vh] max-h-[600px] perspective-1000 touch-none cursor-grab active:cursor-grabbing will-change-transform",
+                "absolute w-[80vw] max-w-[340px] h-[64dvh] max-h-[600px] perspective-1000 touch-none cursor-grab active:cursor-grabbing will-change-transform",
                 !active && "pointer-events-none"
             )}
             whileHover={{ scale: active ? 1.02 : 1 }}
@@ -88,9 +95,10 @@ export const Card: React.FC<CardProps> = ({ data, onSwipe, active, isImportant, 
                 opacity,
                 top: '50%',
                 left: '50%',
-                marginTop: '-32vh',
+                marginTop: '-32dvh',
                 marginLeft: 'max(-170px, -40vw)',
-                transform: 'translateZ(0)' // 🚀 Force hardware acceleration
+                transform: 'translate3d(0,0,0)', // 🎯 Force GPU (Safari specific)
+                backfaceVisibility: 'hidden' // 🎯 Prevent flickering
             }}
         >
             <motion.div
@@ -117,7 +125,8 @@ export const Card: React.FC<CardProps> = ({ data, onSwipe, active, isImportant, 
                             e.stopPropagation();
                             setShowHint(!showHint);
                         }}
-                        swipeDirection={swipeDirection}
+                        rightOpacity={rightOpacity}
+                        leftOpacity={leftOpacity}
                         isImportant={isImportant}
                         toggleImportant={toggleImportant}
                     />
@@ -142,12 +151,14 @@ interface CardFrontProps {
     data: Word;
     showHint: boolean;
     toggleHint: (e: React.MouseEvent) => void;
-    swipeDirection: 'left' | 'right' | null; // 🚀 OPTIMIZED: CSS-based feedback
+    // swipeDirection: 'left' | 'right' | null; // Removed
+    rightOpacity: any; // MotionValue<number>
+    leftOpacity: any; // MotionValue<number>
     isImportant?: boolean;
     toggleImportant?: () => void;
 }
 
-const CardFront: React.FC<CardFrontProps> = ({ data, showHint, toggleHint, swipeDirection, isImportant, toggleImportant }) => (
+const CardFront: React.FC<CardFrontProps> = ({ data, showHint, toggleHint, rightOpacity, leftOpacity, isImportant, toggleImportant }) => (
     <div className={cn(
         "w-full h-full rounded-3xl overflow-hidden shadow-2xl relative",
         "bg-[#111111]", // 🎯 #111111 Dark Background
@@ -157,20 +168,18 @@ const CardFront: React.FC<CardFrontProps> = ({ data, showHint, toggleHint, swipe
         {/* 🚀 OPTIMIZED: Removed external noise texture for better performance */}
         {/* Use CSS noise pattern instead */}
         <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
-             style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 400 400\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\'/%3E%3C/svg%3E")' }}
+            style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 400 400\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\'/%3E%3C/svg%3E")' }}
         />
 
-        {/* 🚀 OPTIMIZED: CSS-based swipe feedback - no motion values */}
-        <div className={cn(
-            "absolute inset-0 z-10 pointer-events-none transition-opacity duration-150",
-            "bg-orange-500/10",
-            swipeDirection === 'left' ? 'opacity-80' : 'opacity-0'
-        )} />
-        <div className={cn(
-            "absolute inset-0 z-10 pointer-events-none transition-opacity duration-150",
-            "bg-emerald-500/10",
-            swipeDirection === 'right' ? 'opacity-80' : 'opacity-0'
-        )} />
+        {/* 🚀 OPTIMIZED: Use motion.div for hardware-accelerated feedback */}
+        <motion.div
+            className="absolute inset-0 z-10 pointer-events-none bg-orange-500/10"
+            style={{ opacity: leftOpacity }}
+        />
+        <motion.div
+            className="absolute inset-0 z-10 pointer-events-none bg-emerald-500/10"
+            style={{ opacity: rightOpacity }}
+        />
 
         {/* Top Bar */}
         <div className="w-full flex justify-between items-start z-20">
@@ -229,7 +238,7 @@ const CardFront: React.FC<CardFrontProps> = ({ data, showHint, toggleHint, swipe
                         className="mt-8 p-4 rounded-xl bg-[#C8A46A]/10 border border-[#C8A46A]/20 text-center max-w-[85%]"
                     >
                         <p className="text-sm font-medium text-[#C8A46A]/90 leading-relaxed">
-                            "{data.example_en.replace(new RegExp(data.text, 'gi'), '_____')}"
+                            {`"${data.example_en.replace(new RegExp(data.text, 'gi'), '_____')}"`}
                         </p>
                     </motion.div>
                 )}
@@ -264,10 +273,10 @@ const CardBack = ({ data }: { data: Word }) => (
         <div className="absolute bottom-0 left-0 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl -ml-16 -mb-16 pointer-events-none" />
 
         {/* Word Header */}
-        <div className="w-full flex justify-between items-start mb-6 z-10">
-            <div className="flex flex-col">
-                <h3 className="text-3xl font-semibold text-white leading-tight">{data.text}</h3>
-                <div className="flex items-center gap-3 mt-1.5">
+        <div className="w-full flex justify-between items-start mb-6 z-10 flex-shrink-0">
+            <div className="flex flex-col min-w-0 flex-1 pr-2">
+                <h3 className="text-3xl font-semibold text-white leading-tight break-words hyphens-auto" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{data.text}</h3>
+                <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                     <span className="text-sm font-normal text-zinc-500 italic font-serif opacity-70">
                         {data.pos}
                     </span>
@@ -280,49 +289,55 @@ const CardBack = ({ data }: { data: Word }) => (
 
             {/* Note: In Apple style, we usually avoid clutter. The flip back button is implied or handled by clicking. 
                 We keep the icon subtle. */}
-            <RotateCcw strokeWidth={1.5} size={16} className="text-zinc-600" />
+            <RotateCcw strokeWidth={1.5} size={16} className="text-zinc-600 flex-shrink-0" />
         </div>
 
         {/* Definition - Highlight */}
-        <div className="mb-6 z-10 rounded-2xl p-5 bg-white/[0.08] border border-white/5">
+        <div className="mb-6 z-10 rounded-2xl p-5 bg-white/[0.08] border border-white/5 flex-shrink-0">
             <span className="text-[10px] font-bold uppercase tracking-widest mb-2 block text-zinc-500">定義</span>
-            <p className="text-lg font-medium leading-relaxed text-zinc-200">
+            <p className="text-lg font-medium leading-relaxed text-zinc-200 break-words">
                 {data.definition_zh}
             </p>
         </div>
 
-        <div className="flex-1 overflow-y-auto space-y-4 z-10 pr-1 mask-linear-fade scrollbar-hide">
-            {/* Lyric Hero Section */}
-            {data.lyric_snippet && (
-                <div className="relative group">
-                    <div className="absolute inset-0 bg-gradient-to-r from-[#C8A46A] to-purple-800 rounded-2xl blur opacity-5 group-hover:opacity-10 transition-opacity" />
-                    <div className="relative bg-[#1a1a1a] rounded-2xl p-4 border border-white/5 overflow-hidden">
-                        <div className="flex items-center gap-2 mb-2 text-[#C8A46A]">
-                            <Music size={12} strokeWidth={1.5} />
-                            <span className="text-[10px] font-bold uppercase tracking-wider opacity-80">歌詞出處</span>
-                        </div>
-                        <p className="text-sm font-medium text-zinc-300 italic leading-relaxed mb-3">
-                            "{data.lyric_snippet.line}"
-                        </p>
-                        <div className="flex items-center gap-2 border-t border-white/5 pt-2">
-                            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[#C8A46A]/20 to-purple-900/20 flex items-center justify-center text-[9px] font-bold text-[#C8A46A]">
-                                {data.lyric_snippet.artist[0]}
+        {/* Scrollable Content Area with proper height calculation */}
+        <div className="relative flex-1 min-h-0 z-10">
+            <div className="h-full overflow-y-auto overflow-x-hidden space-y-4 pr-1 scrollbar-hide">
+                {/* Lyric Hero Section */}
+                {data.lyric_snippet && (
+                    <div className="relative group">
+                        <div className="absolute inset-0 bg-gradient-to-r from-[#C8A46A] to-purple-800 rounded-2xl blur opacity-5 group-hover:opacity-10 transition-opacity" />
+                        <div className="relative bg-[#1a1a1a] rounded-2xl p-4 border border-white/5 overflow-hidden">
+                            <div className="flex items-center gap-2 mb-2 text-[#C8A46A]">
+                                <Music size={12} strokeWidth={1.5} />
+                                <span className="text-[10px] font-bold uppercase tracking-wider opacity-80">歌詞出處</span>
                             </div>
-                            <div className="flex flex-col">
-                                <span className="text-[10px] font-semibold text-zinc-300">{data.lyric_snippet.artist}</span>
+                            <p className="text-sm font-medium text-zinc-300 italic leading-relaxed mb-3 break-words">
+                                {`"${data.lyric_snippet.line}"`}
+                            </p>
+                            <div className="flex items-center gap-2 border-t border-white/5 pt-2">
+                                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[#C8A46A]/20 to-purple-900/20 flex items-center justify-center text-[9px] font-bold text-[#C8A46A] flex-shrink-0">
+                                    {data.lyric_snippet.artist[0]}
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                    <span className="text-[10px] font-semibold text-zinc-300 truncate">{data.lyric_snippet.artist}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {/* Example Sentence */}
-            <div className="p-4 rounded-xl bg-transparent border border-white/5">
-                <span className="text-[10px] font-bold uppercase block mb-1 text-zinc-600">例句</span>
-                <p className="text-sm italic leading-relaxed text-zinc-400">
-                    "{data.example_en}"
-                </p>
+                {/* Example Sentence */}
+                <div className="p-4 rounded-xl bg-transparent border border-white/5">
+                    <span className="text-[10px] font-bold uppercase block mb-1 text-zinc-600">例句</span>
+                    <p className="text-sm italic leading-relaxed text-zinc-400 break-words">
+                        {`"${data.example_en}"`}
+                    </p>
+                </div>
             </div>
+
+            {/* Scroll indicator gradient */}
+            <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-[#111111] to-transparent pointer-events-none" />
         </div>
     </div>
 );

@@ -13,7 +13,6 @@ import { parseEditorModeQuestion, isEditorModeFormat, EditorModeQuestion } from 
 export async function POST(req: NextRequest) {
   const supabase = getSupabaseClient(req);
 
-  // TEMPORARY: Skip authentication for testing (remove after testing)
   // Check authentication using session (cookies)
   const {
     data: { user },
@@ -27,11 +26,31 @@ export async function POST(req: NextRequest) {
   if (user) {
     userId = user.id;
     console.log('[API] Using authenticated user:', userId);
+
+    // Check if user is admin
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .single();
+
+    if (profile?.role !== 'admin') {
+      console.warn(`[API] Unauthorized access attempt by user ${userId} (role: ${profile?.role})`);
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: Admin access required' },
+        { status: 403 }
+      );
+    }
   } else {
-    console.log('[API] No authenticated user, using fallback userId');
+    // console.log('[API] No authenticated user, using fallback userId');
+    // Security Hardening: Reject unauthenticated requests in production
+    return NextResponse.json(
+      { success: false, error: 'Unauthorized: Authentication required' },
+      { status: 401 }
+    );
   }
 
-  // Skip all role checks for testing
+  // Role checks are now enforced via the profile check above
 
   try {
     const formData = await req.formData();
@@ -262,26 +281,49 @@ async function handleExplanationFileOnly(
     });
   }
 
-  // 插入題目到資料庫
-  console.log('[handleExplanationFileOnly] Inserting questions to database, count:', questions.length);
-  console.log('[handleExplanationFileOnly] First question sample:', {
-    questionNumber: questions[0]?.questionNumber,
-    questionText: questions[0]?.questionText?.substring(0, 50),
-    hasOptions: !!(questions[0]?.optionA && questions[0]?.optionB),
-    correctAnswer: questions[0]?.correctAnswer,
-    difficulty: questions[0]?.difficulty,
-  });
+  // 插入或更新題目到資料庫
+  console.log('[handleExplanationFileOnly] Upserting questions to database, count:', questions.length);
 
-  const { data: insertedQuestions, error: insertError } = await supabase
-    .from('seed_questions')
-    .insert(questions)
-    .select();
+  let insertedQuestions: any[] | null = null;
+  let insertError: any = null;
+
+  try {
+    // 嘗試使用 upsert
+    // 注意：這需要資料庫有對應的唯一約束 (source, question_number)
+    const { data, error } = await supabase
+      .from('seed_questions')
+      .upsert(questions, {
+        onConflict: 'source, question_number',
+        ignoreDuplicates: false
+      })
+      .select();
+
+    if (error) {
+      // 如果是用戶缺少約束導致的錯誤，嘗試手動處理 (Check-then-Update/Insert)
+      if (error.code === '23505' || // Unique violation (shouldn't happen with upsert but good to catch)
+        error.message?.includes('constraint') ||
+        error.message?.includes('conflict')) {
+
+        console.warn('[handleExplanationFileOnly] Upsert failed due to constraint issue, falling back to manual update/insert:', error.message);
+        insertedQuestions = await manualUpsert(supabase, questions);
+      } else {
+        throw error;
+      }
+    } else {
+      insertedQuestions = data;
+    }
+  } catch (error: any) {
+    // Fallback: 如果 upsert 完全失敗（例如沒有唯一索引導致語法錯誤），也使用手動
+    console.warn('[handleExplanationFileOnly] Upsert threw error, falling back to manual update/insert:', error.message);
+    try {
+      insertedQuestions = await manualUpsert(supabase, questions);
+    } catch (manualError: any) {
+      insertError = manualError;
+    }
+  }
 
   if (insertError) {
-    console.error('[handleExplanationFileOnly] Database insert error:', insertError);
-    console.error('[handleExplanationFileOnly] Error code:', insertError.code);
-    console.error('[handleExplanationFileOnly] Error details:', insertError.details);
-    console.error('[handleExplanationFileOnly] Error hint:', insertError.hint);
+    console.error('[handleExplanationFileOnly] Database insert/upsert error:', insertError);
     return NextResponse.json(
       {
         success: false,
@@ -293,7 +335,7 @@ async function handleExplanationFileOnly(
     );
   }
 
-  console.log('[handleExplanationFileOnly] Successfully inserted questions:', insertedQuestions?.length || 0);
+  console.log('[handleExplanationFileOnly] Successfully imported questions:', insertedQuestions?.length || 0);
 
   // 插入詳解到 question_explanations 表
   if (insertedQuestions && insertedQuestions.length > 0) {
@@ -303,9 +345,12 @@ async function handleExplanationFileOnly(
         question_id: q.id,
         explanation_text: pq.explanation?.fullText || '',
         option_analysis: pq.explanation ? {
-          corePoint: pq.explanation.corePoint,
+          correctAnalysis: pq.explanation.correctAnalysis,
           translation: pq.explanation.translation,
           conclusion: pq.explanation.conclusion,
+          // 優先使用結構化的選項分析，如果沒有則使用原始字串（如果只是字串會無法正確顯示在 UI）
+          optionAnalysis: pq.explanation.structuredOptionAnalysis || pq.explanation.optionAnalysis || {},
+          wordMeanings: pq.explanation.wordMeanings,
         } : {},
       };
     });
@@ -313,7 +358,7 @@ async function handleExplanationFileOnly(
     console.log('[handleExplanationFileOnly] Inserting explanations, count:', explanations.length);
     const { error: explanationError } = await supabase
       .from('question_explanations')
-      .insert(explanations);
+      .upsert(explanations, { onConflict: 'question_id' });
 
     if (explanationError) {
       console.error('[handleExplanationFileOnly] Explanation insert error:', explanationError);
@@ -736,4 +781,81 @@ async function handleDetectiveModeFile(
     },
     { status: 501 }
   );
+}
+
+/**
+ * 手動執行 Upsert (當資料庫約束不存在時)
+ * 策略：先查詢是否存在，存在則更新，不存在則插入
+ */
+async function manualUpsert(supabase: any, questions: any[]) {
+  console.log('[manualUpsert] Starting manual upsert logic for count:', questions.length);
+  const results: any[] = [];
+
+  // 1. 為了效能，按 Source 分組查詢
+  // 通常一次匯入只有一個 Source (一張考卷)
+  const sources = [...new Set(questions.map((q: any) => q.source))];
+
+  for (const source of sources) {
+    const sourceQuestions = questions.filter((q: any) => q.source === source);
+    const questionNumbers = sourceQuestions.map((q: any) => q.question_number);
+
+    // 2. 查詢已存在的題目
+    const { data: existingQuestions } = await supabase
+      .from('seed_questions')
+      .select('id, question_number, source')
+      .eq('source', source)
+      .in('question_number', questionNumbers);
+
+    const existingMap = new Map();
+    if (existingQuestions) {
+      existingQuestions.forEach((q: any) => {
+        existingMap.set(q.question_number, q);
+      });
+    }
+
+    // 3. 分類為 Insert 和 Update
+    const toInsert: any[] = [];
+    const updatePromises: Promise<any>[] = [];
+
+    for (const q of sourceQuestions) {
+      const existing = existingMap.get(q.question_number);
+      if (existing) {
+        // 更新：保留 ID，更新其他欄位
+        updatePromises.push(
+          supabase
+            .from('seed_questions')
+            .update({ ...q, id: existing.id, updated_at: new Date().toISOString() })
+            .eq('id', existing.id)
+            .select()
+            .single()
+            .then((res: any) => {
+              if (res.error) console.error('Update failed for', q.question_number, res.error);
+              return res.data;
+            })
+        );
+      } else {
+        // 插入
+        toInsert.push(q);
+      }
+    }
+
+    // 執行插入
+    if (toInsert.length > 0) {
+      const { data: inserted, error: insertError } = await supabase
+        .from('seed_questions')
+        .insert(toInsert)
+        .select();
+
+      if (insertError) throw insertError;
+      if (inserted) results.push(...inserted);
+    }
+
+    // 執行更新
+    if (updatePromises.length > 0) {
+      const updated = await Promise.all(updatePromises);
+      results.push(...updated.filter(u => u));
+    }
+  }
+
+  return results;
 }

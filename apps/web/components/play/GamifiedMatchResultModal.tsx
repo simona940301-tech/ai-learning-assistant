@@ -838,6 +838,26 @@ function Layer1Content({
         )}
       </motion.div>
 
+      {/* 🎯 Ready Score Progress Contribution - Ultra Minimalist */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: animationComplete ? 0 : 1.1 }}
+        className="mt-4 border border-white/10 bg-white/5 p-3 relative"
+        style={{
+          borderWidth: '1px',
+          imageRendering: 'pixelated',
+        }}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-white/40 font-mono uppercase tracking-wider">Ready Score</span>
+            <span className="text-sm font-black text-yellow-400 font-mono">+5 題</span>
+          </div>
+          <span className="text-[10px] text-white/50 font-mono">25/30</span>
+        </div>
+      </motion.div>
+
       <div className="relative z-10 mt-4 text-[11px] text-yellow-300/80 font-mono text-center">
         {wrongQuestionsError
           ? `無法載入錯題：${wrongQuestionsError}`

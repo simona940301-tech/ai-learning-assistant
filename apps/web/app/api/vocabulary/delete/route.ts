@@ -1,25 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 import { getSupabaseClient, getApiUser } from '@/lib/api/auth';
 import { backpackCache } from '@/lib/cache/backpack-cache';
 
 export const dynamic = 'force-dynamic';
 
-// Zod schema for delete request
-const DeleteVocabularySchema = z.object({
-    id: z.string().uuid(),
-});
-
 /**
  * DELETE /api/vocabulary/delete
  * 
- * Delete a vocabulary word from the notebook.
- * Validates user ownership before deletion.
- * 
- * @returns {
- *   success: boolean;
- *   deleted_word: { text: string };
- * }
+ * Delete a vocabulary word from notebook_entries.
+ * Requires authentication.
  */
 export async function DELETE(request: NextRequest) {
     try {
@@ -27,61 +16,55 @@ export async function DELETE(request: NextRequest) {
         const { user, errorType } = await getApiUser(request);
 
         if (!user) {
+            const message =
+                errorType === 'invalid-jwt'
+                    ? '登入狀態失效，請重新登入或清除 Cookies 後再試。'
+                    : errorType === 'unauthenticated'
+                        ? 'Authentication required'
+                        : 'Authentication error occurred';
+
             return NextResponse.json(
-                { error: 'UNAUTHORIZED', message: 'Authentication required' },
+                {
+                    error: 'UNAUTHORIZED',
+                    message,
+                    errorType,
+                },
                 { status: 401 }
             );
         }
 
-        // Parse and validate request body
-        const body = await request.json();
-        const parseResult = DeleteVocabularySchema.safeParse(body);
+        const body = await request.json().catch(() => ({}));
+        const { id } = body;
 
-        if (!parseResult.success) {
+        if (!id) {
             return NextResponse.json(
                 {
-                    error: 'INVALID_REQUEST',
-                    message: 'Invalid request format',
-                    details: parseResult.error.errors,
+                    error: 'INVALID_INPUT',
+                    message: '請提供要刪除的單字 ID',
                 },
                 { status: 400 }
             );
         }
 
-        const { id } = parseResult.data;
         const supabase = getSupabaseClient(request);
 
-        // First, fetch the word to get its text (for response)
-        const { data: wordData, error: fetchError } = await supabase
-            .from('notebook_entries')
-            .select('title, user_id')
-            .eq('id', id)
-            .single();
-
-        if (fetchError || !wordData) {
-            return NextResponse.json(
-                { error: 'NOT_FOUND', message: 'Vocabulary word not found' },
-                { status: 404 }
-            );
-        }
-
-        // Verify ownership
-        if (wordData.user_id !== user.id) {
-            return NextResponse.json(
-                { error: 'FORBIDDEN', message: 'You do not own this vocabulary word' },
-                { status: 403 }
-            );
-        }
-
-        // Delete the word
+        // Delete from notebook_entries
         const { error: deleteError } = await supabase
             .from('notebook_entries')
             .delete()
+            .eq('user_id', user.id)
             .eq('id', id)
-            .eq('user_id', user.id); // Double-check ownership
+            .eq('source_type', 'vocabulary'); // Extra safety check
 
         if (deleteError) {
-            throw deleteError;
+            console.error('[vocabulary/delete] Error:', deleteError);
+            return NextResponse.json(
+                {
+                    error: 'DATABASE_ERROR',
+                    message: '刪除失敗',
+                },
+                { status: 500 }
+            );
         }
 
         // Invalidate cache
@@ -89,17 +72,16 @@ export async function DELETE(request: NextRequest) {
 
         return NextResponse.json({
             success: true,
-            deleted_word: {
-                text: wordData.title,
-            },
+            message: '已刪除單字',
         });
 
     } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        console.error('[vocabulary/delete] Error:', error);
-
+        console.error('[vocabulary/delete] Unexpected error:', error);
         return NextResponse.json(
-            { error: errorMessage },
+            {
+                error: 'INTERNAL_ERROR',
+                message: error instanceof Error ? error.message : 'Unknown error',
+            },
             { status: 500 }
         );
     }

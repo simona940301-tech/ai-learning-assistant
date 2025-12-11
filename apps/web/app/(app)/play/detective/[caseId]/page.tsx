@@ -10,6 +10,7 @@ import { NarrativeFeedback } from '@/components/detective/NarrativeFeedback'
 import { DetectiveCase } from '@/lib/detective/types'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
+import { DetectiveCelebration } from '@/components/detective/DetectiveCelebration'
 
 // Mock Data for Development (Replace with API fetch later)
 const MOCK_CASE: DetectiveCase = {
@@ -27,7 +28,16 @@ const MOCK_CASE: DetectiveCase = {
         { id: 'p5', text: '', isImage: true, imageUrl: 'https://placehold.co/600x400/1a1a1a/FFF?text=Crime+Scene+Photo' }
     ],
     questions: [
-        { id: 'q1', text: 'What inconsistency suggests the victim might not have poured the drink himself?', requiredEvidenceCount: 2 }
+        {
+            id: 'q1',
+            text: 'What inconsistency suggests the victim might not have poured the drink himself?',
+            requiredEvidenceCount: 2,
+            standardEvidence: [
+                "He never drank scotch",
+                "He was a gin man",
+                "The bottle on the shelf was indeed a rare single malt"
+            ]
+        }
     ]
 }
 
@@ -35,6 +45,8 @@ export default function DetectiveGamePage() {
     const params = useParams()
     const router = useRouter()
     const { initializeCase, resetGame } = useDetectiveStore()
+    const [showCelebration, setShowCelebration] = React.useState(false)
+    const [lastAccuracy, setLastAccuracy] = React.useState(0)
 
     useEffect(() => {
         // In a real app, fetch case data based on params.caseId
@@ -83,7 +95,7 @@ export default function DetectiveGamePage() {
                     <div className="absolute bottom-6 right-6 flex gap-2">
                         <Button
                             className="bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-lg"
-                            onClick={() => {
+                            onClick={async () => {
                                 const { highlightedEvidence, boardItems } = useDetectiveStore.getState()
                                 const evidenceOnBoard = boardItems.map(item =>
                                     highlightedEvidence.find(e => e.id === item.evidenceId)?.text
@@ -98,27 +110,43 @@ export default function DetectiveGamePage() {
                                     return
                                 }
 
-                                fetch('/api/detective/analyze', {
-                                    method: 'POST',
-                                    body: JSON.stringify({
-                                        question: "What inconsistency suggests the victim might not have poured the drink himself?",
-                                        evidence: evidenceOnBoard,
-                                        mode: 'chain'
-                                    })
-                                })
-                                    .then(res => res.json())
-                                    .then(data => {
-                                        useDetectiveStore.getState().addNarrativeLog({
-                                            speaker: 'Old Detective',
-                                            message: data.feedback,
-                                            type: data.isValid ? 'success' : 'error'
-                                        })
+                                const currentCase = MOCK_CASE // In real app, get from store
+                                const currentQuestion = currentCase.questions[0] // For MVP, just first question
 
-                                        if (data.isValid) {
-                                            // Play success sound / animation
-                                            // Transition to Case Closed
-                                        }
+                                // Call the new 3-Tier Validation API
+                                try {
+                                    const response = await fetch('/api/detective/validate-evidence', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            question: currentQuestion.text,
+                                            userHighlight: evidenceOnBoard.join(' '), // simplified for MVP
+                                            passage: currentCase.content.map(p => p.text).join('\n'),
+                                            standardEvidence: currentQuestion.standardEvidence || []
+                                        })
                                     })
+
+                                    const data = await response.json()
+
+                                    useDetectiveStore.getState().addNarrativeLog({
+                                        speaker: 'Old Detective',
+                                        message: data.feedback,
+                                        type: data.isValid ? 'success' : 'error'
+                                    })
+
+                                    if (data.isValid) {
+                                        // Case solved!
+                                        setLastAccuracy(Math.round(data.confidence * 100))
+                                        setTimeout(() => setShowCelebration(true), 1500)
+                                    }
+                                } catch (error) {
+                                    console.error('Validation error:', error)
+                                    useDetectiveStore.getState().addNarrativeLog({
+                                        speaker: 'System',
+                                        message: "Comm link failure. Try again.",
+                                        type: 'error'
+                                    })
+                                }
                             }}
                         >
                             SUBMIT FINDINGS
@@ -126,6 +154,19 @@ export default function DetectiveGamePage() {
                     </div>
                 </section>
             </main>
+
+            {/* Celebration Overlay */}
+            {showCelebration && (
+                <DetectiveCelebration
+                    caseTitle={MOCK_CASE.title}
+                    difficulty={MOCK_CASE.difficulty}
+                    accuracy={lastAccuracy}
+                    onClose={() => {
+                        setShowCelebration(false)
+                        router.push('/play')
+                    }}
+                />
+            )}
 
             {/* Narrative Feedback Overlay */}
             <NarrativeFeedback />

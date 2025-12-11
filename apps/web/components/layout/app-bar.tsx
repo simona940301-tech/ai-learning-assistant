@@ -7,6 +7,7 @@ import { Home, HelpCircle, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { LevelBar } from '@/components/status/LevelBar'
 import { EnergyPill } from '@/components/status/EnergyPill'
+import { usePlay } from '@/lib/play-context'
 
 interface AppBarProps {
   title: string
@@ -34,7 +35,10 @@ export function AppBar({
   const isHomePage = pathname === '/home'
   const isPlayPage = pathname === '/play'
 
-  // 🎯 Phase A: Play 頁面 - 極簡 HUD（Level + Energy）
+  // ✅ Fix: Always call hooks at the top level
+  const { userStatus } = usePlay()
+
+  // 🎯 Phase A: Play 頁面 - 極簡 HUD（Level + Gold + Energy）
   if (isPlayPage) {
     return (
       <header
@@ -43,14 +47,24 @@ export function AppBar({
           paddingTop: 'env(safe-area-inset-top, 8px)',
         }}
       >
-        <div className={`mx-auto flex h-14 w-full items-center justify-between ${maxWidthClass}`}>
+        <div className={`mx-auto flex h-14 w-full items-center justify-between gap-3 ${maxWidthClass}`}>
           {/* 左：Level Bar */}
-          <div className="flex-1 min-w-0 max-w-[320px]">
+          <div className="flex-1 min-w-0 max-w-[280px]">
             <LevelBar />
           </div>
 
+          {/* 中：Gold Coins - Minimalist Badge */}
+          <div className="flex items-center gap-1.5 bg-gradient-to-br from-[#FFF9EB] to-[#F5E6CC] px-3 py-1.5 rounded-full border border-[#E6D0A0]/40 shadow-sm flex-shrink-0">
+            <div className="flex items-center justify-center w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 shadow-sm">
+              <span className="text-[9px] font-bold text-white">$</span>
+            </div>
+            <span className="text-[13px] font-bold text-[#5D3A1A] tabular-nums leading-none">
+              {userStatus?.walletBalance?.toLocaleString() || 0}
+            </span>
+          </div>
+
           {/* 右：Energy Pill */}
-          <div className="flex items-center flex-shrink-0 justify-end min-w-[200px]">
+          <div className="flex items-center flex-shrink-0 justify-end">
             <EnergyPill />
           </div>
         </div>

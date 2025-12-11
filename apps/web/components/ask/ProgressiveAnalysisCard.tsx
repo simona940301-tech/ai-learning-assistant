@@ -507,9 +507,7 @@ export default function ProgressiveAnalysisCard({
                         <div className="flex items-center gap-2 mb-6 text-muted-foreground">
                             <Sparkles className="w-4 h-4" />
                             <span className="text-sm font-medium">核心摘要</span>
-                            <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
-                                {(progressiveTimestamps.summaryAt / 1000).toFixed(1)}s
-                            </span>
+
                         </div>
                         <RAGMarkdownRenderer
                             content={analysis.quickSummary}
@@ -547,9 +545,7 @@ export default function ProgressiveAnalysisCard({
                     >
                         <div className="flex items-center gap-2">
                             <h3 className="text-lg font-semibold text-[#6C4A2D]">關鍵概念</h3>
-                            <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                                {(progressiveTimestamps.conceptsAt / 1000).toFixed(1)}s
-                            </span>
+
                         </div>
                         <div className="grid gap-3">
                             {analysis.coreConcepts.slice(0, 5).map((concept, idx) => (
@@ -608,11 +604,7 @@ export default function ProgressiveAnalysisCard({
                     <div className="flex items-center gap-2 text-sm font-semibold text-[#6C4A2D]">
                         <Sparkles className="w-4 h-4" />
                         <span>{examPredictionsReady ? '考題預測完成' : '考題預測生成中'}</span>
-                        {examPredictionsReady && (
-                            <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
-                                {(progressiveTimestamps.predictionsAt / 1000).toFixed(1)}s
-                            </span>
-                        )}
+
                     </div>
                     <span className="text-xs text-[#8C6B4A]">
                         {examPredictionsReady ? '可以開始練習 AI 命題' : 'AI 正在推演命題趨勢'}

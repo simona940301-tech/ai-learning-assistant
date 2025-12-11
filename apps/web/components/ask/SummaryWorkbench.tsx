@@ -2,6 +2,7 @@
 
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { Sparkles, Loader2, AlertCircle, MessageSquare, Check, Menu, FileText } from 'lucide-react'
+import { toast } from 'sonner'
 import { FileUploader } from '@/components/ask/file-uploader'
 import { Button } from '@/components/ui/button'
 import { TutorialBubble } from '@/components/ui/tutorial-bubble'
@@ -728,12 +729,16 @@ export function SummaryWorkbench({ onMenuOpen }: SummaryWorkbenchProps = {}) {
             setShowSaveDialog(false)
 
             // Show success toast
+            toast.success('已成功存入書包！')
             setTimeout(() => setSaveSuccess(false), 3000)
         } catch (error) {
             console.error('[SummaryWorkbench] ❌ Save error:', error)
-            // Error will be displayed in the UI state, no need for alert()
+            // Error will be displayed in the UI state
             const errorMessage = error instanceof Error ? error.message : '保存失敗，請稍後再試'
-            // TODO: Add toast notification here instead of alert
+
+            // Show error toast
+            toast.error(errorMessage)
+
             console.error('[SummaryWorkbench] Error message for user:', errorMessage)
         } finally {
             setIsSaving(false)

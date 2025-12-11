@@ -9,15 +9,14 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-2xl border bg-card text-card-foreground shadow-sm",
-      interactive && "transition-all duration-200 hover:-translate-y-1 cursor-pointer",
+      "rounded-[24px] bg-card text-card-foreground", // Apple HIG: Rounded-24px, No Border initially
+      "isolate", // Ensure stacking context for shadows
+      interactive && "transition-transform duration-300 ease-out hover:scale-[1.01] active:scale-[0.98] cursor-pointer", // Apple Physics: Scale interaction
       className
     )}
     style={{
-      boxShadow: "var(--shadow-card)",
-      ...(interactive && {
-        '--tw-shadow': 'var(--shadow-card-hover)',
-      } as React.CSSProperties),
+      boxShadow: "var(--shadow-card)", // Soft diffuse shadow
+      // Remove border by default, rely on shadow for separation
     }}
     {...props}
   />

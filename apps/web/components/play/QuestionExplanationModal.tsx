@@ -91,7 +91,7 @@ export function QuestionExplanationModal({
             <Card className="p-6">
               <h3 className="mb-4 text-lg font-semibold">題目</h3>
               <p className="mb-4 whitespace-pre-wrap">{question.question_text}</p>
-              
+
               {/* 選項 */}
               <div className="space-y-2">
                 {(['A', 'B', 'C', 'D'] as const).map((optionId) => {
@@ -102,22 +102,20 @@ export function QuestionExplanationModal({
                   return (
                     <div
                       key={optionId}
-                      className={`flex items-start gap-3 rounded-lg border-2 p-3 ${
-                        isCorrect
+                      className={`flex items-start gap-3 rounded-lg border-2 p-3 ${isCorrect
                           ? 'border-green-500 bg-green-50'
                           : isUserAnswer && !isCorrect
-                          ? 'border-red-500 bg-red-50'
-                          : 'border-border bg-background'
-                      }`}
+                            ? 'border-red-500 bg-red-50'
+                            : 'border-border bg-background'
+                        }`}
                     >
                       <div
-                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full font-bold ${
-                          isCorrect
+                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full font-bold ${isCorrect
                             ? 'bg-green-500 text-white'
                             : isUserAnswer && !isCorrect
-                            ? 'bg-red-500 text-white'
-                            : 'bg-muted text-muted-foreground'
-                        }`}
+                              ? 'bg-red-500 text-white'
+                              : 'bg-muted text-muted-foreground'
+                          }`}
                       >
                         {optionId}
                       </div>
@@ -148,20 +146,60 @@ export function QuestionExplanationModal({
                   </div>
                 </div>
 
-                {/* 選項分析 */}
-                {explanation.option_analysis && Object.keys(explanation.option_analysis).length > 0 && (
+                {/* 正確解析 (New) */}
+                {explanation.option_analysis?.correctAnalysis && (
                   <div className="mt-6">
-                    <h4 className="mb-3 text-sm font-semibold">選項分析</h4>
-                    <div className="space-y-2">
-                      {Object.entries(explanation.option_analysis).map(([optionId, analysis]) => (
-                        <div key={optionId} className="rounded-lg border bg-muted/50 p-3">
-                          <div className="mb-1 font-semibold">選項 {optionId}</div>
-                          <div className="text-sm text-muted-foreground">{analysis as string}</div>
-                        </div>
-                      ))}
+                    <h4 className="mb-3 text-sm font-semibold flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      正確解析
+                    </h4>
+                    <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+                      {explanation.option_analysis.correctAnalysis}
                     </div>
                   </div>
                 )}
+
+                {/* 選項分析 */}
+                {(() => {
+                  const oa = explanation.option_analysis || {};
+                  // 兼容舊資料 (oa 本身就是 map) 和新資料 (oa.optionAnalysis 是 map)
+                  // 如果 oa.optionAnalysis 存在且是物件，優先使用它；否則如果 oa 本身包含 A-D 鍵，使用 oa
+                  let analysisMap = oa.optionAnalysis || oa;
+
+                  // 過濾出僅含 A, B, C, D 的項目，避免顯示 correctAnalysis 等系統欄位
+                  const validKeys = ['A', 'B', 'C', 'D'];
+                  const entries = Object.entries(analysisMap || {})
+                    .filter(([key]) => validKeys.includes(key));
+
+                  if (entries.length === 0) return null;
+
+                  return (
+                    <div className="mt-6">
+                      <h4 className="mb-3 text-sm font-semibold">選項分析</h4>
+                      <div className="space-y-2">
+                        {entries.map(([optionId, content]) => {
+                          const text = String(content);
+                          const isDistractor = text.includes('[易錯]');
+                          const cleanText = text.replace('[易錯]', '').trim();
+
+                          return (
+                            <div key={optionId} className={`rounded-lg border p-3 ${isDistractor ? 'bg-orange-50 border-orange-200' : 'bg-muted/50'}`}>
+                              <div className="mb-1 font-semibold flex items-center gap-2">
+                                選項 {optionId}
+                                {isDistractor && (
+                                  <span className="inline-flex items-center rounded-full border border-orange-200 bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-800">
+                                    ⚠️ 易錯
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-sm text-muted-foreground">{cleanText}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
               </Card>
             )}
 

@@ -23,6 +23,37 @@ export async function POST(req: NextRequest) {
             )
         }
 
+        // 🎯 SOTA FIX: Check Energy (Feathers)
+        const energySupabase = getServiceSupabaseClient()
+
+        // Check current energy
+        const { data: profile } = await energySupabase
+            .from('profiles')
+            .select('daily_energy_count')
+            .eq('id', userId)
+            .single()
+
+        const currentEnergy = profile?.daily_energy_count ?? 0
+        const ENERGY_COST = 1
+
+        if (currentEnergy < ENERGY_COST) {
+            return NextResponse.json(
+                { error: '羽毛不足', code: 'INSUFFICIENT_ENERGY' },
+                { status: 402 } // Payment Required
+            )
+        }
+
+        // Deduct Energy
+        const { error: updateError } = await energySupabase
+            .from('profiles')
+            .update({ daily_energy_count: currentEnergy - ENERGY_COST })
+            .eq('id', userId)
+
+        if (updateError) {
+            console.error('[PVE Start] Failed to deduct energy:', updateError)
+            return NextResponse.json({ error: 'Failed to deduct energy' }, { status: 500 })
+        }
+
         if (requestedUserId && user && requestedUserId !== user.id) {
             console.warn('[PVE Start] User ID mismatch, using session user', { requestedUserId, sessionUserId: user.id })
         }

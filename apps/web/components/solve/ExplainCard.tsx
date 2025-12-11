@@ -26,13 +26,13 @@ function findNumberedBlanksInText(text: string): Array<{ number: number; index: 
   const matches: Array<{ number: number; index: number }> = []
   let match: RegExpMatchArray | null
   pattern.lastIndex = 0
-  
+
   // Full-width to half-width number mapping
   const fullWidthMap: Record<string, string> = {
     '０': '0', '１': '1', '２': '2', '３': '3', '４': '4',
     '５': '5', '６': '6', '７': '7', '８': '8', '９': '9',
   }
-  
+
   while ((match = pattern.exec(text)) !== null) {
     let numStr = match[1]
     // Convert full-width numbers to half-width
@@ -100,7 +100,7 @@ function LoadingState({ currentStep }: { currentStep: number }) {
   useEffect(() => {
     setDisplayedText('')
     setIsTyping(true)
-    
+
     let currentIndex = 0
     const typingInterval = setInterval(() => {
       if (currentIndex < message.length) {
@@ -233,9 +233,8 @@ function ClarityStripe({ enabled, data }: ClarityStripeProps) {
       </div>
       {confidence && (
         <span
-          className={`hidden sm:inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${
-            CONFIDENCE_STYLE[confidence] ?? 'border-blue-400/40 bg-blue-500/15 text-blue-100'
-          }`}
+          className={`hidden sm:inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${CONFIDENCE_STYLE[confidence] ?? 'border-blue-400/40 bg-blue-500/15 text-blue-100'
+            }`}
         >
           信心：{CONFIDENCE_LABEL[confidence] ?? confidence}
         </span>
@@ -270,9 +269,8 @@ function ActionFooter({ visible, isSaving, saveStatus, saveMessage, onPrimaryCli
           <motion.span
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`text-xs ${
-              saveStatus === 'success' ? 'text-emerald-300' : 'text-amber-300'
-            }`}
+            className={`text-xs ${saveStatus === 'success' ? 'text-emerald-300' : 'text-amber-300'
+              }`}
           >
             {saveMessage}
           </motion.span>
@@ -365,10 +363,10 @@ function convertExplainViewModelToCard(vm: ExplainViewModel, inputText: string):
       : [{ title: '解析', detail: safeText(vm.briefReason, '') }],
     correct: answerKey
       ? {
-          key: answerKey,
-          text: answerText,
-          reason: safeText(vm.briefReason, ''),
-        }
+        key: answerKey,
+        text: answerText,
+        reason: safeText(vm.briefReason, ''),
+      }
       : undefined,
     vocab: [],
     meta,
@@ -382,18 +380,18 @@ function convertExplainViewModelToCard(vm: ExplainViewModel, inputText: string):
  */
 function getMissingFields(view: ExplainVM | null): string[] {
   if (!view) return []
-  
+
   // Simplified: Only check for absolute minimum (answer or reason or stem)
   // If we have any of these, we can render something useful
   const hasAnswer = view.answer?.text || view.answer?.label
   const hasReason = (view.meta as any)?.reasonLine || view.stem?.en
   const hasStem = view.stem?.en
-  
+
   // If we have nothing at all, that's a problem
   if (!hasAnswer && !hasReason && !hasStem) {
     return ['No content available']
   }
-  
+
   // Otherwise, always allow rendering (like ChatGPT)
   return []
 }
@@ -401,10 +399,10 @@ function getMissingFields(view: ExplainVM | null): string[] {
 /**
  * Dev Fallback UI - 優雅處理未知題型 + 缺欄位提示
  */
-function DevFallbackUI({ 
-  data, 
+function DevFallbackUI({
+  data,
   missingFields = [],
-}: { 
+}: {
   data: any
   missingFields?: string[]
 }) {
@@ -519,11 +517,10 @@ function GenericExplain({ view }: { view: GenericVM }) {
             {view.options.map((opt, idx) => (
               <div
                 key={idx}
-                className={`text-sm p-2 rounded ${
-                  opt.label === view.answer?.label
-                    ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-300'
-                    : 'bg-zinc-800/30 text-zinc-300'
-                }`}
+                className={`text-sm p-2 rounded ${opt.label === view.answer?.label
+                  ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-300'
+                  : 'bg-zinc-800/30 text-zinc-300'
+                  }`}
               >
                 <span className="font-medium">{opt.label}.</span> {opt.text}
               </div>
@@ -566,10 +563,10 @@ export default function ExplainCard({ inputText, conservative = false, onFollowU
 
     // Simplified: no kind normalization, just convert
     const card = convertExplainViewModelToCard(vm, inputText)
-    
+
     // Present using presenter
     const view = presentExplainCard(card)
-    
+
     if (!view) {
       console.warn('[ExplainCard] Failed to present card, creating minimal fallback')
       // Return a minimal fallback view with answer and reason
@@ -578,7 +575,7 @@ export default function ExplainCard({ inputText, conservative = false, onFollowU
         id: 'fallback',
         kind: 'GENERIC',
         stem: { en: inputText },
-        answer: vm.answer ? { 
+        answer: vm.answer ? {
           label: answerMatch ? safeToUpperCase(answerMatch[1], '') : '',
           text: safeTrim(safeReplace(safeText(vm.answer, ''), /^\(?[A-E]\)?\s*/i, ''), '') || safeText(vm.answer, '')
         } : undefined,
@@ -876,7 +873,7 @@ export default function ExplainCard({ inputText, conservative = false, onFollowU
           onLoadingChange?.(false) // 即使 abort 也要重置 loading
           return
         }
-        
+
         console.error('[ExplainCard] Error:', err)
         setError(err instanceof Error ? err.message : 'Unknown error')
         setIsLoading(false)
@@ -895,7 +892,7 @@ export default function ExplainCard({ inputText, conservative = false, onFollowU
         abortRef.current = null
       }
     }
-  }, [inputText, conservative])
+  }, [inputText, conservative, onLoadingChange])
 
   const handlePrimaryAction = useCallback(async () => {
     if (isSaving) return
@@ -957,6 +954,7 @@ export default function ExplainCard({ inputText, conservative = false, onFollowU
     explainView,
     inputText,
     vm,
+    user?.id,
   ])
 
   // Removed: kind-based tracking (no longer needed)

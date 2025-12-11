@@ -44,7 +44,7 @@ export function UpdatePrompt() {
                 }
             })
         }
-    }, [showPrompt])
+    }, [showPrompt, registration])
 
     // Listen for custom event from next-pwa
     useEffect(() => {

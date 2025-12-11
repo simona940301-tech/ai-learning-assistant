@@ -75,7 +75,7 @@ export default function OnboardingEntryPage() {
         // 查詢 session 進度
         const { data: session } = await supabaseBrowserClient
           .from('onboarding_sessions')
-          .select('challenge_completed_at, scorecard_submitted_at, current_step')
+          .select('challenge_completed_at, scorecard_submitted_at, current_step, initial_xp_granted')
           .eq('user_id', user.id)
           .eq('status', 'in_progress')
           .order('created_at', { ascending: false })
@@ -89,9 +89,14 @@ export default function OnboardingEntryPage() {
           console.log('[Onboarding] 恢復到：Complete')
           router.push('/onboarding/complete')
         } else if (session?.challenge_completed_at) {
-          // 已完成 challenge → 導向 reward（註冊後繼續）
-          console.log('[Onboarding] 恢復到：Reward')
-          router.push('/onboarding/reward')
+          if (session.initial_xp_granted) {
+            console.log('[Onboarding] 恢復到：Habits (跳過重複 Reward)')
+            router.push('/onboarding/habits')
+          } else {
+            // 已完成 challenge → 導向 reward（註冊後繼續）
+            console.log('[Onboarding] 恢復到：Reward')
+            router.push('/onboarding/reward')
+          }
         } else if (profile?.avatar_url) {
           // 已有頭像 → 導向 challenge
           console.log('[Onboarding] 恢復到：Challenge')

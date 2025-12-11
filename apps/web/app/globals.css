@@ -46,11 +46,16 @@
     --input: 36 30% 80%;
     --ring: 42 98% 70%;
 
-    /* 🎯 Design System: Border Radius (Issue #1.3.3) */
-    --radius-card: 1rem;
-    /* 16px - Cards */
-    --radius-modal: 1.5rem;
-    /* 24px - Modals/BottomSheets (top only) */
+    /* 🎯 Design System: Border Radius (Apple HIG - Squircle Geometry) */
+    --radius-card: 24px;
+    /* Large UI elements */
+    --radius-modal: 24px;
+    /* Modals */
+    --radius-button: 9999px;
+    /* Capsule buttons */
+    --radius-inner: 16px;
+    /* Nested elements */
+
     --radius-full: 9999px;
     /* Pills/Chips/Badges */
     --radius: 1rem;
@@ -70,9 +75,11 @@
     --spacing-2xl: 3rem;
     /* 48px */
 
-    /* 🎯 Design System: Shadows (2-tier system) */
-    --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-    --shadow-card-hover: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    /* 🎯 Design System: Shadows (Apple HIG - Diffuse & Soft) */
+    /* Inset Grouped Shadow: Very soft, large diffusion */
+    --shadow-card: 0 8px 30px rgb(0 0 0 / 0.04);
+    /* Active/Lifted State */
+    --shadow-card-hover: 0 20px 40px rgb(0 0 0 / 0.08);
 
     /* 🎯 SOTA Mobile Fix: Dynamic Viewport Height */
     --app-height: 100dvh;
@@ -162,12 +169,16 @@
     padding: 0;
     overflow: hidden;
     /* 關掉外層捲動，交給 App 自己控制 */
-    position: relative;
-    /* 移除 fixed，使用 relative */
-    touch-action: manipulation;
-    /* Optimize for touch devices */
-    -webkit-tap-highlight-color: transparent;
-    -webkit-touch-callout: none;
+    position: fixed;
+    /* 🎯 SOTA: Force fixed to prevent bounce entirely */
+    width: 100%;
+
+    /* 🎯 SOTA: Lockdown */
+    overscroll-behavior: none;
+    overscroll-behavior-y: none;
+    touch-action: none;
+    /* 🎯 Prevent browser gestures globally (except where re-enabled) */
+
     background-color: hsl(var(--background));
     /* 🎯 SOTA: Prevent white flash */
   }

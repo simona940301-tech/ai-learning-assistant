@@ -25,6 +25,7 @@ interface GameState {
     savedVocabularyIds: Set<string>; // Track saved word texts (for deduplication)
     captureModalOpen: boolean; // Control VocabularyCaptureModal
     importantQueue: string[]; // 🎯 Track words marked as important (Star)
+    isExiting: boolean; // 🎯 Control early exit state (Game Paused)
 
     // Actions
     setArtists: (artists: string[]) => void;
@@ -43,6 +44,7 @@ interface GameState {
     markWordsAsSaved: (wordTexts: string[]) => void; // Mark words as saved
     openCaptureModal: () => void; // Open vocabulary capture modal
     closeCaptureModal: () => void; // Close vocabulary capture modal
+    setIsExiting: (isExiting: boolean) => void; // 🎯 Set exit state
 }
 
 const SESSION_LIMIT = 20;
@@ -76,6 +78,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     savedVocabularyIds: new Set(),
     captureModalOpen: false,
     importantQueue: [],
+    isExiting: false,
 
     setArtists: (artists) => set({ selectedArtists: artists, gameStatus: 'level-selection' }),
     setLevels: (levels) => set({ selectedLevels: levels }),
@@ -297,4 +300,5 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     openCaptureModal: () => set({ captureModalOpen: true }),
     closeCaptureModal: () => set({ captureModalOpen: false }),
+    setIsExiting: (isExiting) => set({ isExiting }),
 }));

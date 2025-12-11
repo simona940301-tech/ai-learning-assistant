@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
       content,
       is_anonymous = false,
       question_metadata,
+      images = [], // Support images array
       // 錯題本僅允許對戰/練習流程寫入，社群貼文不再觸發
       add_to_error_book = false,
     } = body;
@@ -51,6 +52,35 @@ export async function POST(req: NextRequest) {
         { error: 'INVALID_INPUT', message: '請輸入問題內容' },
         { status: 400 }
       );
+    }
+
+    // Validate images array
+    if (images && !Array.isArray(images)) {
+      return NextResponse.json(
+        { error: 'INVALID_INPUT', message: '圖片格式錯誤' },
+        { status: 400 }
+      );
+    }
+
+    // Limit to 4 images
+    if (images && images.length > 4) {
+      return NextResponse.json(
+        { error: 'INVALID_INPUT', message: '最多只能上傳 4 張圖片' },
+        { status: 400 }
+      );
+    }
+
+    // Validate image URLs are from community_images bucket
+    if (images && images.length > 0) {
+      const invalidImages = images.filter(
+        (url: string) => !url.includes('/community_images/')
+      );
+      if (invalidImages.length > 0) {
+        return NextResponse.json(
+          { error: 'INVALID_INPUT', message: '圖片來源無效' },
+          { status: 400 }
+        );
+      }
     }
 
     // 構建 question_metadata
@@ -72,11 +102,13 @@ export async function POST(req: NextRequest) {
         content: content.trim(),
         is_anonymous: Boolean(is_anonymous),
         question_metadata: Object.keys(metadata).length > 0 ? metadata : null,
-        images: [],
+        images: images || [],
         likes: 0,
+        liked_by: [],
       })
       .select()
       .single();
+
 
     if (insertError) {
       console.error('[Community Post Create] Database error:', insertError);

@@ -32,7 +32,7 @@ export function ChickInteractionModal({ isOpen, onClose }: ChickInteractionModal
         isExplorationFinished
     } = useChickStore()
 
-    const { userStatus } = usePlay()
+    const { userStatus, openSystemModal } = usePlay()
     const walletBalance = userStatus?.walletBalance ?? 0
     const [allowance, setAllowance] = useState(100)
 
@@ -66,7 +66,7 @@ export function ChickInteractionModal({ isOpen, onClose }: ChickInteractionModal
 
     const handleGoToBattle = () => {
         onClose()
-        toast("去對戰賺取飼料吧！", { icon: '⚔️' })
+        openSystemModal()
     }
 
     const handleStartExploration = async () => {

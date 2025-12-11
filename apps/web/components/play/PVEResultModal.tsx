@@ -11,7 +11,7 @@
  * 5. Warm, encouraging tone (growth mindset)
  */
 
-import { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -39,24 +39,45 @@ interface PVEResultModalProps {
     onPlayAgain: () => void
 }
 
-export function PVEResultModal({ isOpen, onClose, onPlayAgain }: PVEResultModalProps) {
+export const PVEResultModal = React.memo(function PVEResultModal({ isOpen, onClose, onPlayAgain }: PVEResultModalProps) {
     const { user } = useAuth()
     const { battleState, progression } = usePlay()
 
-    // Calculate results from battleState
-    const results = useMemo(() => {
-        if (!battleState) return null
+    // 🎯 FIX: Use ref to snapshot battleState when modal opens
+    // This prevents recalculation when battleState changes (e.g., isInBattle: false)
+    const battleStateSnapshotRef = React.useRef<BattleState | null>(null)
 
-        const playerScore = battleState.player1Score
-        const aiScore = battleState.player2Score
+    // Snapshot battleState when modal opens
+    React.useEffect(() => {
+        if (isOpen && battleState && !battleStateSnapshotRef.current) {
+            console.log('[PVE Result] 📸 Snapshotting battleState for results calculation')
+            battleStateSnapshotRef.current = battleState
+        } else if (!isOpen) {
+            // Clear snapshot when modal closes
+            battleStateSnapshotRef.current = null
+        }
+    }, [isOpen, battleState])
+
+    // Calculate results from SNAPSHOT (not live battleState)
+    const results = useMemo(() => {
+        const snapshot = battleStateSnapshotRef.current
+        if (!snapshot || !isOpen) {
+            console.log('[PVE Result] ⚠️ No snapshot or modal closed, returning null')
+            return null
+        }
+
+        console.log('[PVE Result] 🧮 Calculating results from snapshot')
+
+        const playerScore = snapshot.player1Score
+        const aiScore = snapshot.player2Score
         const isWinner = playerScore > aiScore
-        const totalQuestions = battleState.questionList.length
+        const totalQuestions = snapshot.questionList.length
 
         // Calculate wrong questions from answer records
-        const wrongQuestionsRaw = (battleState.answerRecords || [])
+        const wrongQuestionsRaw = (snapshot.answerRecords || [])
             .filter(record => !record.isCorrect)
             .map(record => {
-                const question = battleState.questionList.find(q => q.id === record.questionId)
+                const question = snapshot.questionList.find(q => q.id === record.questionId)
                 if (!question) return null
 
                 const wrongQ: WrongQuestion = {
@@ -67,28 +88,31 @@ export function PVEResultModal({ isOpen, onClose, onPlayAgain }: PVEResultModalP
                         : [],
                     correctAnswer: (question.correct_answer || question.correctAnswer || 'A') as 'A' | 'B' | 'C' | 'D',
                     userAnswer: record.userAnswer as 'A' | 'B' | 'C' | 'D' | null,
-                    explanation: (question as any).explanation, // explanation may not be in Question type
+                    explanation: (question as any).explanation,
                     difficulty: question.difficulty,
                 }
+
                 return wrongQ
             })
 
         const wrongQuestions = wrongQuestionsRaw.filter((q): q is WrongQuestion => q !== null)
 
-        // 🔍 DEBUG: Track explanation availability in wrong questions
-        console.log('[PVE Result] Wrong questions explanation stats:', {
-            total: wrongQuestions.length,
-            withExplanation: wrongQuestions.filter(q => q.explanation).length,
-            withoutExplanation: wrongQuestions.filter(q => !q.explanation).length,
-            questionIds: wrongQuestions.map(q => ({ id: q.id, hasExplanation: !!q.explanation }))
-        })
-
         const correctCount = totalQuestions - wrongQuestions.length
         const accuracy = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0
 
-        // Calculate rewards (simplified, adjust based on your scoring system)
+        // Calculate rewards based on performance
         const xpEarned = Math.round(playerScore / 10)
         const coinsEarned = isWinner ? 50 : 25
+
+        console.log('[PVE Result] ✅ Results calculated:', {
+            playerScore,
+            aiScore,
+            isWinner,
+            correctCount,
+            wrongCount: wrongQuestions.length,
+            xpEarned,
+            coinsEarned
+        })
 
         return {
             playerScore,
@@ -102,7 +126,7 @@ export function PVEResultModal({ isOpen, onClose, onPlayAgain }: PVEResultModalP
             xpEarned,
             coinsEarned,
         }
-    }, [battleState])
+    }, [isOpen]) // Only depend on isOpen, not battleState
 
     const [showCelebration, setShowCelebration] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
@@ -132,6 +156,7 @@ export function PVEResultModal({ isOpen, onClose, onPlayAgain }: PVEResultModalP
         try {
             let successCount = 0
             let failCount = 0
+            const errors: Array<{ questionId: string; error: string }> = []
 
             // Save each wrong question
             for (const question of results.wrongQuestions) {
@@ -149,14 +174,19 @@ export function PVEResultModal({ isOpen, onClose, onPlayAgain }: PVEResultModalP
 
                     if (response.ok) {
                         successCount++
+                        console.log('[PVE Error Book] Successfully saved question:', question.id)
                     } else {
                         failCount++
                         const errorData = await response.json()
-                        console.error(`Failed to save question ${question.id}:`, errorData)
+                        const errorMessage = errorData.message || errorData.error || 'Unknown error'
+                        console.error(`[PVE Error Book] Failed to save question ${question.id}:`, errorData)
+                        errors.push({ questionId: question.id, error: errorMessage })
                     }
                 } catch (error) {
                     failCount++
-                    console.error(`Error saving question ${question.id}:`, error)
+                    const errorMessage = error instanceof Error ? error.message : 'Network error'
+                    console.error(`[PVE Error Book] Error saving question ${question.id}:`, error)
+                    errors.push({ questionId: question.id, error: errorMessage })
                 }
             }
 
@@ -166,16 +196,26 @@ export function PVEResultModal({ isOpen, onClose, onPlayAgain }: PVEResultModalP
             }
 
             if (failCount > 0) {
+                // Log detailed errors for debugging
+                console.error('[PVE Error Book] Detailed errors:', errors)
+
                 if (successCount === 0) {
-                    // All failed - show more helpful message
-                    notify.error('儲存失敗，題目可能尚未同步。請稍後再試或聯繫客服。')
+                    // All failed - show more helpful message with first error
+                    const firstError = errors[0]?.error || '未知錯誤'
+                    if (firstError.includes('QUESTION_NOT_FOUND') || firstError.includes('同步')) {
+                        notify.error('題目尚未同步到題庫，請稍後再試或聯繫客服')
+                    } else if (firstError.includes('UNAUTHORIZED')) {
+                        notify.error('請先登入後再儲存錯題')
+                    } else {
+                        notify.error(`儲存失敗：${firstError}`)
+                    }
                 } else {
                     // Partial failure
                     notify.warning(`${failCount} 題儲存失敗，${successCount} 題已成功儲存`)
                 }
             }
         } catch (error) {
-            console.error('Error saving to error book:', error)
+            console.error('[PVE Error Book] Unexpected error in saveToErrorBook:', error)
             notify.error('儲存失敗，請稍後再試')
         } finally {
             setIsSaving(false)
@@ -385,21 +425,32 @@ export function PVEResultModal({ isOpen, onClose, onPlayAgain }: PVEResultModalP
 
                                         {/* Explanation */}
                                         {question.explanation && (
-                                            <div className="mt-4 bg-[#FFF8E1] rounded-xl p-5 border-l-4 border-[#FFB74D] shadow-sm">
-                                                <div className="prose prose-sm max-w-none text-[#795548] prose-headings:text-[#5D4037] prose-strong:text-[#E65100] prose-a:text-[#5B7CFF] prose-p:leading-relaxed prose-li:marker:text-[#FFB74D]">
-                                                    <ReactMarkdown
-                                                        components={{
-                                                            p: (props) => <p className="mb-3 last:mb-0 leading-relaxed font-medium whitespace-pre-wrap" {...props} />,
-                                                            ul: (props) => <ul className="list-disc pl-4 mb-3 space-y-1.5" {...props} />,
-                                                            ol: (props) => <ol className="list-decimal pl-4 mb-3 space-y-1.5" {...props} />,
-                                                            li: (props) => <li className="pl-1 leading-relaxed" {...props} />,
-                                                            strong: (props) => <strong className="font-bold text-[#E65100]" {...props} />,
-                                                            code: (props) => <code className="bg-[#FFECB3] px-1.5 py-0.5 rounded text-[#E65100] font-mono text-xs" {...props} />,
-                                                            br: () => <br />,
-                                                        }}
-                                                    >
-                                                        {question.explanation}
-                                                    </ReactMarkdown>
+                                            <div className="mt-6 space-y-4">
+                                                {/* Core Explanation */}
+                                                <div className="bg-[#FFF8E1] rounded-xl p-5 border-l-4 border-[#FFB74D] shadow-sm">
+                                                    <div className="flex items-center gap-2 mb-3">
+                                                        <Sparkles className="w-5 h-5 text-[#FFB74D]" />
+                                                        <h4 className="text-[16px] font-bold text-[#5D4037]">詳細解析</h4>
+                                                    </div>
+                                                    <div className="prose prose-sm max-w-none text-[#795548] prose-headings:text-[#5D4037] prose-strong:text-[#E65100] prose-a:text-[#5B7CFF] prose-p:leading-relaxed prose-li:marker:text-[#FFB74D]">
+                                                        <ReactMarkdown
+                                                            components={{
+                                                                p: (props) => <p className="mb-3 last:mb-0 leading-relaxed font-medium whitespace-pre-wrap" {...props} />,
+                                                                ul: (props) => <ul className="list-disc pl-4 mb-3 space-y-1.5" {...props} />,
+                                                                ol: (props) => <ol className="list-decimal pl-4 mb-3 space-y-1.5" {...props} />,
+                                                                li: (props) => <li className="pl-1 leading-relaxed" {...props} />,
+                                                                strong: (props) => <strong className="font-bold text-[#E65100]" {...props} />,
+                                                                code: (props) => <code className="bg-[#FFECB3] px-1.5 py-0.5 rounded text-[#E65100] font-mono text-xs" {...props} />,
+                                                                br: () => <br />,
+                                                                // Custom heading rendering for better hierarchy
+                                                                h1: (props) => <h1 className="text-lg font-bold text-[#5D4037] mt-4 mb-2" {...props} />,
+                                                                h2: (props) => <h2 className="text-base font-bold text-[#5D4037] mt-3 mb-2" {...props} />,
+                                                                h3: (props) => <h3 className="text-sm font-bold text-[#795548] mt-2 mb-1" {...props} />,
+                                                            }}
+                                                        >
+                                                            {question.explanation}
+                                                        </ReactMarkdown>
+                                                    </div>
                                                 </div>
                                             </div>
                                         )}
@@ -491,4 +542,4 @@ export function PVEResultModal({ isOpen, onClose, onPlayAgain }: PVEResultModalP
             </DialogContent>
         </Dialog>
     )
-}
+})

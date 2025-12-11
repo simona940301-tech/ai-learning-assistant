@@ -48,7 +48,7 @@ const PROTECTED_API_ROUTES = [
   '/api/store/',
   '/api/dashboard/',
   '/api/proficiency/',
-  '/api/community/',
+  // '/api/community/', // 🔧 Moved to PUBLIC_API_ROUTES - auth handled in route handlers
   '/api/questions/generate',
   '/api/hints/generate',
   '/api/onboarding/',
@@ -67,7 +67,7 @@ const PUBLIC_API_ROUTES = [
   '/api/packs', // Public pack browsing (auth optional for install status)
   '/api/auth/', // Authentication routes (login, register, etc.)
   '/api/onboarding/questions', // Onboarding questions - allow anonymous access for onboarding flow
-  '/api/internal/seed-questions/import', // TEMPORARY: Allow public access for testing
+  '/api/community/', // 🔧 Community routes - auth handled in route handlers
 ]
 
 /**
@@ -79,7 +79,8 @@ const SERVICE_API_ROUTES = [
   '/api/internal/departments',
   '/api/internal/questions',
   '/api/internal/onboarding-questions',
-  // TEMPORARY: Skip /api/internal/seed-questions for testing
+  '/api/internal/onboarding-questions',
+  // Note: Seed questions import removed from public access
   '/api/play/battle/events', // Called by Rust battle-ws service
   '/api/play/questions/seed',
 ]
@@ -109,7 +110,8 @@ function extractBearerToken(header: string | null): string | null {
  */
 function isMockModeEnabled(): boolean {
   // 🎯 修復：徹底停用 Mock Mode
-  return false && (
+  // 🎯 Fix: Ensure Mock Mode is controlled by env vars strictly
+  return (
     process.env.NODE_ENV === 'development' &&
     process.env.NEXT_PUBLIC_DISABLE_MOCK_USER !== 'true' &&
     process.env.NEXT_PUBLIC_ENABLE_REAL_AUTH_TEST !== 'true'

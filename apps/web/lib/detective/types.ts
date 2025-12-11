@@ -21,6 +21,7 @@ export interface CaseQuestion {
     text: string
     requiredEvidenceCount: number
     correctEvidenceIds?: string[] // For basic validation if needed locally, though AI is primary
+    standardEvidence?: string[] // For 3-tier validation (Exact match & Semantic embedding source)
 }
 
 export interface Evidence {

@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     // 從 seed_questions 獲取題目詳情
     // 確保 questionIds 是 UUID 格式
     const validQuestionIds = questionIds.filter(id => id && typeof id === 'string')
-    
+
     if (validQuestionIds.length === 0) {
       return NextResponse.json(
         { success: false, error: 'No valid question IDs' },
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
         source,
         source_type,
         source_year,
-        question_explanations(explanation_text)
+        question_explanations(explanation_text, option_analysis)
       `)
       .in('id', validQuestionIds)
 
@@ -66,6 +66,7 @@ export async function GET(req: NextRequest) {
         : q.question_explanations
 
       const explanationText = explanationEntry?.explanation_text || ''
+      const optionAnalysis = explanationEntry?.option_analysis || {}
 
       return {
         id: q.id,
@@ -74,6 +75,7 @@ export async function GET(req: NextRequest) {
         correctAnswer: q.correct_answer,
         difficulty: q.difficulty_level || 3,
         explanation: explanationText,
+        optionAnalysis: optionAnalysis,
         source: q.source_type && q.source_year
           ? `${q.source_type} ${q.source_year}`
           : q.source || null,

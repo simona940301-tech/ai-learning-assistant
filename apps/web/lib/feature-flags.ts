@@ -67,9 +67,9 @@ const GAME_MODE_DEFAULTS: Record<GameModeFlag, boolean> = {
   UGC_MODE: false,       // 內容貢獻
   PRACTICE_MODE: false,  // 無限練習
 
-  // 🚧 未完成功能 (disabled)
-  DETECTIVE_MODE: false, // 偵探模式 - API 未完成
-  EDITOR_MODE: false,    // 編輯模式 - 需要生產測試
+  // 🚧 已完成功能 (enabled)
+  DETECTIVE_MODE: true, // 偵探模式 - API V1 完成 (三層驗證)
+  EDITOR_MODE: true,    // 編輯模式 - 包含 Onboarding 與 Celebration
 }
 
 /**

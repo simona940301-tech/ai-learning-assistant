@@ -86,12 +86,36 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
+    // Helper to map Chinese subjects to English codes for DB constraint
+    const mapSubjectToCode = (subject: string): string => {
+      const map: Record<string, string> = {
+        '英文': 'english',
+        '數學': 'math',
+        '國文': 'chinese',
+        '社會': 'social', // or 'social_studies' depending on DB, but 'social' is common
+        '自然': 'science',
+        '其他': 'other'
+      }
+
+      // If it's one of the known Chinese keys, return mapped value
+      if (map[subject]) return map[subject]
+
+      // If it's already english-like (contains only ascii), assume it's valid code
+      if (/^[a-zA-Z0-9_-]+$/.test(subject)) return subject.toLowerCase()
+
+      // Fallback: 'other' is safest if unknown
+      return 'other'
+    }
+
     // Try Enhanced format first (with conversation history)
     const enhancedParse = SaveEnhancedSchema.safeParse(body)
     if (enhancedParse.success) {
       const { user_id, title, subject, content, include_conversation, conversation_history } = enhancedParse.data
       // SECURITY: Always use authenticated user ID, ignore client-provided user_id
       const finalUserId = user.id
+
+      // Map subject
+      const dbSubject = mapSubjectToCode(subject)
 
       // Build markdown content with conversation if requested
       let finalContent = content
@@ -117,7 +141,8 @@ export async function POST(request: NextRequest) {
           title,
           content_md: finalContent,
           source_type: 'summary',
-          tags: [subject],
+          subject: dbSubject,
+          tags: [subject], // Keep original Chinese tag in tags array
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
@@ -125,6 +150,16 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (error) {
+        // Handle duplicate title error
+        if (error.code === '23505') {
+          return NextResponse.json(
+            {
+              error: 'DUPLICATE_TITLE',
+              message: '檔案名稱重複，請使用其他名稱'
+            },
+            { status: 409 }
+          )
+        }
         throw new Error(`Failed to save to notebook: ${error.message}`)
       }
 
@@ -169,20 +204,35 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const data = await saveBackpackNote({
-        user_id: finalUserId,
-        question,
-        canonical_skill,
-        note_md,
-      })
+      try {
+        const data = await saveBackpackNote({
+          user_id: finalUserId,
+          question,
+          canonical_skill,
+          note_md,
+        })
 
-      const latency = Date.now() - startTime
-      trackAPICall('/api/backpack/save', latency, true)
+        const latency = Date.now() - startTime
+        trackAPICall('/api/backpack/save', latency, true)
 
-      // 🚀 P1: Invalidate cache after mutation
-      await backpackCache.invalidate(finalUserId)
+        // 🚀 P1: Invalidate cache after mutation
+        await backpackCache.invalidate(finalUserId)
 
-      return NextResponse.json({ data, saved: true })
+        return NextResponse.json({ data, saved: true })
+      } catch (error: any) {
+        // Handle duplicate title error from saveBackpackNote helper if it throws or returns error
+        // Note: saveBackpackNote implementation needs checking, but assuming it throws or writes to error
+        if (error?.code === '23505' || error?.message?.includes('duplicate key')) {
+          return NextResponse.json(
+            {
+              error: 'DUPLICATE_TITLE',
+              message: '檔案名稱重複，請使用其他名稱'
+            },
+            { status: 409 }
+          )
+        }
+        throw error
+      }
     }
 
     // Fallback to legacy format
@@ -196,6 +246,9 @@ export async function POST(request: NextRequest) {
       // This ensures we use the user-confirmed subject from the dialog
       const finalSubject = subject || canonical_skill
 
+      // Map subject
+      const dbSubject = mapSubjectToCode(finalSubject)
+
       // Save to notebook_entries (not backpack_notes)
       const supabase = getSupabaseClient(request)
       const { data, error } = await supabase
@@ -205,6 +258,7 @@ export async function POST(request: NextRequest) {
           title: question,
           content_md: note_md,
           source_type: 'summary', // RAG analysis summary
+          subject: dbSubject,
           tags: [finalSubject],
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -213,6 +267,15 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (error) {
+        if (error.code === '23505') {
+          return NextResponse.json(
+            {
+              error: 'DUPLICATE_TITLE',
+              message: '檔案名稱重複，請使用其他名稱'
+            },
+            { status: 409 }
+          )
+        }
         throw new Error(`Failed to save to notebook: ${error.message}`)
       }
 

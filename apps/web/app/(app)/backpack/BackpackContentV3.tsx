@@ -13,6 +13,7 @@ import { Plus, Book, Store, Edit2, Trash2, X, Sparkles, CheckSquare, BookText } 
 import { useAsk } from '@/lib/ask-context'
 import type { BackpackFile } from '@/lib/types'
 import { NoteViewerModal } from '@/components/backpack/NoteViewerModal'
+import { ErrorBookDetailModal } from '@/components/backpack/ErrorBookDetailModal'
 // 🎯 Phase 2: 使用簡化版 PDF Reader（無選取/註解功能）
 import { BackpackReaderSimple as BackpackReader } from '@/components/backpack/BackpackReaderSimple'
 import { StoreModal } from '@/components/store/StoreModal'
@@ -81,7 +82,7 @@ export function BackpackContentV3() {
   const [showUpload, setShowUpload] = useState(false)
   const [viewingNote, setViewingNote] = useState<BackpackFile | null>(null)
   const [creatingRoomId, setCreatingRoomId] = useState<string | null>(null)
-  const [showErrorBookModal, setShowErrorBookModal] = useState(false)
+  const [viewingErrorItem, setViewingErrorItem] = useState<any>(null)
   const [showStoreModal, setShowStoreModal] = useState(false)
   const [selectedErrorIds, setSelectedErrorIds] = useState<Set<string>>(new Set())
   const [isEditMode, setIsEditMode] = useState(false)
@@ -197,7 +198,9 @@ export function BackpackContentV3() {
     subjects.forEach((subject) => {
       counts[subject.id] = {
         note: items.filter((item) => item.subject === subject.id).length,
-        wrong: errorBookItems.filter((item: any) => item.packs?.subject === subject.id).length,
+        wrong: errorBookItems.filter((item: any) => item.subject === subject.id).length,
+
+
         book: questionSetItems.filter((item: any) => item.subject === subject.id).length,
       }
     })
@@ -214,7 +217,7 @@ export function BackpackContentV3() {
     if (contentType === 'note') {
       return items.filter((item) => item.subject === selectedSubject)
     } else if (contentType === 'wrong') {
-      return errorBookItems.filter((item: any) => item.packs?.subject === selectedSubject)
+      return errorBookItems.filter((item: any) => item.subject === selectedSubject)
     } else {
       return questionSetItems.filter((item: any) => item.subject === selectedSubject)
     }
@@ -309,9 +312,8 @@ export function BackpackContentV3() {
   }
 
   const handleErrorBookClick = (item: any) => {
-    const allIds = new Set([item.question_id])
-    setSelectedErrorIds(allIds)
-    setShowErrorBookModal(true)
+    // 🎯 Use new detailed modal
+    setViewingErrorItem(item)
   }
 
   const handleCreatePractice = async (item: any) => {
@@ -756,6 +758,17 @@ export function BackpackContentV3() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* 🎯 Error Book Information Modal */}
+      <ErrorBookDetailModal
+        isOpen={!!viewingErrorItem}
+        onClose={() => setViewingErrorItem(null)}
+        item={viewingErrorItem}
+        onMaster={(id) => {
+          console.log('Mastered:', id)
+          // Optional: Implement master API call here or in the modal
+        }}
+      />
 
       {/* Upload Area */}
       {showUpload && contentType === 'note' && (

@@ -79,7 +79,57 @@ export async function GET(request: NextRequest) {
       .sort(() => Math.random() - 0.5)
       .slice(0, count)
 
-    // Transform to expected format
+    // 🎯 Fetch explanations separately (same pattern as pve-helpers.ts)
+    const questionIds = selectedQuestions.map(q => q.id)
+    const { data: explanations, error: explError } = await supabase
+      .from('question_explanations')
+      .select('question_id, explanation_text, option_analysis')
+      .in('question_id', questionIds)
+
+    if (explError) {
+      console.warn('[OnboardingQuestionsAPI] Failed to fetch explanations:', explError)
+    }
+
+    // Create explanation map with merged explanation_text and option_analysis
+    const explanationMap = new Map<string, string>()
+    if (explanations) {
+      explanations.forEach((expl: any) => {
+        let fullExplanation = expl.explanation_text || ''
+
+        // Append option_analysis if it exists
+        if (expl.option_analysis && typeof expl.option_analysis === 'object') {
+          const optionAnalysis = expl.option_analysis
+
+          // Normalize keys to uppercase
+          const normalizedAnalysis: Record<string, string> = {}
+          Object.keys(optionAnalysis).forEach(key => {
+            normalizedAnalysis[key.toUpperCase()] = optionAnalysis[key]
+          })
+
+          const optionKeys = ['A', 'B', 'C', 'D'].filter(key => normalizedAnalysis[key])
+
+          if (optionKeys.length > 0) {
+            // Clean up dangling "選項分析：" from end of text
+            fullExplanation = fullExplanation.replace(/\s*(\*\*|)?選項分析(\*\*|)?[:：]\s*$/g, '')
+
+            fullExplanation += '\n\n**選項分析：**\n'
+            optionKeys.forEach(key => {
+              fullExplanation += `\n**選項 ${key}**：${normalizedAnalysis[key]}`
+            })
+          }
+        }
+
+        explanationMap.set(expl.question_id, fullExplanation)
+      })
+    }
+
+    console.log('[OnboardingQuestionsAPI] Explanations fetched:', {
+      total: explanations?.length || 0,
+      questionCount: selectedQuestions.length,
+      coverage: selectedQuestions.length > 0 ? Math.round((explanations?.length || 0) / selectedQuestions.length * 100) : 0
+    })
+
+    // Transform to expected format with explanations
     const transformedQuestions = selectedQuestions.map(q => ({
       id: q.id,
       question_text: q.question_text,
@@ -89,7 +139,7 @@ export async function GET(request: NextRequest) {
       option_d: q.option_d,
       correct_answer: q.correct_answer,
       difficulty_level: q.difficulty_level,
-      explanation: null, // seed_questions does not have explanation column
+      explanation: explanationMap.get(q.id) || undefined, // ✅ Include explanation from separate table
       subject: q.subject
     }))
 

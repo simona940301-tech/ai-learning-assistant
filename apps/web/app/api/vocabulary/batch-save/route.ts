@@ -76,7 +76,6 @@ export async function POST(request: NextRequest) {
 
         // Parse and validate request body
         const body = await request.json();
-        // console.log('[batch-save] Payload:', JSON.stringify(body, null, 2)); // Debug log
 
         const parseResult = BatchSaveVocabularySchema.safeParse(body);
 
@@ -116,6 +115,7 @@ export async function POST(request: NextRequest) {
                         lyric_snippet: word.lyric_snippet,
                     }),
                     source_type: 'vocabulary',
+                    subject: 'english', // Vocabulary is always English
                     tags: ['english', 'vocabulary', word.level.toLowerCase().replace(/\s+/g, '_')],
                     source_session_id: session_id,
                     source_deck_type: deck_type,

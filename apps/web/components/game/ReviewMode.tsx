@@ -61,7 +61,7 @@ export const ReviewMode: React.FC = () => {
                                 </span>
                             </div>
                             <p className="text-blue-600 dark:text-blue-400 font-medium mb-2">{word.definition_zh}</p>
-                            <p className="text-sm text-zinc-600 dark:text-zinc-400 italic">"{word.example_en}"</p>
+                            <p className="text-sm text-zinc-600 dark:text-zinc-400 italic">{`"${word.example_en}"`}</p>
                         </div>
                     ))
                 )}

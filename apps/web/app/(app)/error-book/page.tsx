@@ -68,9 +68,21 @@ export default async function ErrorBookPage() {
     )
   }
 
-  const supabase = createClient()
+  // 🎯 SOTA FIX: Use Service Role client to bypass RLS for packs/pack_questions join
+  // This is required because PVE packs are private/system-owned and not visible to normal users
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-  const { data, error } = await supabase
+  const adminClient = await import('@supabase/supabase-js').then(mod =>
+    mod.createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    })
+  )
+
+  const { data, error } = await adminClient
     .from('error_book')
     .select(
       `

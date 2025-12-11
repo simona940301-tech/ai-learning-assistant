@@ -19,6 +19,8 @@ export default function LyricalFlowPage() {
         startGame,
         generateSessionId,
         loadSavedVocabularyIds,
+        setIsExiting, // 🎯 Global Exit Action
+        isExiting, // 🎯 Global Exit State
     } = useGameStore();
 
     // 🎯 Initialize session and load saved vocabulary on mount
@@ -45,18 +47,33 @@ export default function LyricalFlowPage() {
                 className="absolute top-0 left-0 right-0 pt-[calc(env(safe-area-inset-top)+1.5rem)] px-6 pb-6 flex justify-between items-center z-50"
             >
                 <button
-                    onClick={() => router.back()}
-                    className="p-2 rounded-full bg-white/50 dark:bg-zinc-800/50 backdrop-blur-md hover:bg-white/80 dark:hover:bg-zinc-800 transition-colors"
+                    onClick={() => {
+                        if (gameStatus === 'playing') {
+                            setIsExiting(true); // 🎯 Trigger "Game Paused" summary
+                        } else {
+                            router.back(); // Standard back for other modes
+                        }
+                    }}
+                    className="group relative p-3 rounded-full overflow-hidden transition-all duration-300 transform active:scale-90"
+                    style={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.6)',
+                        backdropFilter: 'blur(12px)',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
+                        border: '1px solid rgba(255, 255, 255, 0.3)'
+                    }}
                 >
-                    <X className="w-6 h-6 text-zinc-600 dark:text-zinc-400" />
+                    <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <X className="w-5 h-5 text-zinc-600 dark:text-zinc-300" strokeWidth={2.5} />
                 </button>
 
-                <div className="px-4 py-2 rounded-full backdrop-blur-md text-sm font-medium border" style={{
-                    backgroundColor: 'hsl(var(--card) / 0.5)',
+                <div className="px-5 py-2 rounded-full text-xs font-semibold tracking-widest uppercase transition-all duration-300" style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+                    backdropFilter: 'blur(12px)',
                     color: 'hsl(var(--foreground))',
-                    borderColor: 'hsl(var(--border))'
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)'
                 }}>
-                    歌詞學習
+                    Lyrical Flow
                 </div>
 
                 <div className="w-10" /> {/* Spacer for centering */}

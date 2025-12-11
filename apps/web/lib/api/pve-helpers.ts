@@ -354,28 +354,53 @@ export async function fetchPveQuestions(
             if (expl.option_analysis && typeof expl.option_analysis === 'object') {
                 const optionAnalysis = expl.option_analysis
 
-                // Check if this is the structured format with A, B, C, D keys
-                const optionKeys = ['A', 'B', 'C', 'D'].filter(key => optionAnalysis[key])
+                // 🔍 DEBUG: Log the raw analysis object to see what keys we actually have
+                console.log(`[PVE Helper] Raw option_analysis for question ${expl.question_id}:`, JSON.stringify(optionAnalysis))
+
+                // Normalize keys to uppercase to handle 'a', 'b', 'c', 'd' vs 'A', 'B', 'C', 'D'
+                const normalizedAnalysis: Record<string, string> = {}
+                Object.keys(optionAnalysis).forEach(key => {
+                    normalizedAnalysis[key.toUpperCase()] = optionAnalysis[key]
+                })
+
+                // Check for formatted keys A, B, C, D
+                const optionKeys = ['A', 'B', 'C', 'D'].filter(key => normalizedAnalysis[key])
 
                 if (optionKeys.length > 0) {
-                    // Has option-specific analysis
+                    // Clean up dangling "選項分析：" or "選項分析:" from the end of explanation_text
+                    // This prevents the issue where the text says "選項分析：" and then we append another "選項分析："
+                    // or if we have it in text but no data, we might want to keep it (but here we have data)
+                    fullExplanation = fullExplanation.replace(/\s*(\*\*|)?選項分析(\*\*|)?[:：]\s*$/g, '')
+
+                    // Append our structured analysis
                     fullExplanation += '\n\n**選項分析：**\n'
                     optionKeys.forEach(key => {
-                        fullExplanation += `\n**選項 ${key}**：${optionAnalysis[key]}`
+                        fullExplanation += `\n**選項 ${key}**：${normalizedAnalysis[key]}`
                     })
                 } else {
-                    // Check for other structured fields (excluding corePoint and translation which are already in explanation_text)
+                    // Check for other structured fields (excluding corePoint and translation which might be redundant)
+                    // Also exclude 'A', 'B', 'C', 'D' since we handled them (though logic above says they aren't there)
                     const otherKeys = Object.keys(optionAnalysis).filter(
-                        key => key !== 'corePoint' && key !== 'translation' && optionAnalysis[key]
+                        key => {
+                            const k = key.toUpperCase()
+                            return k !== 'COREPOINT' && k !== 'TRANSLATION' &&
+                                k !== 'A' && k !== 'B' && k !== 'C' && k !== 'D' &&
+                                optionAnalysis[key]
+                        }
                     )
 
                     if (otherKeys.length > 0) {
+                        // Clean up dangling headers if specific keys are found
+                        fullExplanation = fullExplanation.replace(/\s*(\*\*|)?(選項分析|補充說明)(\*\*|)?[:：]\s*$/g, '')
+
                         fullExplanation += '\n\n**補充說明：**\n'
                         otherKeys.forEach(key => {
                             fullExplanation += `\n**${key}**：${optionAnalysis[key]}`
                         })
                     }
                 }
+            } else {
+                console.log(`[PVE Helper] No valid option_analysis object for question ${expl.question_id}`)
             }
 
             explanationMap.set(expl.question_id, fullExplanation)

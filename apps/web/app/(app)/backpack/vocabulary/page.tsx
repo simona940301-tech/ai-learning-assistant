@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { BackpackItemCard } from '@/components/backpack/BackpackItemCard';
 import { Input } from '@/components/ui/input';
@@ -53,12 +53,7 @@ export default function VocabularyNotebookPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [isLoading, setIsLoading] = useState(true);
 
-    // Fetch vocabulary
-    useEffect(() => {
-        fetchVocabulary();
-    }, [filter, searchQuery]);
-
-    const fetchVocabulary = async () => {
+    const fetchVocabulary = useCallback(async () => {
         setIsLoading(true);
         try {
             const params = new URLSearchParams();
@@ -82,7 +77,12 @@ export default function VocabularyNotebookPage() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [filter, searchQuery]);
+
+    // Fetch vocabulary
+    useEffect(() => {
+        fetchVocabulary();
+    }, [fetchVocabulary]);
 
     const handleDelete = async (id: string, wordText: string) => {
         // Optimistic update
@@ -255,7 +255,7 @@ export default function VocabularyNotebookPage() {
                                         例句
                                     </h4>
                                     <p className="text-sm text-foreground italic">
-                                        "{word.example_en}"
+                                        {`"${word.example_en}"`}
                                     </p>
                                 </div>
 
@@ -267,7 +267,7 @@ export default function VocabularyNotebookPage() {
                                             <span className="text-xs font-bold">歌詞片段</span>
                                         </div>
                                         <p className="text-sm italic mb-2">
-                                            "{word.lyric_snippet.line}"
+                                            {`"${word.lyric_snippet.line}"`}
                                         </p>
                                         <div className="text-xs text-muted-foreground">
                                             {word.lyric_snippet.artist} - {word.lyric_snippet.song}

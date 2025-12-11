@@ -547,6 +547,16 @@ export function PlayProvider({ children }: { children: React.ReactNode }) {
 
         setBattleFlow('IN_BATTLE')
 
+        // 🎯 CRITICAL FIX: Actually consume the energy after match starts successfully
+        console.log('[PlayProvider] 🔋 Consuming energy for PVE match...')
+        const consumeResult = await consumeEnergy()
+        if (!consumeResult.success) {
+          console.warn('[PlayProvider] ⚠️ Energy consumption failed:', consumeResult.message)
+          // Don't fail the match, just log the warning
+        } else {
+          console.log('[PlayProvider] ✅ Energy consumed successfully')
+        }
+
         console.log('[PlayProvider] ✅ PVE Match started locally with', data.questions.length, 'questions')
         return { ok: true }
 
@@ -663,24 +673,13 @@ export function PlayProvider({ children }: { children: React.ReactNode }) {
           setPostMatchInsights(result)
           setActiveModal('BATTLE_RESULT')
 
-          // TODO: Async sync state to server
-          fetch('/api/play/pve/finish', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              matchId: prev.matchId,
-              finalScore: {
-                player1: prev.player1Score,
-                player2: prev.player2Score
-              },
-              winnerId: isWinner ? user?.id : 'ai',
-              coinsEarned: result.coinsEarned
-            })
-          }).catch(err => console.error('[PlayContext] Background finish error:', err))
+          // 🎯 NOTE: PVE finish API is called from page.tsx when last question is answered
+          // This advancePveRound function is only called for non-last questions
+          // So we don't need to call the API here
 
           return {
             ...prev,
-            isInBattle: false
+            currentQuestionIndex: nextIndex,
           }
         }
 

@@ -80,6 +80,7 @@ export async function POST(req: NextRequest) {
           difficulty: dbQ.difficulty_level || dbQ.difficulty || 3,
           time_limit: dbQ.time_limit || 20,
           skill_tags: dbQ.skill_tags || dbQ.knowledge_tags || [],
+          explanation: dbQ.explanation, // ✅ Pass through explanation from pve-helpers
         }
       }
     ).filter(q => q.question_text.length > 0 && q.options.length >= 2)

@@ -8,6 +8,9 @@ import { cn } from '@/lib/utils'
 import { CheckCircle2, XCircle, Trophy, ArrowRight, Sparkles, Loader2 } from 'lucide-react'
 import { useEditorStore, ChipData } from '@/store/editorStore'
 import { Chip } from '@/components/game/Chip'
+import { EditorProgressBar } from './EditorProgressBar'
+import { EditorOnboarding, useEditorOnboarding } from './EditorOnboarding'
+import { EditorCelebration } from './EditorCelebration'
 
 // ============================================
 // Mock Data (Enhanced)
@@ -74,6 +77,7 @@ function DropZone({
 
     return (
         <span
+            data-dropzone
             className={cn(
                 "inline-flex align-middle mx-1.5 relative transition-all duration-300",
                 "min-w-[80px] h-[32px] rounded-lg",
@@ -148,6 +152,10 @@ export function EditorGame({ onComplete }: { onComplete?: (score: number, total:
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [progressionResult, setProgressionResult] = useState<any>(null)
     const [error, setError] = useState<string | null>(null)
+    const [showCelebration, setShowCelebration] = useState(false)
+
+    // Onboarding state
+    const { shouldShow: shouldShowOnboarding, setShouldShow: setShouldShowOnboarding } = useEditorOnboarding()
 
     // Initialize game and start session
     useEffect(() => {
@@ -259,6 +267,9 @@ export function EditorGame({ onComplete }: { onComplete?: (score: number, total:
             setProgressionResult(data.progression)
             console.log('[EditorGame] Session submitted:', data)
 
+            // Show celebration animation
+            setShowCelebration(true)
+
             if (onComplete) {
                 onComplete(correctCount, Object.keys(ANSWER_KEY).length)
             }
@@ -276,6 +287,33 @@ export function EditorGame({ onComplete }: { onComplete?: (score: number, total:
 
     return (
         <div className="flex flex-col h-full max-h-[80dvh] gap-6">
+            {/* Onboarding */}
+            {shouldShowOnboarding && (
+                <EditorOnboarding
+                    onComplete={() => setShouldShowOnboarding(false)}
+                    onSkip={() => setShouldShowOnboarding(false)}
+                />
+            )}
+
+            {/* Celebration */}
+            {showCelebration && progressionResult && (
+                <EditorCelebration
+                    score={correctCount}
+                    total={totalCount}
+                    xpGained={progressionResult.xpGained}
+                    coinsGained={progressionResult.coinsGained}
+                    leveledUp={progressionResult.leveledUp}
+                    newLevel={progressionResult.newLevel}
+                    onClose={() => setShowCelebration(false)}
+                />
+            )}
+
+            {/* Progress Bar */}
+            <EditorProgressBar
+                current={Object.keys(blanks).length}
+                total={totalCount}
+            />
+
             {/* Header Stats */}
             <div className="flex items-center justify-between px-1">
                 <div className="flex gap-4 text-sm text-muted-foreground">
@@ -297,7 +335,7 @@ export function EditorGame({ onComplete }: { onComplete?: (score: number, total:
             <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-6 min-h-0">
 
                 {/* Left: Article Text */}
-                <Card className="md:col-span-8 overflow-y-auto p-8 leading-loose text-lg font-serif bg-background/50 backdrop-blur-sm border-none shadow-none">
+                <Card className="md:col-span-8 overflow-y-auto p-8 leading-loose text-lg font-serif bg-background/50 backdrop-blur-sm border-none shadow-none" data-article-area>
                     {segments.map((segment, i) => {
                         if (segment.type === 'text') {
                             return <span key={i} className="text-foreground/80">{segment.content}</span>
@@ -329,7 +367,7 @@ export function EditorGame({ onComplete }: { onComplete?: (score: number, total:
                             <Sparkles className="w-3 h-3" />
                             Vocabulary Pool
                         </h3>
-                        <div className="flex flex-wrap gap-3 content-start">
+                        <div className="flex flex-wrap gap-3 content-start" data-chip-pool>
                             <AnimatePresence>
                                 {chips.map(option => {
                                     const isUsed = Object.values(blanks).includes(option.id)

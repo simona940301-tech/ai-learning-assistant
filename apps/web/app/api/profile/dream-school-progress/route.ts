@@ -178,7 +178,12 @@ export async function GET(request: NextRequest) {
       readyPct: result.readyPct,
     })
 
-    return NextResponse.json(result)
+    // 🎯 Add progress tracking metadata for UI
+    return NextResponse.json({
+      ...result,
+      totalQuestions, // For progress bar
+      isDataSufficient: totalQuestions >= 30, // Threshold flag
+    })
   } catch (error) {
     console.error('Internal error:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })

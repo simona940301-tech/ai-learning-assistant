@@ -268,10 +268,10 @@ export default function TestPVEPage() {
                 <Card className="border-2 border-amber-200 bg-amber-50 p-6">
                     <h3 className="mb-2 font-semibold text-amber-900">📋 Testing Instructions</h3>
                     <ol className="list-inside list-decimal space-y-1 text-sm text-amber-800">
-                        <li>First run "Run All Tests" to check database and API</li>
-                        <li>If tests pass, click "Full Battle Test" to start a real match</li>
+                        <li>First run {`"Run All Tests"`} to check database and API</li>
+                        <li>If tests pass, click {`"Full Battle Test"`} to start a real match</li>
                         <li>Check the logs for any errors or warnings</li>
-                        <li>If battle starts, you'll be redirected to the battle screen</li>
+                        <li>If battle starts, you{`'`}ll be redirected to the battle screen</li>
                         <li>Open browser console (F12) for additional debug info</li>
                     </ol>
                 </Card>

@@ -32,6 +32,7 @@ import { useIsIOS } from '@/hooks/useIsIOS'
 import { SelectionActionBar } from './SelectionActionBar'
 import { clientRectsToNormalized, unionRects } from '@/lib/pdf/coordinate-utils'
 import { track } from '@/lib/telemetry'
+import { toast } from 'sonner'
 
 interface PdfViewerV2Props {
   /** Container ref from parent (for page element queries) */
@@ -163,8 +164,9 @@ export function PdfViewerV2({
   const handleStrikeout = useCallback(() => {
     if (!selection) return
 
-    console.log('[PdfViewerV2] Strikeout not yet implemented')
+    // console.log('[PdfViewerV2] Strikeout not yet implemented')
     track('pdf.selection.strikeout')
+    toast.info('Strikeout feature coming soon!')
     // TODO: Create strikeout annotation
     clearSelection()
   }, [selection, clearSelection])
@@ -229,8 +231,9 @@ export function PdfViewerV2({
   const handleComment = useCallback(() => {
     if (!selection) return
 
-    console.log('[PdfViewerV2] Comment not yet implemented')
+    // console.log('[PdfViewerV2] Comment not yet implemented')
     track('pdf.selection.comment')
+    toast.info('Commments feature coming soon!')
     // TODO: Open comment input dialog
     clearSelection()
   }, [selection, clearSelection])

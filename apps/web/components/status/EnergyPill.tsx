@@ -44,9 +44,10 @@ export function EnergyPill() {
           <span
             className="font-bold tabular-nums"
             style={{
-              color: '#6B4A36',
+              color: '#5D3A1A',
               lineHeight: 1.15,
-              fontSize: '16px',
+              fontSize: '18px',
+              textShadow: '0 0.5px 0 rgba(255,255,255,0.3)',
             }}
           >
             {energy}

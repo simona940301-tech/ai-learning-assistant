@@ -11,7 +11,7 @@ import { useLevelStatus } from '@/lib/hooks/useLevelStatus'
  */
 export function LevelBar() {
   const { level, currentXp, xpToNextLevel, progressPercent, isLoading } = useLevelStatus()
-  const xpBarHeight = 19 // +20% height for a thicker bar
+  const xpBarHeight = 22 // Enhanced visibility with thicker bar
 
   if (isLoading) {
     return (

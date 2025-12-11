@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle2, Gift, Loader2, Sparkles, Sword, BookOpen, Heart, Brain, Star, ChevronRight } from 'lucide-react'
+import { CheckCircle2, Gift, Loader2, Sparkles, Sword, BookOpen, Heart, Brain, Star, ChevronRight, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { toast } from 'sonner'
@@ -59,6 +59,7 @@ export function DailyMissionWidgetV2() {
     const [showBubble, setShowBubble] = useState(false)
     const [bubbleText, setBubbleText] = useState('')
     const [isInteractionOpen, setIsInteractionOpen] = useState(false)
+    const [activeTooltip, setActiveTooltip] = useState<string | null>(null)
 
     // Chick Store
     const { iq, fatigue, emotionState, hunger, interact } = useChickStore()
@@ -190,42 +191,30 @@ export function DailyMissionWidgetV2() {
                 onClose={() => setIsInteractionOpen(false)}
             />
 
-            {/* 1. Header Area - Dashboard Style */}
-            <div className="relative mb-5 flex justify-between items-start z-10">
-                {/* Left: Info */}
-                <div className="flex flex-col">
-                    {/* Greeting + Progress */}
-                    <div className="flex items-baseline gap-2 mb-1">
-                        <AnimatePresence mode="wait">
-                            <motion.span
-                                key={defaultText}
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                className="text-[15px] font-normal text-[#8B7355]"
-                            >
-                                {defaultText}
-                            </motion.span>
-                        </AnimatePresence>
-                        <span className="text-[13px] font-medium text-[#B88C55]/60">
-                            {Math.round(progress)}% 完成
-                        </span>
-                    </div>
+            {/* 1. Header Area - Minimalist Two-Line Hierarchy */}
+            <div className="relative mb-6 flex justify-between items-start z-10">
+                {/* Left: Info - Clear Two-Line Structure */}
+                <div className="flex flex-col gap-2">
+                    {/* Line 1: Greeting + Name */}
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={defaultText}
+                            initial={{ opacity: 0, y: -4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="text-[13px] font-normal text-[#8B7355]/70 tracking-wide"
+                        >
+                            {defaultText}
+                        </motion.div>
+                    </AnimatePresence>
 
-                    {/* Title & Gold Coins Row */}
-                    <div className="flex items-center gap-3">
-                        <h3 className="text-[20px] font-semibold text-[#4A2E05] leading-tight">
+                    {/* Line 2: Title + Progress */}
+                    <div className="flex items-baseline gap-2.5">
+                        <h3 className="text-[24px] font-bold text-[#3D2817] leading-none tracking-tight">
                             今日任務
                         </h3>
-
-                        {/* Minimalist Gold Coin Display */}
-                        <div className="flex items-center gap-1 bg-[#F5E6CC]/40 px-2 py-0.5 rounded-full border border-[#E6D0A0]/30">
-                            <div className="flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gradient-to-br from-yellow-300 to-amber-500 shadow-sm text-[8px] font-bold text-white">
-                                $
-                            </div>
-                            <span className="text-[11px] font-medium text-[#8B5E3C] tabular-nums leading-none">
-                                {userStatus?.walletBalance?.toLocaleString() || 0}
-                            </span>
-                        </div>
+                        <span className="text-[12px] font-medium text-[#B88C55]/50">
+                            {Math.round(progress)}% 完成
+                        </span>
                     </div>
                 </div>
 
@@ -280,7 +269,7 @@ export function DailyMissionWidgetV2() {
                             animate={{ opacity: 1, scale: 1 }}
                             transition={{ delay: index * 0.1 }}
                             className={`
-                                flex flex-col items-center justify-center gap-2 aspect-[4/5] rounded-[16px] transition-all relative overflow-hidden
+                                flex flex-col items-center justify-center gap-2 aspect-[4/5] rounded-[16px] transition-all relative overflow-visible
                                 ${mission.is_completed
                                     ? 'bg-[#F2F8F2] border border-green-200/50'
                                     : 'bg-white border border-[rgba(189,164,123,0.22)] shadow-[0_4px_10px_rgba(85,61,41,0.05)]'
@@ -318,6 +307,49 @@ export function DailyMissionWidgetV2() {
                                     +{mission.reward.xp}
                                 </div>
                             )}
+
+                            {/* Info Button - Top Left */}
+                            <button
+                                onClick={() => setActiveTooltip(activeTooltip === mission.id ? null : mission.id)}
+                                className="absolute top-2 left-2 flex items-center justify-center h-5 w-5 rounded-full bg-white/80 hover:bg-white border border-[#D4A057]/20 transition-all hover:scale-110 active:scale-95"
+                            >
+                                <Info className="h-3 w-3 text-[#B88C55]" />
+                            </button>
+
+                            {/* Tooltip */}
+                            <AnimatePresence>
+                                {activeTooltip === mission.id && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: -5, scale: 0.95 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: -5, scale: 0.95 }}
+                                        transition={{ duration: 0.15 }}
+                                        className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 w-48 p-3 rounded-xl bg-white border border-[#D4A057]/30 shadow-lg"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <div className="flex flex-col gap-2">
+                                            <div className="flex items-start gap-2">
+                                                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#FFF9EB]">
+                                                    {getMissionIcon(mission.type, mission.metadata?.status_icon)}
+                                                </div>
+                                                <div className="flex-1">
+                                                    <p className="text-[11px] font-bold text-[#3D2817] mb-1">{mission.title}</p>
+                                                    <p className="text-[10px] text-[#6B5D4F] leading-relaxed">{mission.description}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center justify-between pt-2 border-t border-[#D4A057]/10">
+                                                <span className="text-[9px] text-[#9A8C76] font-medium">獎勵</span>
+                                                <div className="flex items-center gap-2 text-[9px] font-semibold">
+                                                    <span className="text-[#FFB300]">+{mission.reward.xp} XP</span>
+                                                    <span className="text-[#D4A057]">+{mission.reward.gold} 金幣</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {/* Tooltip Arrow */}
+                                        <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 h-3 w-3 rotate-45 bg-white border-l border-t border-[#D4A057]/30" />
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </motion.div>
                     ))}
                 </div>

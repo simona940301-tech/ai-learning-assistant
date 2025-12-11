@@ -4,7 +4,124 @@ import { tagQuestion } from '@/lib/concept-tagger'
 
 export const dynamic = 'force-dynamic'
 
+// 創建一個 admin client 用於處理 RLS 限制的表格 (packs, pack_questions)
+import { createClient } from '@supabase/supabase-js'
+
+function getAdminClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    console.error('[Error Book] Missing Supabase URL or Service Role Key')
+    return null
+  }
+
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  })
+}
+
+
 async function resolvePackQuestionId(supabase: any, questionId: string) {
+  // 對於讀取操作，我們可以嘗試使用傳入的 client (user context)
+  // 但對於寫入 (創建 pack/question)，必須使用 admin client
+  const adminClient = getAdminClient() || supabase
+
+  // PVE battles use seed_questions, we need to sync them to pack_questions for error_book
+  // We use adminClient for seed_questions query just in case, but usually public read is simple
+  const seedQuestion = await adminClient
+    .from('seed_questions')
+    .select('id, stem, choices, answer, explanation, difficulty, subject, department_id')
+    .eq('id', questionId)
+    .maybeSingle()
+
+  if (seedQuestion.data) {
+    // 🎯 Use adminClient because pack_questions might have restrictive RLS
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.warn('[Error Book] No Service Role Key available, pack creation might fail due to RLS')
+    }
+
+    // 🎯 SOTA FIX: Create separate PVE packs for each subject
+    // This ensures questions appear in the correct folder in Backpack > Error Book
+    const subjectRaw = seedQuestion.data.subject || 'general'
+    // Normalize subject if needed (e.g. ensure it matches 'chinese', 'english', etc.)
+    const subject = subjectRaw.toLowerCase()
+
+    const pvePackName = `PVE Training Pack - ${subject}` // e.g. "PVE Training Pack - english"
+
+    let pvePack = await adminClient
+      .from('packs')
+      .select('id')
+      .eq('name', pvePackName)
+      .maybeSingle()
+
+    if (!pvePack.data) {
+      // 創建 PVE pack for this subject
+      const { data: newPack, error: packError } = await adminClient
+        .from('packs')
+        .insert({
+          name: pvePackName,
+          subject: subject, // Use the specific subject
+          skill: 'mixed',
+          difficulty: 3,
+          description: `Auto-generated pack for PVE ${subject} questions`,
+          is_public: false,
+          source: 'system', // Mark as system to match our RLS policy
+        })
+        .select('id')
+        .single()
+
+      if (packError) {
+        console.error('[Error Book] Failed to create PVE pack:', packError)
+        return null
+      }
+      pvePack = { data: newPack }
+    }
+
+    if (!pvePack?.data) {
+      console.error('[Error Book] Failed to create/find PVE pack')
+      return null
+    }
+
+    // 🎯 Check if pack_question ALREADY EXISTS IN THIS SPECIFIC PACK
+    const existing = await adminClient
+      .from('pack_questions')
+      .select('id')
+      .eq('question_id', seedQuestion.data.id)
+      .eq('pack_id', pvePack.data.id)
+      .maybeSingle()
+
+    if (existing.data) {
+      return existing.data.id
+    }
+
+    // 創建 pack_question within the corect pack
+    const { data: newPackQuestion, error: insertError } = await adminClient
+      .from('pack_questions')
+      .insert({
+        pack_id: pvePack.data.id,
+        question_id: seedQuestion.data.id,
+        stem: seedQuestion.data.stem,
+        choices: seedQuestion.data.choices,
+        answer: seedQuestion.data.answer,
+        explanation: seedQuestion.data.explanation,
+        difficulty: seedQuestion.data.difficulty || 3,
+      })
+      .select('id')
+      .single()
+
+    if (insertError) {
+      console.error('[Error Book] Failed to create pack_question:', insertError)
+      return null
+    }
+
+    return newPackQuestion.id
+  }
+
+  // 原有的 fallback 邏輯 (如果不是 seed_question)
   // 直接匹配 pack_questions.id
   const direct = await supabase
     .from('pack_questions')
@@ -25,81 +142,6 @@ async function resolvePackQuestionId(supabase: any, questionId: string) {
 
   if (bySeed.data?.id) {
     return bySeed.data.id
-  }
-
-  // 🎯 新增：檢查是否為 seed_questions (PVE 戰鬥使用的題目)
-  // PVE battles use seed_questions, we need to sync them to pack_questions for error_book
-  const seedQuestion = await supabase
-    .from('seed_questions')
-    .select('id, stem, choices, answer, explanation, difficulty, subject, department_id')
-    .eq('id', questionId)
-    .maybeSingle()
-
-  if (seedQuestion.data) {
-    // 檢查是否已經有對應的 pack_question
-    const existing = await supabase
-      .from('pack_questions')
-      .select('id')
-      .eq('question_id', seedQuestion.data.id)
-      .maybeSingle()
-
-    if (existing.data) {
-      return existing.data.id
-    }
-
-    // 如果沒有，需要創建一個 pack_question (使用系統 PVE pack)
-    // 首先查找或創建 PVE 系統 pack
-    const pvePackName = 'PVE Training Pack'
-    let pvePack = await supabase
-      .from('packs')
-      .select('id')
-      .eq('name', pvePackName)
-      .maybeSingle()
-
-    if (!pvePack.data) {
-      // 創建 PVE pack
-      const { data: newPack } = await supabase
-        .from('packs')
-        .insert({
-          name: pvePackName,
-          subject: seedQuestion.data.subject || 'general',
-          skill: 'mixed',
-          difficulty: 3,
-          description: 'Auto-generated pack for PVE training questions',
-          is_public: false,
-        })
-        .select('id')
-        .single()
-
-      pvePack = newPack
-    }
-
-    if (!pvePack?.data) {
-      console.error('[Error Book] Failed to create/find PVE pack')
-      return null
-    }
-
-    // 創建 pack_question
-    const { data: newPackQuestion, error: insertError } = await supabase
-      .from('pack_questions')
-      .insert({
-        pack_id: pvePack.data.id,
-        question_id: seedQuestion.data.id,
-        stem: seedQuestion.data.stem,
-        choices: seedQuestion.data.choices,
-        answer: seedQuestion.data.answer,
-        explanation: seedQuestion.data.explanation,
-        difficulty: seedQuestion.data.difficulty || 3,
-      })
-      .select('id')
-      .single()
-
-    if (insertError) {
-      console.error('[Error Book] Failed to create pack_question:', insertError)
-      return null
-    }
-
-    return newPackQuestion.id
   }
 
   return null
@@ -139,8 +181,10 @@ export async function GET(req: NextRequest) {
     const subject = searchParams.get('subject')
     const status = searchParams.get('status') || 'active' // active, mastered, all
 
-    // Build query
-    let query = supabase
+    // Build query with standard client (RLS policies now allow this)
+    // Use admin client to bypass RLS on pack_questions/packs (which might be private system packs)
+    const adminClient = getAdminClient() || supabase
+    let query = adminClient
       .from('error_book')
       .select(`
         id,
@@ -187,10 +231,23 @@ export async function GET(req: NextRequest) {
       )
     }
 
+    // Normalize and flatten data
+    const normalizedData = (data || []).map((item: any) => {
+      let itemSubject = item.pack_questions?.packs?.subject
+      // Fallback for legacy mixed pack items
+      if (itemSubject === 'mixed' || !itemSubject) {
+        itemSubject = 'english' // Default to English for legacy items
+      }
+      return {
+        ...item,
+        subject: itemSubject
+      }
+    })
+
     // Filter by subject if provided
-    let filteredData = data || []
-    if (subject && data) {
-      filteredData = data.filter((item: any) => item.packs?.subject === subject)
+    let filteredData = normalizedData
+    if (subject) {
+      filteredData = normalizedData.filter((item: any) => item.subject === subject)
     }
 
     return NextResponse.json({

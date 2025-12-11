@@ -58,7 +58,10 @@ export function CompactDreamSchoolCard({
   useEffect(() => {
     async function fetchData() {
       try {
-        const res = await fetch('/api/profile/dream-school-progress', { credentials: 'include' })
+        const res = await fetch('/api/profile/dream-school-progress', {
+          credentials: 'include',
+          cache: 'no-store' // 🎯 Fix: Ensure fresh data on every mount
+        })
         if (!res.ok) throw new Error('Failed to fetch data')
         const json = await res.json()
         setData(json)
@@ -83,7 +86,7 @@ export function CompactDreamSchoolCard({
   const vocabAccuracy =
     data.breakdown.skillDetails.length > 0
       ? data.breakdown.skillDetails.reduce((sum, skill) => sum + (skill.accuracy || 0), 0) /
-        data.breakdown.skillDetails.length
+      data.breakdown.skillDetails.length
       : 0
 
   const academicScore = data.academicReadyScore

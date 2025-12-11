@@ -1,67 +1,47 @@
-import { Client } from 'pg';
-import fs from 'fs';
-import path from 'path';
-import dotenv from 'dotenv';
+import { Client } from 'pg'
+import dotenv from 'dotenv'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
-// Load environment variables (try .env.local first, then .env)
-const envLocalPath = path.resolve(process.cwd(), '.env.local');
-const envPath = path.resolve(process.cwd(), '.env');
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+dotenv.config({ path: path.resolve(__dirname, '../.env.local') })
 
-if (fs.existsSync(envLocalPath)) {
-    dotenv.config({ path: envLocalPath });
-} else if (fs.existsSync(envPath)) {
-    dotenv.config({ path: envPath });
+// Try to find a connection string
+const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL
+
+if (!connectionString) {
+    console.error('❌ Missing DATABASE_URL or POSTGRES_URL in .env.local')
+    console.log('👉 Please run the following SQL manually in your Supabase Dashboard SQL Editor:')
+    console.log('--------------------------------------------------------------------------------')
+    const migrationPath = path.resolve(__dirname, '../db/sql/025_update_rls_for_pve.sql')
+    console.log(fs.readFileSync(migrationPath, 'utf8'))
+    console.log('--------------------------------------------------------------------------------')
+    process.exit(1)
 }
 
-async function main() {
-    console.log('🔄 Applying vocabulary schema migration...');
-
-    // Try to find connection string
-    const connectionString =
-        process.env.DATABASE_URL ||
-        process.env.POSTGRES_URL ||
-        process.env.SUPABASE_DB_URL;
-
-    if (!connectionString) {
-        console.error('❌ Error: Missing database connection string.');
-        console.error('Please ensure DATABASE_URL, POSTGRES_URL, or SUPABASE_DB_URL is set in your .env or environment.');
-        process.exit(1);
-    }
-
+async function run() {
     const client = new Client({
         connectionString,
-        ssl: connectionString.includes('localhost') ? false : { rejectUnauthorized: false },
-    });
+        ssl: { rejectUnauthorized: false } // Required for Supabase transaction mode usually
+    })
 
     try {
-        await client.connect();
-        console.log('✅ Connected to database.');
+        await client.connect()
+        console.log('✅ Connected to database')
 
-        const migrationPath = path.join(process.cwd(), 'apps/web/db/migrations/fix_vocabulary_schema.sql');
+        const migrationPath = path.resolve(__dirname, '../db/sql/025_update_rls_for_pve.sql')
+        const sql = fs.readFileSync(migrationPath, 'utf8')
 
-        if (!fs.existsSync(migrationPath)) {
-            // Fallback if running from root
-            const altPath = path.join(process.cwd(), 'db/migrations/fix_vocabulary_schema.sql');
-            if (!fs.existsSync(altPath)) {
-                throw new Error(`Migration file not found at ${migrationPath}`);
-            }
-        }
-
-        const sql = fs.readFileSync(migrationPath, 'utf8');
-
-        console.log('📝 Executing SQL...');
-        await client.query(sql);
-
-        console.log('✅ Migration applied successfully!');
-        console.log('   - Updated source_type constraint');
-        console.log('   - Added unique index for upsert');
-
+        console.log('Running migration...')
+        await client.query(sql)
+        console.log('✅ Migration applied successfully!')
     } catch (err) {
-        console.error('❌ Migration failed:', err);
-        process.exit(1);
+        console.error('❌ Migration failed:', err)
     } finally {
-        await client.end();
+        await client.end()
     }
 }
 
-main();
+run()

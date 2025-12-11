@@ -156,7 +156,7 @@ export function SystemBattleModal({ onClose }: SystemBattleModalProps) {
   if (isPveTransitioning) {
     return (
       <Dialog open={true} onOpenChange={() => { }}>
-        <DialogContent className="max-w-full h-screen p-0 border-none bg-transparent shadow-none" hideCloseButton>
+        <DialogContent className="max-w-full h-screen p-0 border-none bg-transparent shadow-none [&>button]:hidden">
           <motion.div
             className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#FAF6E9]"
             initial={{ opacity: 0 }}

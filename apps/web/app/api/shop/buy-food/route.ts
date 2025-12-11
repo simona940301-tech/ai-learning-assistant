@@ -22,7 +22,7 @@ export async function POST(req: Request) {
         // 1. Check balance
         const { data: profile, error: profileError } = await supabase
             .from('profiles')
-            .select('user_wallet_balance, food_bowls_count')
+            .select('user_wallet_balance, chick_food_bowls')
             .eq('id', user.id)
             .single()
 
@@ -39,13 +39,13 @@ export async function POST(req: Request) {
         // or use a single update if possible. Since we are updating two columns in the same row, it's atomic per row.
 
         const newBalance = (profile.user_wallet_balance || 0) - totalCost
-        const newBowls = (profile.food_bowls_count || 0) + quantity
+        const newBowls = (profile.chick_food_bowls || 0) + quantity
 
         const { error: updateError } = await supabase
             .from('profiles')
             .update({
                 user_wallet_balance: newBalance,
-                food_bowls_count: newBowls
+                chick_food_bowls: newBowls
             })
             .eq('id', user.id)
 

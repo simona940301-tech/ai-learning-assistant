@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSupabaseClient, isMockModeEnabled, getApiUser } from '@/lib/api/auth'
+import { getSupabaseClient, getApiUser, isMockModeEnabled } from '@/lib/api/auth'
 import { backpackCache } from '@/lib/cache/backpack-cache'
+import { inferSubject } from '@/lib/backpack/subject-inference'
 
 export const dynamic = 'force-dynamic'
 
@@ -88,13 +89,33 @@ export async function GET(req: NextRequest) {
       notebookQuery = notebookQuery.lt('updated_at', cursor)
     }
 
-    const backpackResult = await backpackQuery
+    // 🚀 Fetch backpack_notes with cursor-based pagination
+    // NEW: Retrieving data from the "missing" table
+    let notesQuery = supabase
+      .from('backpack_notes')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false }) // backpack_notes uses created_at as main sort key usually
+      .limit(limit + 1)
+
+    if (cursor) {
+      notesQuery = notesQuery.lt('created_at', cursor)
+    }
+
+    const [backpackResult, notebookResult, notesResult] = await Promise.all([
+      backpackQuery,
+      notebookQuery,
+      notesQuery
+    ])
+
     const backpackData = backpackResult.data || []
     const backpackError = backpackResult.error
 
-    const notebookResult = await notebookQuery
     const notebookData = notebookResult.data || []
     const notebookError = notebookResult.error
+
+    const notesData = notesResult.data || []
+    const notesError = notesResult.error
 
     if (backpackError) {
       console.error('[Backpack API] Error fetching backpack items:', backpackError)
@@ -111,26 +132,20 @@ export async function GET(req: NextRequest) {
       console.warn('[Backpack API] Error fetching notebook entries:', notebookError)
     }
 
+    if (notesError) {
+      console.warn('[Backpack API] Error fetching backpack notes:', notesError)
+    }
+
     // Transform notebook entries to BackpackFile format
     const transformedNotebookEntries = notebookData.map((entry: any) => {
-      const subjectMap: Record<string, string> = {
-        '英文': 'english',
-        '數學': 'math',
-        '國文': 'chinese',
-        '社會': 'social',
-        '自然': 'science',
-      }
+      // Use unified subject inference
+      const entrySubject = inferSubject({
+        subject: entry.subject,
+        tags: entry.tags,
+        folder: entry.folder,
+      })
 
-      let entrySubject = 'math' // default
-      if (Array.isArray(entry.tags)) {
-        for (const tag of entry.tags) {
-          if (subjectMap[tag]) {
-            entrySubject = subjectMap[tag]
-            break
-          }
-        }
-      }
-
+      // Filter by subject if specified
       if (subject && entrySubject !== subject) {
         return null
       }
@@ -140,19 +155,52 @@ export async function GET(req: NextRequest) {
         user_id: entry.user_id,
         subject: entrySubject,
         type: 'text' as const,
-        title: entry.title,
-        content: entry.content_md,
+        title: entry.title || '無標題筆記',
+        content: entry.content_md || '',
         file_url: null,
+        file_size: null,
+        derived_from: [],
+        version_history: [],
         created_at: entry.created_at,
         updated_at: entry.updated_at,
         source_type: entry.source_type,
-        tags: entry.tags,
-        is_notebook_entry: true,
+        tags: entry.tags || [],
+        is_notebook_entry: true, // Fix: Ensure UI treats this as a note
+      }
+    }).filter(Boolean)
+
+    // Transform backpack_notes to BackpackFile format
+    const transformedBackpackNotes = notesData.map((note: any) => {
+      // Use unified subject inference
+      const entrySubject = inferSubject({
+        tags: note.tags,
+        folder: note.folder,
+        canonical_skill: note.canonical_skill,
+      })
+
+      // Filter by subject if specified
+      if (subject && entrySubject !== subject) {
+        return null
+      }
+
+      return {
+        id: note.id,
+        user_id: note.user_id,
+        subject: entrySubject,
+        type: 'text' as const,
+        title: note.question || 'Untitled Note',
+        content: note.note_md,
+        file_url: null,
+        created_at: note.created_at,
+        updated_at: note.created_at, // backpack_notes usually lacks updated_at
+        source_type: 'backpack_note',
+        tags: note.tags || [note.canonical_skill].filter(Boolean),
+        is_notebook_entry: true, // Treat as notebook entry for UI
       }
     }).filter(Boolean)
 
     // Merge and sort by updated_at
-    let allItems = [...backpackData, ...transformedNotebookEntries].sort(
+    let allItems = [...backpackData, ...transformedNotebookEntries, ...transformedBackpackNotes].sort(
       (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
     )
 
@@ -311,8 +359,15 @@ export async function DELETE(req: NextRequest) {
       .eq('user_id', user.id)
       .in('id', ids)
 
-    if (backpackError && notebookError) {
-      console.error('[Backpack Delete] Errors:', { backpackError, notebookError })
+    // 刪除 backpack_notes
+    const { error: notesError } = await supabase
+      .from('backpack_notes')
+      .delete()
+      .eq('user_id', user.id)
+      .in('id', ids)
+
+    if (backpackError && notebookError && notesError) {
+      console.error('[Backpack Delete] Errors:', { backpackError, notebookError, notesError })
       return NextResponse.json(
         {
           error: 'DATABASE_ERROR',

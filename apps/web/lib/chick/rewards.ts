@@ -10,7 +10,7 @@ export async function addFoodBowls(
 ): Promise<{ success: boolean; newCount: number }> {
   const { data: profile, error: fetchError } = await supabase
     .from('profiles')
-    .select('food_bowls_count')
+    .select('chick_food_bowls')
     .eq('id', userId)
     .single()
 
@@ -19,12 +19,19 @@ export async function addFoodBowls(
     return { success: false, newCount: 0 }
   }
 
-  const currentCount = profile.food_bowls_count || 0
+  const currentCount = profile.chick_food_bowls || 0
   const newCount = currentCount + amount
+
+  console.log('[addFoodBowls] Updating food bowls:', {
+    userId,
+    currentCount,
+    amount,
+    newCount
+  })
 
   const { error: updateError } = await supabase
     .from('profiles')
-    .update({ food_bowls_count: newCount })
+    .update({ chick_food_bowls: newCount })
     .eq('id', userId)
 
   if (updateError) {
@@ -32,6 +39,7 @@ export async function addFoodBowls(
     return { success: false, newCount: currentCount }
   }
 
+  console.log('[addFoodBowls] ✅ Successfully updated food bowls to:', newCount)
   return { success: true, newCount }
 }
 

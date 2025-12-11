@@ -27,13 +27,40 @@ export const Deck: React.FC = () => {
         markWordsAsSaved,
         importantQueue, // 🎯 New
         toggleImportant, // 🎯 New
+        isExiting, // 🎯 Global Exit State
+        setIsExiting, // 🎯 Global Exit Action
     } = useGameStore();
 
-    const [isExiting, setIsExiting] = React.useState(false); // 🎯 Control early exit
+    // Removed local isExiting state
 
     useEffect(() => {
         loadWords(); // No arguments needed now as they are in store state
     }, []);
+
+    // 🎯 Native-Grade Optimization: Aggressive Image Pre-fetching
+    useEffect(() => {
+        if (!words || words.length === 0) return;
+
+        // Pre-load next 3 cards (images/assets)
+        const PRELOAD_Count = 3;
+        const nextCards = words.slice(currentIndex + 1, currentIndex + 1 + PRELOAD_Count);
+
+        nextCards.forEach(word => {
+            // If the card has specific image assets (e.g. artist image, though mostly using CSS/SVG now)
+            // But if we had images:
+            // const img = new Image();
+            // img.src = word.imageUrl; 
+
+            // Note: Since current design uses CSS gradients and text, browser handles it well.
+            // If we add remote images later (e.g. Artist Avatars), uncomment this:
+            /*
+            if ((word.lyric_snippet as any)?.artist_image) {
+                 const img = new Image();
+                 img.src = (word.lyric_snippet as any).artist_image;
+            }
+            */
+        });
+    }, [currentIndex, words]);
 
     // Session Limit Logic for Flow Control Card
     const SESSION_LIMIT = 20;
@@ -96,17 +123,8 @@ export const Deck: React.FC = () => {
     const visibleCards = words.slice(currentIndex, currentIndex + 2).reverse();
 
     return (
-        <div className="relative w-full h-[60vh] flex items-center justify-center px-4">
-            {/* Exit Button - Minimalist Top Right */}
-            <div className="absolute top-[-60px] right-4 z-50">
-                <button
-                    onClick={() => setIsExiting(true)}
-                    className="p-3 bg-white/80 dark:bg-zinc-800/90 rounded-full text-zinc-500 hover:text-red-500 transition-colors shadow-sm"
-                >
-                    <RotateCcw className="w-5 h-5 opacity-0 absolute" /> {/* Hidden but keeps layout if needed? No, just use X */}
-                    <span className="text-xs font-bold">Exit</span>
-                </button>
-            </div>
+        <div className="relative w-full h-[60dvh] flex items-center justify-center px-4">
+            {/* Exit Button - Removed as per new requirement (handled by Top-Left X) */}
 
             {/* Card Stack - 🚀 OPTIMIZED with hardware acceleration */}
             <div className="relative w-full h-full flex items-center justify-center will-change-transform">

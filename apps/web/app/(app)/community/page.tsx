@@ -1,15 +1,14 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, Suspense, useRef, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Card } from '@/components/ui/card'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Heart, MessageCircle, Share2, Plus, Image as ImageIcon, HelpCircle, Users } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { SkeletonList } from '@/components/ui/skeleton'
 import { EmptyStateManager, useEmptyStateConditions } from '@/components/EmptyStateManager'
+import { PostComposer } from '@/components/community/PostComposer'
+import { PostCard } from '@/components/community/PostCard'
+import { ImageGallery } from '@/components/community/ImageGallery'
+import { ChevronDown, Loader2 } from 'lucide-react'
 
 interface Post {
   id: string
@@ -22,86 +21,165 @@ interface Post {
   content: string
   images: string[]
   likes: number
+  is_liked_by_me: boolean
+  is_author: boolean
   created_at: string
-  question_metadata?: {
-    questionText?: string
-    options?: string[]
-    correctAnswer?: string
-    type?: string
-  }
+  question_metadata?: any
   is_question_post?: boolean
 }
 
-function formatTimeAgo(dateString: string): string {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-
-  if (diffMins < 1) return '剛剛'
-  if (diffMins < 60) return `${diffMins}分鐘前`
-  if (diffHours < 24) return `${diffHours}小時前`
-  if (diffDays < 7) return `${diffDays}天前`
-  return date.toLocaleDateString('zh-TW')
+interface User {
+  name: string
+  avatar?: string | null
 }
 
 function CommunityPageContent() {
   const searchParams = useSearchParams()
   const { isCommunityEmpty } = useEmptyStateConditions()
-  const [showComposer, setShowComposer] = useState(false)
-  const [content, setContent] = useState('')
   const [mounted, setMounted] = useState(false)
   const [posts, setPosts] = useState<Post[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [highlightPostId, setHighlightPostId] = useState<string | null>(null)
+  const [user, setUser] = useState<User | null>(null)
+
+  // Image gallery state
+  const [galleryImages, setGalleryImages] = useState<string[]>([])
+  const [galleryIndex, setGalleryIndex] = useState(0)
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false)
+
+  const observerTarget = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setMounted(true)
-    // 檢查 URL 參數中是否有 post ID（從求助學霸跳轉過來）
+    // Check URL params for highlighted post
     const postId = searchParams.get('post')
     if (postId) {
       setHighlightPostId(postId)
     }
   }, [searchParams])
 
+  // Load user profile
   useEffect(() => {
-    // 載入貼文
-    const loadPosts = async () => {
-      setIsLoading(true)
+    const loadUser = async () => {
       try {
-        const response = await fetch('/api/community/posts?limit=20')
+        const response = await fetch('/api/profile')
         if (response.ok) {
           const data = await response.json()
-          setPosts(data.posts || [])
+          setUser({
+            name: data.profile?.username || data.profile?.display_name || '用戶',
+            avatar: data.profile?.avatar_url,
+          })
         }
       } catch (error) {
-        console.error('[CommunityPage] Failed to load posts:', error)
-      } finally {
-        setIsLoading(false)
+        console.error('[CommunityPage] Failed to load user:', error)
       }
     }
-
-    loadPosts()
+    loadUser()
   }, [])
+
+  // Load initial posts
+  const loadPosts = useCallback(async (cursor?: string) => {
+    const isInitial = !cursor
+    if (isInitial) {
+      setIsLoading(true)
+    } else {
+      setIsLoadingMore(true)
+    }
+
+    try {
+      const url = cursor
+        ? `/api/community/posts?limit=20&cursor=${encodeURIComponent(cursor)}`
+        : '/api/community/posts?limit=20'
+
+      const response = await fetch(url)
+      if (response.ok) {
+        const data = await response.json()
+        if (isInitial) {
+          setPosts(data.posts || [])
+        } else {
+          setPosts((prev) => [...prev, ...(data.posts || [])])
+        }
+        setNextCursor(data.nextCursor)
+      }
+    } catch (error) {
+      console.error('[CommunityPage] Failed to load posts:', error)
+    } finally {
+      if (isInitial) {
+        setIsLoading(false)
+      } else {
+        setIsLoadingMore(false)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    loadPosts()
+  }, [loadPosts])
+
+  // Infinite scroll observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && nextCursor && !isLoadingMore) {
+          loadPosts(nextCursor)
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    const currentTarget = observerTarget.current
+    if (currentTarget) {
+      observer.observe(currentTarget)
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget)
+      }
+    }
+  }, [nextCursor, isLoadingMore, loadPosts])
+
+  const handlePostCreated = () => {
+    loadPosts() // Reload posts
+  }
+
+  const handlePostDeleted = (postId: string) => {
+    setPosts((prev) => prev.filter((p) => p.id !== postId))
+  }
+
+  const handleImageClick = (images: string[], index: number) => {
+    setGalleryImages(images)
+    setGalleryIndex(index)
+    setIsGalleryOpen(true)
+  }
 
   return (
     <>
       <main
         className="mx-auto max-w-lg"
         style={{
-          // 🎯 SOTA Mobile Fix: 预留 TabBar 空间，防止内容被遮挡
           paddingBottom: 'var(--content-bottom-padding)',
         }}
       >
-        {/* Removed Tabs - only showing latest posts */}
+        {/* Header */}
         <div className="sticky top-14 z-30 border-b bg-background/80 backdrop-blur-xl">
           <div className="h-12 flex items-center justify-center">
-            <h2 className="text-base font-semibold text-foreground">最新貼文</h2>
+            <h2 className="text-base font-semibold text-foreground">社群</h2>
           </div>
         </div>
 
+        {/* Post Composer - Always Visible */}
+        <div className="border-b bg-background">
+          <PostComposer
+            user={user || undefined}
+            onPostCreated={handlePostCreated}
+            className="p-4"
+          />
+        </div>
+
+        {/* Posts Feed */}
         <div className="mt-0">
           {isLoading ? (
             <div className="p-4">
@@ -118,114 +196,45 @@ function CommunityPageContent() {
                     key={post.id}
                     initial={mounted ? { opacity: 0, y: 20 } : { opacity: 1, y: 0 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: mounted ? idx * 0.1 : 0, duration: 0.3 }}
+                    transition={{ delay: mounted ? idx * 0.05 : 0, duration: 0.3 }}
                     className={highlightPostId === post.id ? 'bg-indigo-500/10' : ''}
                   >
-                    <article className="p-4">
-                      <div className="flex gap-3">
-                        <Avatar className="h-10 w-10">
-                          {post.user.is_anonymous ? (
-                            <AvatarFallback className="bg-muted text-muted-foreground">
-                              ?
-                            </AvatarFallback>
-                          ) : (
-                            <>
-                              <AvatarImage src={post.user.avatar || undefined} />
-                              <AvatarFallback>{post.user.name[0]}</AvatarFallback>
-                            </>
-                          )}
-                        </Avatar>
-
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">
-                              {post.user.is_anonymous ? '匿名用戶' : post.user.name}
-                            </span>
-                            {post.is_question_post && (
-                              <span className="flex items-center gap-1 rounded-full bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-500">
-                                <HelpCircle className="h-3 w-3" />
-                                求助學霸
-                              </span>
-                            )}
-                            <span className="text-xs text-muted-foreground">
-                              {formatTimeAgo(post.created_at)}
-                            </span>
-                          </div>
-
-                          <p className="mt-2 whitespace-pre-line text-[15px] leading-relaxed">
-                            {post.content}
-                          </p>
-
-                          {post.images.length > 0 && (
-                            <div className={`mt-3 grid gap-1 ${post.images.length === 1 ? 'grid-cols-1' :
-                              post.images.length === 2 ? 'grid-cols-2' :
-                                'grid-cols-2'
-                              }`}>
-                              {post.images.map((img, i) => (
-                                <div key={i} className="aspect-square overflow-hidden rounded-lg bg-muted" />
-                              ))}
-                            </div>
-                          )}
-
-                          <div className="mt-4 flex gap-6">
-                            <button className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-foreground">
-                              <Heart className="h-5 w-5" />
-                              <span className="text-sm">{post.likes}</span>
-                            </button>
-                            <button className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-foreground">
-                              <MessageCircle className="h-5 w-5" />
-                            </button>
-                            <button className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-foreground">
-                              <Share2 className="h-5 w-5" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </article>
+                    <PostCard
+                      post={post}
+                      onDelete={handlePostDeleted}
+                      onImageClick={handleImageClick}
+                    />
                   </motion.div>
                 ))}
               </div>
+
+              {/* Infinite Scroll Trigger */}
+              {nextCursor && (
+                <div ref={observerTarget} className="p-4 flex justify-center">
+                  {isLoadingMore && (
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  )}
+                </div>
+              )}
+
+              {/* End of Feed */}
+              {!nextCursor && posts.length > 0 && (
+                <div className="p-8 text-center text-sm text-muted-foreground">
+                  已經到底了 🎉
+                </div>
+              )}
             </EmptyStateManager>
           )}
         </div>
       </main>
 
-      {/* Floating Action Button */}
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={() => setShowComposer(true)}
-        className="fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-foreground text-background shadow-lg"
-      >
-        <Plus className="h-6 w-6" />
-      </motion.button>
-
-      {/* Composer Dialog */}
-      <Dialog open={showComposer} onOpenChange={setShowComposer}>
-        <DialogContent className="top-0 max-w-lg translate-y-0 sm:top-[50%] sm:translate-y-[-50%]">
-          <DialogHeader>
-            <DialogTitle>新貼文</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <textarea
-              placeholder="分享你的想法..."
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="min-h-[200px] w-full resize-none bg-transparent text-[15px] leading-relaxed outline-none"
-            />
-
-            <div className="flex items-center justify-between">
-              <Button variant="ghost" size="sm">
-                <ImageIcon className="mr-2 h-4 w-4" />
-                新增圖片
-              </Button>
-
-              <Button onClick={() => setShowComposer(false)}>發佈</Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Image Gallery */}
+      <ImageGallery
+        images={galleryImages}
+        initialIndex={galleryIndex}
+        isOpen={isGalleryOpen}
+        onClose={() => setIsGalleryOpen(false)}
+      />
     </>
   )
 }

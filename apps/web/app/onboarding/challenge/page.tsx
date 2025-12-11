@@ -713,21 +713,32 @@ export default function OnboardingChallengePage() {
                           })}
                         </div>
                         {question?.explanation && (
-                          <div className="mt-4 bg-[#FFF8E1] rounded-xl p-5 border-l-4 border-[#FFB74D] shadow-sm">
-                            <div className="prose prose-sm max-w-none text-[#795548] prose-headings:text-[#5D4037] prose-strong:text-[#E65100] prose-a:text-[#5B7CFF] prose-p:leading-relaxed prose-li:marker:text-[#FFB74D]">
-                              <ReactMarkdown
-                                components={{
-                                  p: (props) => <p className="mb-3 last:mb-0 leading-relaxed font-medium whitespace-pre-wrap" {...props} />,
-                                  ul: (props) => <ul className="list-disc pl-4 mb-3 space-y-1.5" {...props} />,
-                                  ol: (props) => <ol className="list-decimal pl-4 mb-3 space-y-1.5" {...props} />,
-                                  li: (props) => <li className="pl-1 leading-relaxed" {...props} />,
-                                  strong: (props) => <strong className="font-bold text-[#E65100]" {...props} />,
-                                  code: (props) => <code className="bg-[#FFECB3] px-1.5 py-0.5 rounded text-[#E65100] font-mono text-xs" {...props} />,
-                                  br: () => <br />,
-                                }}
-                              >
-                                {question.explanation}
-                              </ReactMarkdown>
+                          <div className="mt-6 space-y-4">
+                            {/* Core Explanation */}
+                            <div className="bg-[#FFF8E1] rounded-xl p-5 border-l-4 border-[#FFB74D] shadow-sm">
+                              <div className="flex items-center gap-2 mb-3">
+                                <Sparkles className="w-5 h-5 text-[#FFB74D]" />
+                                <h4 className="text-[16px] font-bold text-[#5D4037]">詳細解析</h4>
+                              </div>
+                              <div className="prose prose-sm max-w-none text-[#795548] prose-headings:text-[#5D4037] prose-strong:text-[#E65100] prose-a:text-[#5B7CFF] prose-p:leading-relaxed prose-li:marker:text-[#FFB74D]">
+                                <ReactMarkdown
+                                  components={{
+                                    p: (props) => <p className="mb-3 last:mb-0 leading-relaxed font-medium whitespace-pre-wrap" {...props} />,
+                                    ul: (props) => <ul className="list-disc pl-4 mb-3 space-y-1.5" {...props} />,
+                                    ol: (props) => <ol className="list-decimal pl-4 mb-3 space-y-1.5" {...props} />,
+                                    li: (props) => <li className="pl-1 leading-relaxed" {...props} />,
+                                    strong: (props) => <strong className="font-bold text-[#E65100]" {...props} />,
+                                    code: (props) => <code className="bg-[#FFECB3] px-1.5 py-0.5 rounded text-[#E65100] font-mono text-xs" {...props} />,
+                                    br: () => <br />,
+                                    // Custom heading rendering for better hierarchy
+                                    h1: (props) => <h1 className="text-lg font-bold text-[#5D4037] mt-4 mb-2" {...props} />,
+                                    h2: (props) => <h2 className="text-base font-bold text-[#5D4037] mt-3 mb-2" {...props} />,
+                                    h3: (props) => <h3 className="text-sm font-bold text-[#795548] mt-2 mb-1" {...props} />,
+                                  }}
+                                >
+                                  {question.explanation}
+                                </ReactMarkdown>
+                              </div>
                             </div>
                           </div>
                         )}

@@ -29,16 +29,18 @@ export function useLevelStatus(): UseLevelStatus {
     }
 
     const { level, total, progress, nextLevelXp } = progression.xp
-    
-    // 計算當前等級內的 XP
-    const xpInCurrentLevel = Math.floor(progress * nextLevelXp)
-    const xpToNextLevel = nextLevelXp - xpInCurrentLevel
+
+    // 🎯 FIX: 正確計算當前等級內的 XP 進度
+    // progress 是 0-1 的比例，表示當前等級的完成度
+    // currentXp（分子）= 當前等級已獲得的 XP
+    // xpToNextLevel（分母）= 升級所需的總 XP
+    const currentXp = Math.floor(progress * nextLevelXp)
     const progressPercent = Math.min(100, Math.max(0, progress * 100))
 
     return {
       level: level || 1,
-      currentXp: xpInCurrentLevel,
-      xpToNextLevel,
+      currentXp,
+      xpToNextLevel: nextLevelXp, // 這是升級所需的總 XP，不是剩餘 XP
       progressPercent,
     }
   }, [progression?.xp])
@@ -48,6 +50,7 @@ export function useLevelStatus(): UseLevelStatus {
     isLoading: isLoadingStatus,
   }
 }
+
 
 
 

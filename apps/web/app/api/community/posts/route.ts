@@ -14,13 +14,17 @@ export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient();
 
+    // Get current user (optional for public feed)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
     const searchParams = req.nextUrl.searchParams;
     const limit = parseInt(searchParams.get('limit') || '20');
-    const offset = parseInt(searchParams.get('offset') || '0');
+    const cursor = searchParams.get('cursor'); // Cursor-based pagination
 
-    // 獲取貼文，同時獲取用戶資訊（但如果是匿名貼文，不顯示用戶資訊）
-    // 如果 posts 表不存在或查詢失敗，返回空陣列而不是錯誤
-    const { data: posts, error: postsError } = await supabase
+    // Build query - make liked_by optional for backward compatibility
+    let query = supabase
       .from('posts')
       .select(`
         id,
@@ -39,44 +43,56 @@ export async function GET(req: NextRequest) {
         )
       `)
       .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+      .limit(limit);
+
+    // Apply cursor if provided
+    if (cursor) {
+      query = query.lt('created_at', cursor);
+    }
+
+    const { data: posts, error: postsError } = await query;
 
     console.log('[Community Posts] Query result:', { postsCount: posts?.length, postsError });
 
-    // 如果表不存在或其他錯誤，返回空陣列（優雅降級）
+    // If table doesn't exist or other error, return empty array (graceful degradation)
     if (postsError) {
       console.error('[Community Posts] Database error:', postsError);
-      
-      // 如果是表不存在的錯誤，返回空陣列
+
+      // If table doesn't exist, return empty array
       if (postsError.code === '42P01' || postsError.message?.includes('does not exist')) {
         console.warn('[Community Posts] Posts table does not exist, returning empty array');
         return NextResponse.json({
           success: true,
           posts: [],
           total: 0,
+          nextCursor: null,
         });
       }
-      
+
       return NextResponse.json(
         { error: 'DATABASE_ERROR', message: `獲取貼文失敗: ${postsError.message}` },
         { status: 500 }
       );
     }
 
-    // 格式化貼文資料
+    // Format post data
     const formattedPosts = posts?.map((post: any) => {
       const profile = post.profiles;
       const isAnonymous = post.is_anonymous || false;
       const questionMetadata = post.question_metadata || null;
+      // Handle missing liked_by column (for backward compatibility)
+      const likedBy = Array.isArray(post.liked_by) ? post.liked_by : [];
+      const isLikedByMe = user && likedBy.length > 0 ? likedBy.includes(user.id) : false;
 
       return {
         id: post.id,
         content: post.content,
         images: post.images || [],
         likes: post.likes || 0,
+        is_liked_by_me: isLikedByMe,
         created_at: post.created_at,
         updated_at: post.updated_at,
-        // 如果是匿名貼文，不顯示用戶資訊
+        // If anonymous post, don't show user info
         user: isAnonymous
           ? { name: '匿名用戶', avatar: null, is_anonymous: true }
           : {
@@ -85,16 +101,24 @@ export async function GET(req: NextRequest) {
             avatar: profile?.avatar_url || null,
             is_anonymous: false,
           },
-        // 題目相關資訊
+        // Question-related info
         question_metadata: questionMetadata,
         is_question_post: !!questionMetadata,
+        // For author identification (only if not anonymous)
+        is_author: user && !isAnonymous ? post.user_id === user.id : false,
       };
     }) || [];
+
+    // Get next cursor (last post's created_at)
+    const nextCursor = formattedPosts.length === limit
+      ? formattedPosts[formattedPosts.length - 1].created_at
+      : null;
 
     return NextResponse.json({
       success: true,
       posts: formattedPosts,
       total: formattedPosts.length,
+      nextCursor,
     });
   } catch (error) {
     console.error('[Community Posts] Unexpected error:', error);

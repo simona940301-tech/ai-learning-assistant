@@ -35,119 +35,149 @@ export default function AuthCallbackPage() {
       }
 
       const stored = localStorage.getItem('onboarding_anonymous_data')
-      if (!stored) {
-        // 檢查 sessionStorage 是否有資料（從 reward 頁面來的）
-        const score = sessionStorage.getItem('onboarding_challenge_score')
-        const results = sessionStorage.getItem('onboarding_challenge_results')
-        const questions = sessionStorage.getItem('onboarding_challenge_questions')
+      // 檢查 sessionStorage 是否有資料（從 reward 頁面來的）
+      const scoreStr = sessionStorage.getItem('onboarding_challenge_score')
+      const resultsStr = sessionStorage.getItem('onboarding_challenge_results')
+      const questionsStr = sessionStorage.getItem('onboarding_challenge_questions')
 
-        if (!score && !results) {
-          return false // 沒有匿名資料
-        }
+      let score = 0
+      let results: any[] = []
+      let questions: any[] = []
+      let userLevel = 8
+      let goalData: any = null
+      let startedAt: string | undefined
 
-        // 從 sessionStorage 構建資料結構
-        const data: any = {
-          results: results ? JSON.parse(results) : [],
-          questions: questions ? JSON.parse(questions) : [],
-          userLevel: 8, // 預設值
-        }
-
-        // 準備 session 資料
-        const sessionData: any = {
-          user_id: userId,
-          current_step: 3, // 已完成 challenge，準備進入 reward
-          status: 'in_progress',
-          mock_exam_level: 8,
-        }
-
-        // 如果有 challenge 資料，加入測驗結果
-        if (data.results && data.results.length > 0) {
-          sessionData.challenge_score = parseInt(score || '0', 10)
-          sessionData.challenge_question_ids = data.questions?.map((q: any) => q.id) || []
-          sessionData.challenge_results = data.results.map((r: any) => ({
-            question_id: r.questionId,
-            is_correct: r.isCorrect,
-            time_ms: r.timeMs,
-            answer_selected: r.answerSelected,
-          }))
-          sessionData.challenge_completed_at = new Date().toISOString()
-        }
-
-        // 創建或更新 onboarding session（避免重複）
-        const { data: existingSession } = await supabaseBrowserClient
-          .from('onboarding_sessions')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('status', 'in_progress')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-
-        if (existingSession) {
-          await supabaseBrowserClient
-            .from('onboarding_sessions')
-            .update(sessionData)
-            .eq('id', existingSession.id)
-        } else {
-          await supabaseBrowserClient
-            .from('onboarding_sessions')
-            .insert(sessionData)
-            .select()
-            .single()
-        }
-
-        // 清除 sessionStorage
-        sessionStorage.removeItem('onboarding_challenge_score')
-        sessionStorage.removeItem('onboarding_challenge_results')
-        sessionStorage.removeItem('onboarding_challenge_questions')
-
-        console.log('[AuthCallback] Migrated anonymous data from sessionStorage')
-        return true
+      if (stored) {
+        const data = JSON.parse(stored)
+        results = data.results || []
+        questions = data.questions || []
+        userLevel = data.userLevel || 8
+        goalData = data.goalData
+        startedAt = data.startedAt
+        score = results.filter((r: any) => r.isCorrect).length
+      } else if (scoreStr || resultsStr) {
+        // Fallback to sessionStorage
+        score = parseInt(scoreStr || '0', 10)
+        results = resultsStr ? JSON.parse(resultsStr) : []
+        questions = questionsStr ? JSON.parse(questionsStr) : []
+      } else {
+        return false // 沒有匿名資料
       }
-
-      const data = JSON.parse(stored)
 
       // 準備 session 資料
       const sessionData: any = {
         user_id: userId,
-        current_step: 3, // 已完成 challenge，準備進入 reward
+        // 直接跳過 Reward(4)，進入 Habits(5)
+        // 邏輯: Goal(1) -> Avatar(2) -> Challenge(3) -> Reward(4) -> Habits(5) -> Complete
+        // 因為我們在這裡發放獎勵，所以直接設為 4 (完成 Reward) 或 5 (進入 Habits)
+        // 根據 reward/page.tsx，完成後並沒有明確 update current_step 到 5，而是依賴 navigation
+        // 此處我們設為 4 代表已過 Reward
+        current_step: 4,
         status: 'in_progress',
-        mock_exam_level: data.goalData?.mock_exam_level || data.userLevel || 8,
+        mock_exam_level: goalData?.mock_exam_level ?? userLevel ?? 8,
       }
 
       // 如果有 goalData，加入目標設定資料
-      if (data.goalData) {
-        sessionData.target_university = data.goalData.target_university
-        sessionData.target_department = data.goalData.target_department
-        sessionData.is_exploring = data.goalData.is_exploring
-        sessionData.current_grade = data.goalData.current_grade
-        if (data.goalData.mock_exam_level) {
-          sessionData.mock_exam_level = data.goalData.mock_exam_level
-        }
+      if (goalData) {
+        sessionData.target_university = goalData.target_university
+        sessionData.target_department = goalData.target_department
+        sessionData.is_exploring = goalData.is_exploring
+        sessionData.current_grade = goalData.current_grade
       }
 
-      // 如果有 challenge 資料，加入測驗結果
-      if (data.startedAt) {
-        sessionData.challenge_started_at = data.startedAt
-        sessionData.challenge_completed_at = new Date().toISOString()
+      // 加入測驗結果
+      if (startedAt) {
+        sessionData.challenge_started_at = startedAt
       }
-      if (data.results && data.results.length > 0) {
-        sessionData.challenge_score = data.results.filter((r: any) => r.isCorrect).length
-        sessionData.challenge_question_ids = data.questions?.map((q: any) => q.id) || []
-        sessionData.challenge_results = data.results.map((r: any) => ({
+      // 總是更新完成時間
+      sessionData.challenge_completed_at = new Date().toISOString()
+
+      if (results.length > 0) {
+        sessionData.challenge_score = score
+        sessionData.challenge_question_ids = questions.map((q: any) => q.id) || []
+        sessionData.challenge_results = results.map((r: any) => ({
           question_id: r.questionId,
           is_correct: r.isCorrect,
           time_ms: r.timeMs,
           answer_selected: r.answerSelected,
         }))
-        // 確保 challenge_completed_at 已設置（如果還沒有）
-        if (!sessionData.challenge_completed_at) {
-          sessionData.challenge_completed_at = new Date().toISOString()
-        }
       }
 
-      // 創建或更新 onboarding session（避免重複創建）
-      // 先檢查是否已有 in_progress session
+      // ========================================
+      // 🎁 [NEW] 自動發放獎勵邏輯
+      // ========================================
+      const xpEarned = 20 + score * 10
+      const coinsEarned = score >= 5 ? 100 : score >= 4 ? 80 : score >= 3 ? 60 : 40
+
+      console.log('[AuthCallback] 🎁 自動發放獎勵:', { xp: xpEarned, coins: coinsEarned })
+
+      // 1. 更新 Profile 錢包
+      const { data: profile } = await supabaseBrowserClient
+        .from('profiles')
+        .select('user_wallet_balance')
+        .eq('id', userId)
+        .single()
+
+      if (profile) {
+        await supabaseBrowserClient
+          .from('profiles')
+          .update({
+            user_wallet_balance: (profile.user_wallet_balance || 0) + coinsEarned,
+          })
+          .eq('id', userId)
+      }
+
+      // 2. 發放徽章
+      await supabaseBrowserClient
+        .from('user_badges')
+        .upsert({
+          user_id: userId,
+          badge_code: 'rookie_warrior',
+          earned_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id,badge_code',
+          ignoreDuplicates: true
+        })
+
+      // 3. 生成任務配置
+      // 簡易分析邏輯 (複製自 reward page)
+      const weakAreas: string[] = []
+      // 總是包含 vocabulary (2)
+      weakAreas.push('vocabulary', 'vocabulary')
+      // 總是包含 cloze (1)
+      weakAreas.push('cloze')
+      // 根據分數調整
+      if (score <= 2) {
+        weakAreas.push('vocabulary') // +1 vocab
+      } else if (score >= 5) {
+        weakAreas.push('reading', 'reading') // +2 reading
+      } else {
+        weakAreas.push('reading') // +1 reading
+      }
+
+      await supabaseBrowserClient
+        .from('onboarding_task_configs')
+        .upsert({
+          user_id: userId,
+          weak_areas: weakAreas, // 簡化存儲類型
+          vocabulary_ratio: 0.4,
+          cloze_ratio: 0.3,
+          reading_ratio: 0.3,
+          daily_task_size: weakAreas.length,
+        }, {
+          onConflict: 'user_id'
+        })
+
+      // 更新 sessionData 以包含獎勵資訊
+      sessionData.initial_xp_granted = xpEarned
+      sessionData.initial_badge_granted = 'rookie_warrior'
+      sessionData.surprise_reward = { type: 'gold', amount: coinsEarned }
+
+      // ========================================
+      // 保存 Session
+      // ========================================
+
+      // 創建或更新 onboarding session
       const { data: existingSession } = await supabaseBrowserClient
         .from('onboarding_sessions')
         .select('id')
@@ -158,15 +188,11 @@ export default function AuthCallbackPage() {
         .maybeSingle()
 
       if (existingSession) {
-        // 更新現有 session
-        console.log('[AuthCallback] 更新現有 session:', existingSession.id)
         await supabaseBrowserClient
           .from('onboarding_sessions')
           .update(sessionData)
           .eq('id', existingSession.id)
       } else {
-        // 創建新 session
-        console.log('[AuthCallback] 創建新 session')
         await supabaseBrowserClient
           .from('onboarding_sessions')
           .insert(sessionData)
@@ -175,12 +201,12 @@ export default function AuthCallbackPage() {
       }
 
       // 更新 profile（如果有目標設定資料）
-      if (data.goalData) {
+      if (goalData) {
         await supabaseBrowserClient
           .from('profiles')
           .update({
-            target_university: data.goalData.target_university,
-            target_department: data.goalData.target_department,
+            target_university: goalData.target_university,
+            target_department: goalData.target_department,
             updated_at: new Date().toISOString(),
           })
           .eq('id', userId)
@@ -192,7 +218,7 @@ export default function AuthCallbackPage() {
       sessionStorage.removeItem('onboarding_challenge_results')
       sessionStorage.removeItem('onboarding_challenge_questions')
 
-      console.log('[AuthCallback] Successfully migrated anonymous data')
+      console.log('[AuthCallback] Successfully migrated anonymous data & granted rewards')
       return true
     } catch (error) {
       console.error('[AuthCallback] Failed to migrate anonymous data:', error)
@@ -297,13 +323,13 @@ export default function AuthCallbackPage() {
           if (data?.onboarding_completed) {
             // ✅ 老用戶：清除所有匿名資料，直接到首頁
             console.log('[AuthCallback] 🎯 老用戶登入，清除匿名資料並導向 /home')
-            
+
             // 清除匿名資料（避免污染老用戶資料）
             localStorage.removeItem('onboarding_anonymous_data')
             sessionStorage.removeItem('onboarding_challenge_score')
             sessionStorage.removeItem('onboarding_challenge_results')
             sessionStorage.removeItem('onboarding_challenge_questions')
-            
+
             router.push(redirectTo)
             return
           }
@@ -312,7 +338,7 @@ export default function AuthCallbackPage() {
           // 🆕 新用戶：遷移匿名資料
           // ========================================
           console.log('[AuthCallback] 🆕 新用戶登入，檢查匿名資料...')
-          
+
           const hasAnonymousData =
             sessionStorage.getItem('onboarding_challenge_score') ||
             sessionStorage.getItem('onboarding_challenge_results') ||
@@ -330,7 +356,7 @@ export default function AuthCallbackPage() {
           // Get session to check progress (after migration)
           const { data: session } = await supabaseBrowserClient
             .from('onboarding_sessions')
-            .select('challenge_completed_at, scorecard_submitted_at, current_step, id')
+            .select('challenge_completed_at, scorecard_submitted_at, current_step, id, initial_xp_granted')
             .eq('user_id', user.id)
             .eq('status', 'in_progress')
             .order('created_at', { ascending: false })
@@ -343,8 +369,15 @@ export default function AuthCallbackPage() {
             // Completed habits survey, go to complete page
             router.push('/onboarding/complete')
           } else if (session?.challenge_completed_at) {
-            // Completed challenge, go to reward page
-            router.push('/onboarding/reward')
+            // New Check: If rewards already granted, skip reward page
+            // 這裡可以檢查 initial_xp_granted 是否存在
+            if (session.initial_xp_granted) {
+              console.log('[AuthCallback] 🎁 獎勵已發放，跳過 Reward 直接進入 Habits')
+              router.push('/onboarding/habits')
+            } else {
+              // Completed challenge, go to reward page
+              router.push('/onboarding/reward')
+            }
           } else if (session?.current_step && session.current_step >= 3) {
             // Started or completed challenge step, go to challenge
             router.push('/onboarding/challenge')
@@ -360,7 +393,7 @@ export default function AuthCallbackPage() {
           }
         } catch (error) {
           console.error('[AuthCallback] Error checking user status:', error)
-          
+
           // 🔒 錯誤處理：根據是否有 user 決定導向
           if (user) {
             // 已登入但查詢出錯，安全起見導向首頁（避免卡在 onboarding）

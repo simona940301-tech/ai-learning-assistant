@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select(
-        'chick_iq, chick_fatigue, chick_emotion_state, last_login_at, chick_iq_last_decay_at, chick_evolution_stage, chick_evolution_variant, chick_hunger, chick_intimacy, food_bowls_count, chick_exploration_start_at, chick_exploration_allowance, chick_name, user_nickname, chick_hatched_at, chick_first_fed_at, last_seen_at'
+        'chick_iq, chick_fatigue, chick_emotion_state, last_login_at, chick_iq_last_decay_at, chick_evolution_stage, chick_evolution_variant, chick_hunger, chick_intimacy, chick_food_bowls, chick_exploration_start_at, chick_exploration_allowance, chick_name, user_nickname, chick_hatched_at, chick_first_fed_at, last_seen_at'
       )
       .eq('id', user.id)
       .single()
@@ -126,7 +126,7 @@ export async function GET(req: NextRequest) {
       evolutionVariant: profile?.chick_evolution_variant ?? 'default',
       hunger: profile?.chick_hunger ?? 50,
       intimacy: profile?.chick_intimacy ?? 0,
-      foodBowlsCount: profile?.food_bowls_count ?? 0,
+      foodBowlsCount: profile?.chick_food_bowls ?? 0,
       explorationStartAt: profile?.chick_exploration_start_at ?? null,
       explorationAllowance: profile?.chick_exploration_allowance ?? 0,
       isWellFed: isWellFedActive,

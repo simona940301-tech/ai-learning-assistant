@@ -222,7 +222,7 @@ export function MatchmakingModal({ onCancel, matchType, subject, timeLimit = 20 
 
     // WIDE retry disabled
     setSmartRetryChoice(null)
-  }, [adaptiveCountdown, checkEnergy, matchId, matchType, onCancel, setPveCountdown, smartRetryChoice, subject, timeLimit])
+  }, [adaptiveCountdown, checkEnergy, onCancel, setPveCountdown, smartRetryChoice])
 
 
   const smartRetryPending = isTimeout && !smartRetryChoice
@@ -287,10 +287,10 @@ export function MatchmakingModal({ onCancel, matchType, subject, timeLimit = 20 
                     <motion.div
                       key={phase.id}
                       className={`relative overflow-hidden rounded-2xl border px-4 py-3 ${isDone
-                          ? 'border-emerald-400/40 bg-emerald-400/10'
-                          : isActive
-                            ? 'border-white/40 bg-white/10'
-                            : 'border-white/10 bg-white/5'
+                        ? 'border-emerald-400/40 bg-emerald-400/10'
+                        : isActive
+                          ? 'border-white/40 bg-white/10'
+                          : 'border-white/10 bg-white/5'
                         }`}
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
