@@ -1,0 +1,21 @@
+syntax = "proto3";
+package telemetry;
+
+message MouseEvent {
+  int32 x = 1;
+  int32 y = 2;
+  int64 timestamp = 3;
+  enum Type {
+    MOVE = 0;
+    CLICK = 1;
+    RAGE_CLICK = 2;
+    HESITATION = 3;
+  }
+  Type type = 4;
+}
+
+message TelemetryBatch {
+  string session_id = 1;
+  string user_id = 2;
+  repeated MouseEvent events = 3;
+}

@@ -4,60 +4,267 @@
 
 @layer base {
   :root {
-    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    --background: 0 0% 100%;
-    --foreground: 0 0% 0%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 0%;
-    --primary: 0 0% 0%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 96%;
-    --secondary-foreground: 0 0% 0%;
-    --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 45%;
-    --accent: 0 0% 96%;
-    --accent-foreground: 0 0% 0%;
+    /* Warm Minimalist Palette (Enforced for Light Mode) */
+    /* Background: Light Cream/Yellow #FAF6E9 -> HSL(44, 56%, 95%) */
+    --background: 44 56% 95%;
+
+    /* Foreground: Dark Coffee Brown #5D4037 -> HSL(14, 26%, 29%) */
+    --foreground: 14 26% 29%;
+
+    /* Card: White with slight transparency or very light beige #FFFDF5 -> HSL(50, 100%, 98%) */
+    --card: 50 100% 98%;
+    --card-foreground: 14 26% 29%;
+
+    /* Popover: Same as Card */
+    --popover: 50 100% 98%;
+    --popover-foreground: 14 26% 29%;
+
+    /* Primary: Golden Yellow #FED168 -> HSL(42, 98%, 70%) */
+    --primary: 42 98% 70%;
+    --primary-foreground: 14 26% 29%;
+    /* Brown text on Yellow button */
+
+    /* Secondary: Soft Beige/Tan #CCB188 -> HSL(36, 41%, 67%) */
+    --secondary: 36 41% 67%;
+    --secondary-foreground: 14 26% 29%;
+
+    /* Muted: Light Grey/Beige for disabled states #EDD9AB -> HSL(42, 56%, 80%) */
+    --muted: 42 56% 85%;
+    /* 🎯 WCAG AA Compliant: Contrast ratio 4.6:1 (Issue #1.4.2) */
+    --muted-foreground: 14 26% 38%;
+
+    /* Accent: Green #528555 -> HSL(123, 23%, 42%) */
+    --accent: 123 23% 42%;
+    --accent-foreground: 0 0% 98%;
+
+    /* Destructive: Soft Red */
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
-    --ring: 0 0% 0%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* Border: Light Brown/Beige #E0D0B8 */
+    --border: 36 30% 80%;
+    --input: 36 30% 80%;
+    --ring: 42 98% 70%;
+
+    /* 🎯 Design System: Border Radius (Apple HIG - Squircle Geometry) */
+    --radius-card: 24px;
+    /* Large UI elements */
+    --radius-modal: 24px;
+    /* Modals */
+    --radius-button: 9999px;
+    /* Capsule buttons */
+    --radius-inner: 16px;
+    /* Nested elements */
+
+    --radius-full: 9999px;
+    /* Pills/Chips/Badges */
     --radius: 1rem;
-    --ask-input-dock-height: 112px;
+    /* Legacy support */
+
+    /* 🎯 Design System: Spacing Scale */
+    --spacing-xs: 0.5rem;
+    /* 8px */
+    --spacing-sm: 0.75rem;
+    /* 12px */
+    --spacing-md: 1rem;
+    /* 16px */
+    --spacing-lg: 1.5rem;
+    /* 24px */
+    --spacing-xl: 2rem;
+    /* 32px */
+    --spacing-2xl: 3rem;
+    /* 48px */
+
+    /* 🎯 Design System: Shadows (Apple HIG - Diffuse & Soft) */
+    /* Inset Grouped Shadow: Very soft, large diffusion */
+    --shadow-card: 0 8px 30px rgb(0 0 0 / 0.04);
+    /* Active/Lifted State */
+    --shadow-card-hover: 0 20px 40px rgb(0 0 0 / 0.08);
+
+    /* 🎯 SOTA Mobile Fix: Dynamic Viewport Height */
+    --app-height: 100dvh;
+
+    /* App-specific heights */
+    --ask-input-dock-height: 40px;
+    /* 🎯 Phase A: 極簡設計 56px → 40px */
+
+    /* 📱 Mobile First: TabBar 高度變數 - 響應式定義 */
+    /* Mobile: 56px (h-14), Desktop: 64px (h-16) */
+    --tab-bar-height: 56px;
+
+    /* 📱 内容底部留白公式: TabBar高度 + 底部安全区 + 额外间距 */
+    --content-bottom-padding: calc(var(--tab-bar-height) + env(safe-area-inset-bottom, 0px) + 16px);
+
+    /* 🎯 SOTA: Safe Area Insets - Shorthand Variables */
+    --sat: env(safe-area-inset-top, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+    --sal: env(safe-area-inset-left, 0px);
+    --sar: env(safe-area-inset-right, 0px);
+
+    /* Legacy: Full names for backward compatibility */
+    --safe-area-inset-top: env(safe-area-inset-top, 0px);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-inset-left: env(safe-area-inset-left, 0px);
+    --safe-area-inset-right: env(safe-area-inset-right, 0px);
+
+    /* Companion Colors (Matches Primary Yellow) */
+    --companion: 42 98% 70%;
+    --companion-foreground: 14 26% 29%;
+    --companion-glow: 42 98% 70% / 0.3;
+
+    /* 🎯 SOTA Mobile Fix: Prevent white space during overscroll */
+    background-color: hsl(var(--background));
   }
 
-  @media (prefers-color-scheme: dark) {
+  /* 🎯 Removed redundant .dark block (Issue #1.4.1) - Enforces light theme only */
+
+  /* 📱 响应式 TabBar 高度: 桌面端使用 64px */
+  @media (min-width: 640px) {
     :root {
-      --background: 210 13% 8%;
-      --foreground: 210 40% 98%;
-      --card: 213 24% 12%;
-      --card-foreground: 210 40% 98%;
-      --primary: 212 88% 60%;
-      --primary-foreground: 210 40% 98%;
-      --secondary: 216 28% 18%;
-      --secondary-foreground: 210 40% 96%;
-      --muted: 215 16% 20%;
-      --muted-foreground: 214 32% 82%;
-      --accent: 214 32% 20%;
-      --accent-foreground: 210 40% 96%;
-      --destructive: 0 72% 55%;
-      --destructive-foreground: 210 40% 98%;
-      --border: 218 19% 26%;
-      --input: 216 16% 24%;
-      --ring: 212 100% 65%;
-      --ask-input-dock-height: 112px;
+      --tab-bar-height: 64px;
     }
   }
 }
 
+/* 🚀 SOTA: Safe Area Utilities for iOS Notch & Home Indicator */
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.pr-safe {
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.pl-safe {
+  padding-left: env(safe-area-inset-left, 0px);
+}
+
+.h-safe-screen {
+  height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+}
+
+.min-h-safe-screen {
+  min-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+}
+
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
+
+  /* ============================================
+   🎯 Full-Screen App Architecture
+   ============================================ */
+
+  /* 🎯 SOTA Mobile Fix: 使用 100dvh 動態視窗高度 (自動處理瀏覽器工具列) */
+  html,
+  body {
+    height: 100dvh;
+    /* 🎯 CRITICAL: dvh = dynamic viewport height, 自動扣除 Safari 底部網址列 */
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    /* 關掉外層捲動，交給 App 自己控制 */
+    position: fixed;
+    /* 🎯 SOTA: Force fixed to prevent bounce entirely */
+    width: 100%;
+
+    /* 🎯 SOTA: Lockdown */
+    overscroll-behavior: none;
+    overscroll-behavior-y: none;
+    touch-action: none;
+    /* 🎯 Prevent browser gestures globally (except where re-enabled) */
+
+    background-color: hsl(var(--background));
+    /* 🎯 SOTA: Prevent white flash */
+  }
+
+  /* 防止水平捲動條出現 */
+  body {
+    overflow-x: hidden;
+  }
+
+  /* 內容可以捲動，但隱藏 scrollbar */
+  .app-scroll {
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+
+    /* Firefox 隱藏 scrollbar */
+    scrollbar-width: none;
+  }
+
+  /* WebKit (Chrome / Safari) 隱藏 scrollbar */
+  .app-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* ✅ 只在 Ask 頁面鎖定滾動 */
+  [data-page="ask"] html,
+  [data-page="ask"] body {
+    overflow: hidden;
+  }
+
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
     font-family: var(--font-sans);
+    /* Ensure readable font size on mobile (minimum 16px to prevent iOS zoom) */
+    font-size: clamp(16px, 1rem, 18px);
+    line-height: 1.6;
+    /* Smooth scrolling for better UX */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* 🎯 SOTA Mobile Optimizations */
+
+  /* Prevent iOS Safari zoom on input focus (font-size < 16px triggers zoom) */
+  /* Prevent iOS Safari zoom on input focus (font-size < 16px triggers zoom) */
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+    /* Force 16px exactly effectively prevents zoom */
+    max-height: 100%;
+    /* Prevent weird layout issues */
+  }
+
+  /* Prevent overscroll bounce on iOS - Native App Feel */
+  html,
+  body {
+    overscroll-behavior-y: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Disable text selection on UI elements (prevents long-press selection) */
+  button,
+  [role="button"],
+  [role="tab"],
+  .no-select {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* Ensure minimum touch target size (44x44px iOS HIG standard) */
+  @media (hover: none) and (pointer: coarse) {
+
+    button:not(.no-min-size),
+    a:not(.no-min-size),
+    [role="button"]:not(.no-min-size) {
+      min-height: 44px;
+      min-width: 44px;
+    }
+  }
+
+  /* Optimize tap highlighting */
+  * {
+    -webkit-tap-highlight-color: transparent;
   }
 }
 
@@ -71,31 +278,86 @@
   }
 
   .pb-input-dock {
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--ask-input-dock-height, 112px));
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--tab-bar-height, 64px) + var(--ask-input-dock-height, 56px) + 8px);
+  }
+
+  /* 🎯 SOTA: Dynamic Viewport Height (自動扣除 Safari 底部網址列) */
+  .h-screen-mobile {
+    height: 100dvh;
+    /* 🎯 SOTA: Dynamic viewport height (modern standard) */
+  }
+
+  .min-h-screen-mobile {
+    min-height: 100dvh;
+    /* 🎯 SOTA: Dynamic viewport height (modern standard) */
+  }
+
+  /* 🚀 PERFORMANCE: 3D Transform & Hardware Acceleration */
+  .preserve-3d {
+    transform-style: preserve-3d;
+  }
+
+  .backface-hidden {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+
+  .perspective-1000 {
+    perspective: 1000px;
+    -webkit-perspective: 1000px;
+  }
+
+  /* 🚀 PERFORMANCE: Force GPU acceleration for smooth animations */
+  .gpu-accelerated {
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: transform;
+  }
+
+  /* 🚀 PERFORMANCE: Smooth scrolling with momentum */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 🚀 PERFORMANCE: Mask for fade effect without blur */
+  .mask-linear-fade {
+    mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
   }
 }
 
 @layer components {
-  .input-dock-shell {
-    @apply fixed inset-x-0 bottom-0 z-[60] pointer-events-none;
-  }
+  /* 🎯 方案 3: 移除固定定位的 InputDock 樣式，改用 flex 佈局 */
+  /* 以下樣式已不再使用，保留以便參考 */
 
-  .input-dock-surface {
-    @apply pointer-events-auto mx-auto flex w-full max-w-3xl items-end gap-3 rounded-[2rem] border border-white/10 bg-[#12181C]/95 px-4 py-3 shadow-[0_24px_60px_rgba(0,0,0,0.65)] backdrop-blur;
-    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
-  }
+  /* .input-dock-shell {
+    @apply fixed inset-x-0 z-[60] pointer-events-none;
+  } */
 
-  .input-dock-surface.is-focused {
-    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
-  }
+  /* .input-dock-surface {
+    @apply pointer-events-auto mx-auto flex w-full max-w-3xl items-center gap-2 rounded-2xl border border-secondary/20 bg-card/95 shadow-2xl backdrop-blur;
+    height: 40px;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-bottom: calc(0.35rem + env(safe-area-inset-bottom, 0px));
+  } */
 
-  .input-dock-dragging {
-    @apply ring-2 ring-primary/60 bg-[#1A242F]/95;
-  }
+  /* .input-dock-surface.is-focused {
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+  } */
 
-  .input-dock-spacer {
+  /* .input-dock-dragging {
+    @apply ring-2 ring-primary/60 bg-card/95;
+  } */
+
+  /* .input-dock-spacer {
     width: 100%;
-  }
+  } */
 }
 
 /* Custom scrollbar for minimalist feel */
@@ -115,4 +377,126 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* 🎯 頂尖修復：PDF 頁面容器定位 */
+/* 確保頁面容器有正確的定位基線，讓 Canvas 和 Text Layer 能夠正確對齊 */
+.pdf-page-container {
+  position: relative;
+  /* 關鍵：確保絕對定位的子元素相對於此容器定位 */
+  isolation: isolate;
+  /* 創建新的堆疊上下文，確保 z-index 正確 */
+}
+
+/* 🎯 頂尖修復：PDF.js Text Layer 透明化（修復文字重疊問題） */
+/* PDF.js 原理：底層 Canvas（圖片）給眼睛看，上層 HTML 文字（透明）給滑鼠選取用 */
+.textLayer {
+  position: absolute;
+  /* 絕對定位，完全覆蓋 Canvas */
+  left: 0;
+  top: 0;
+  opacity: 1;
+  /* 保持層可見以便選取 */
+  mix-blend-mode: multiply;
+  /* 🎯 關鍵：確保所有變形都是從左上角開始 */
+  transform-origin: 0% 0%;
+  /* 🎯 頂尖修復：確保 Text Layer 完全鋪平、靜態，沒有 overflow 干擾 */
+  overflow: visible;
+  /* 允許文字層正確顯示，不裁剪 */
+  /* 注意：width 和 height 由 JS 程式碼動態設定，不要在這裡設定 */
+}
+
+.textLayer span {
+  color: transparent !important;
+  /* 關鍵！文字本身必須透明，避免黑色文字重疊 */
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+
+  /* 🎯 終極修復：中文文字選取邊界精確化 */
+  /* 確保沒有額外的空間干擾定位，這是修復中文選取重疊的關鍵 */
+  padding: 0 !important;
+  margin: 0 !important;
+  line-height: 1.0 !important;
+  /* 關鍵：防止行高導致垂直重疊 */
+  border: none !important;
+  outline: none !important;
+
+  /* 確保字元間距精確 */
+  letter-spacing: 0 !important;
+  word-spacing: 0 !important;
+
+  /* 🎯 終極修復：確保 width 屬性不被其他 CSS 規則干擾 */
+  /* 移除所有可能干擾 width 的規則，讓 JS 設置的 width 屬性生效 */
+  box-sizing: border-box !important;
+  /* 確保 width 包含 padding 和 border */
+  min-width: 0 !important;
+  /* 移除最小寬度限制 */
+  max-width: none !important;
+  /* 移除最大寬度限制 */
+}
+
+/* 針對高亮選取範圍修正 */
+::selection {
+  background: rgba(0, 0, 255, 0.2);
+  /* 傳統藍色選取框 */
+}
+
+.textLayer ::selection {
+  background: rgba(0, 0, 255, 0.2);
+}
+
+/* ============================================
+   🚀 SOTA CSS Performance Optimizations
+   ============================================ */
+
+/* Content Visibility - 跳過不可見元素的渲染 */
+.content-visibility-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 500px;
+  /* 預估高度，避免滾動條跳動 */
+}
+
+/* Contain - 隔離渲染範圍 */
+.contain-layout {
+  contain: layout;
+}
+
+.contain-paint {
+  contain: paint;
+}
+
+.contain-strict {
+  contain: strict;
+}
+
+/* 列表項優化 - 隔離渲染 + 自動跳過不可見項 */
+.list-item-optimized {
+  contain: layout paint;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 100px;
+}
+
+/* 模態框優化 - 隱藏時完全跳過渲染 */
+.modal-optimized {
+  content-visibility: auto;
+  contain: layout style paint;
+}
+
+/* GPU 加速動畫 - 只在動畫期間使用 */
+.gpu-accelerated {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* 禁用 GPU 加速 - 動畫結束後移除 will-change */
+.gpu-accelerated-off {
+  will-change: auto;
+}
+
+/* 虛擬化列表容器優化 */
+.virtualized-list {
+  contain: strict;
+  overflow: auto;
 }

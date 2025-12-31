@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getSupabaseClient } from '@/lib/api/auth';
 import type { AnswerQuestionRequest, AnswerQuestionResponse } from '@plms/shared/types';
 import { AnswerQuestionRequestSchema } from '@plms/shared/types';
 import { checkRateLimit } from '@/lib/rate-limit';
@@ -17,7 +17,7 @@ const recentAnswers = new Map<string, Array<{ timestamp: number; timeSpent: numb
  */
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createClient();
+    const supabase = getSupabaseClient(req);
 
     // Check authentication
     const {
@@ -194,36 +194,6 @@ export async function POST(req: NextRequest) {
       .eq('user_id', user.id)
       .eq('question_id', validated.questionId)
       .eq('context', 'mission');
-
-    // If incorrect, add to error book (if not already there)
-    if (!isCorrect) {
-      const { data: existingError } = await supabase
-        .from('error_book')
-        .select('id, attempt_count')
-        .eq('user_id', user.id)
-        .eq('question_id', validated.questionId)
-        .single();
-
-      if (!existingError) {
-        await supabase.from('error_book').insert({
-          user_id: user.id,
-          question_id: validated.questionId,
-          pack_id: question.pack_id,
-          status: 'active',
-          first_attempted_at: new Date().toISOString(),
-          last_attempted_at: new Date().toISOString(),
-          attempt_count: 1,
-        });
-      } else {
-        await supabase
-          .from('error_book')
-          .update({
-            last_attempted_at: new Date().toISOString(),
-            attempt_count: (existingError.attempt_count || 0) + 1,
-          })
-          .eq('id', existingError.id);
-      }
-    }
 
     // Get updated mission progress
     const { data: updatedMission } = await supabase

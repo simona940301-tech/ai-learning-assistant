@@ -5,7 +5,7 @@
  * Minimalism: Whitelist only necessary tags and attributes
  */
 
-import DOMPurify from 'dompurify'
+import DOMPurify, { Config } from 'dompurify'
 
 /**
  * Allowed HTML tags for passage/explanation content
@@ -52,7 +52,7 @@ const ALLOWED_ATTR = [
 /**
  * DOMPurify configuration for passage content
  */
-const PASSAGE_CONFIG: DOMPurify.Config = {
+const PASSAGE_CONFIG: Config = {
   ALLOWED_TAGS,
   ALLOWED_ATTR,
   ALLOW_DATA_ATTR: true,
@@ -64,7 +64,7 @@ const PASSAGE_CONFIG: DOMPurify.Config = {
 /**
  * Stricter configuration for inline content (options, short text)
  */
-const INLINE_CONFIG: DOMPurify.Config = {
+const INLINE_CONFIG: Config = {
   ALLOWED_TAGS: ['mark', 'em', 'strong', 'b', 'i', 'u', 'span', 'code'],
   ALLOWED_ATTR: ['class', 'data-*'],
   ALLOW_DATA_ATTR: true,
@@ -83,7 +83,7 @@ export function sanitizePassage(html: string): string {
   if (!html) return ''
 
   try {
-    return DOMPurify.sanitize(html, PASSAGE_CONFIG)
+    return DOMPurify.sanitize(html, PASSAGE_CONFIG) as string
   } catch (error) {
     console.error('[sanitize] Failed to sanitize passage:', error)
     // Fallback: Strip all HTML tags
@@ -103,7 +103,7 @@ export function sanitizeInline(html: string): string {
   if (!html) return ''
 
   try {
-    return DOMPurify.sanitize(html, INLINE_CONFIG)
+    return DOMPurify.sanitize(html, INLINE_CONFIG) as string
   } catch (error) {
     console.error('[sanitize] Failed to sanitize inline:', error)
     return html.replace(/<[^>]*>/g, '')
@@ -122,7 +122,7 @@ export function stripHtml(html: string): string {
   if (!html) return ''
 
   // First sanitize to remove dangerous content
-  const sanitized = DOMPurify.sanitize(html, { ALLOWED_TAGS: [] })
+  const sanitized = DOMPurify.sanitize(html, { ALLOWED_TAGS: [] }) as string
 
   // Then remove any remaining tags
   return sanitized.replace(/<[^>]*>/g, '').trim()

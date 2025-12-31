@@ -1,7 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getSupabaseClient } from '@/lib/api/auth';
 import type { PackListResponse, PackWithStatus } from '@plms/shared/types';
 import { getConfidenceBadge } from '@plms/shared/types';
+
+/**
+ * ✅ 簡化的字段映射：snake_case → camelCase
+ * 遵循專案架構，直接在 route 中處理
+ */
+function snakeToCamelCase<T extends Record<string, any>>(obj: T): any {
+  if (!obj || typeof obj !== 'object') return obj;
+  
+  const result: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+    result[camelKey] = value && typeof value === 'object' && !Array.isArray(value)
+      ? snakeToCamelCase(value)
+      : value;
+  }
+  return result;
+}
 
 /**
  * GET /api/packs
@@ -26,7 +43,7 @@ export async function GET(req: NextRequest) {
     const sortBy = searchParams.get('sortBy') || 'latest';
     const search = searchParams.get('search');
 
-    const supabase = createClient();
+    const supabase = getSupabaseClient(req);
 
     // Get current user (optional - to check installation status)
     const {
@@ -69,7 +86,7 @@ export async function GET(req: NextRequest) {
       query = query.order('avg_confidence', { ascending: false });
     } else {
       // Default: latest
-      query = query.order('published_at', { ascending: false, nullsLast: true });
+      query = query.order('published_at', { ascending: false });
     }
 
     // Pagination
@@ -101,36 +118,22 @@ export async function GET(req: NextRequest) {
       installedPackIds = installations?.map(i => i.pack_id) || [];
     }
 
-    // Transform to PackWithStatus (V2: Added source fields)
-    const packsWithStatus: PackWithStatus[] = (packs || []).map(pack => ({
-      id: pack.id,
-      title: pack.title,
-      description: pack.description,
-      subject: pack.subject,
-      topic: pack.topic,
-      skill: pack.skill,
-      grade: pack.grade,
-      itemCount: pack.item_count,
-      hasExplanation: pack.has_explanation,
-      explanationRate: pack.explanation_rate,
-      avgConfidence: pack.avg_confidence,
-      confidenceBadge: getConfidenceBadge(pack.avg_confidence),
-      status: pack.status,
-      visibility: pack.visibility || 'public', // V2
-      source: pack.source || 'internal', // V2
-      sourceName: pack.source_name, // V2
-      sourceId: pack.source_id, // V2
-      publishedAt: pack.published_at,
-      expiresAt: pack.expires_at,
-      installCount: pack.install_count,
-      completionRate: pack.completion_rate || 0,
-      qrAlias: pack.qr_alias,
-      createdAt: pack.created_at,
-      updatedAt: pack.updated_at,
-      createdBy: pack.created_by,
-      isInstalled: installedPackIds.includes(pack.id),
-      installedAt: undefined, // Will be filled if needed
-    }));
+    // Transform to PackWithStatus (V2: Optimized with automatic field mapping)
+    const packsWithStatus: PackWithStatus[] = (packs || []).map(pack => {
+      // ✅ 使用內聯工具自動轉換 snake_case → camelCase
+      const autoConverted = snakeToCamelCase(pack);
+      
+      return {
+        ...autoConverted, // 自動處理: item_count→itemCount, has_explanation→hasExplanation 等
+        // 只需手動處理業務邏輯和預設值
+        confidenceBadge: getConfidenceBadge(pack.avg_confidence),
+        visibility: pack.visibility || 'public', // V2 預設值
+        source: pack.source || 'internal', // V2 預設值
+        completionRate: pack.completion_rate || 0, // 預設值處理
+        isInstalled: installedPackIds.includes(pack.id), // 業務邏輯
+        installedAt: undefined, // 業務邏輯 - Will be filled if needed
+      };
+    });
 
     const response: PackListResponse = {
       packs: packsWithStatus,

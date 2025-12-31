@@ -2,7 +2,7 @@
  * TARS: Type-Agnostic Recognition System
  * Detects question type from input text
  */
-import { chatCompletionJSON } from '@/lib/openai'
+import { chatCompletionJSON } from '@/lib/gemini'
 import type { ExplainKind } from '@/lib/types'
 
 interface TARSResult {

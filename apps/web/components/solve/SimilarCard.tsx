@@ -134,7 +134,7 @@ export default function SimilarCard({ result, onAddToQuiz, onStoreRedirect }: Si
             <p className="mb-4">換個關鍵字或逛逛題庫 Store</p>
             <button
               type="button"
-              onClick={onStoreRedirect || (() => (window.location.href = '/store'))}
+              onClick={onStoreRedirect || (() => (window.location.href = '/store-shop'))}
               className="px-4 py-2 rounded-xl bg-secondary text-foreground hover:bg-secondary/80 transition-colors"
             >
               前往 Store

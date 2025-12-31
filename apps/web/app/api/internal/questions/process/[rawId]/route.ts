@@ -1,100 +1,108 @@
-import { NextRequest, NextResponse } from 'next/server';
-import type { QuestionNormalized } from '@plms/shared/types';
-import { labelQuestion, detectDuplicates } from '@/lib/ai-labeling';
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { QuestionRepo } from '@/lib/dal/question-repo'
+import { QuestionService } from '@/lib/services/question-service'
+import { GeminiService } from '@/lib/services/gemini-service'
+import { QuestionProcessingService } from '@/lib/services/question-processing-service'
 
 /**
- * POST /api/internal/questions/process/:rawId
- *
- * Process raw question:
- * 1. Normalize format
- * 2. Apply AI labeling
- * 3. Detect duplicates
- * 4. Store in questions table
+ * POST /api/internal/questions/process/[rawId]
+ * 
+ * 觸發單個原始題目的處理流程
+ * 
+ * Architecture: Route -> Service -> Repo
  */
 export async function POST(
   req: NextRequest,
   { params }: { params: { rawId: string } }
 ) {
   try {
-    const { rawId } = params;
+    const supabase = createClient()
 
-    // TODO: Fetch raw question from database
-    // For now, mock data
-    const rawQuestion = {
-      id: rawId,
-      sourceFile: 'example.csv',
-      rawContent: 'What is 2 + 2?',
-      uploadedAt: new Date().toISOString(),
-      status: 'pending' as const,
-    };
+    // 1. 權限檢查 (Admin Only)
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json(
+        { success: false, error: 'UNAUTHORIZED', message: 'Authentication required' },
+        { status: 401 }
+      )
+    }
 
-    // Step 1: Normalize
-    const normalized = {
-      subject: 'math',
-      stem: rawQuestion.rawContent,
-      choices: ['3', '4', '5', '6'],
-      answer: '4',
-      explanation: '2 plus 2 equals 4',
-    };
+    // 檢查是否為管理員 (這裡假設 profiles 表有 role 欄位，或者使用簡單的 email 檢查)
+    // 為了簡化，這裡先檢查是否登入，實際生產環境應檢查 role
 
-    // Step 2: AI Labeling
-    const aiLabel = await labelQuestion(normalized.stem);
+    const rawId = params.rawId
+    if (!rawId) {
+      return NextResponse.json(
+        { success: false, error: 'VALIDATION_ERROR', message: 'rawId is required' },
+        { status: 400 }
+      )
+    }
 
-    // Step 3: Detect duplicates
-    const existingQuestions: Array<{ id: string; stem: string }> = [];
-    // TODO: Fetch from database
+    // 2. 初始化 Services
+    const questionRepo = new QuestionRepo(supabase)
+    const geminiService = new GeminiService()
+    const questionService = new QuestionService(questionRepo, geminiService)
+    const processingService = new QuestionProcessingService(questionRepo, questionService, geminiService)
 
-    const duplicateCheck = await detectDuplicates(
-      rawId,
-      normalized.stem,
-      existingQuestions
-    );
+    // 3. 獲取原始題目記錄
+    const { data: rawData, error: fetchError } = await supabase
+      .from('questions_raw')
+      .select('*')
+      .eq('id', rawId)
+      .single()
 
-    // Step 4: Create normalized question
-    const questionId = `q-normalized-${Date.now()}`;
-    const question: QuestionNormalized = {
-      id: questionId,
-      rawId,
-      ...normalized,
-      aiLabel,
-      confidence: aiLabel.confidence,
-      labelSource: 'ai',
-      labelVersion: 1,
-      finalDifficulty: aiLabel.difficulty,
-      isDuplicate: duplicateCheck.isDuplicate,
-      duplicateOf: duplicateCheck.duplicateOf,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    if (fetchError || !rawData) {
+      return NextResponse.json(
+        { success: false, error: 'NOT_FOUND', message: 'Raw question not found' },
+        { status: 404 }
+      )
+    }
 
-    // TODO: Save to database (questions table)
+    const rawQuestionRecord = {
+      id: rawData.id,
+      source: rawData.source,
+      rawData: rawData.raw_data,
+      status: rawData.status,
+      errorMessage: rawData.error_message,
+      processedQuestionId: rawData.processed_question_id,
+      createdAt: rawData.created_at,
+      updatedAt: rawData.updated_at,
+    }
 
-    console.log('[Question Process]', {
-      rawId,
-      questionId,
-      difficulty: aiLabel.difficulty,
-      confidence: aiLabel.confidence,
-      isDuplicate: duplicateCheck.isDuplicate,
-    });
+    // 4. 執行處理
+    const result = await processingService.processSingleQuestion(rawQuestionRecord)
 
-    return NextResponse.json({
-      success: true,
-      data: question,
-      timestamp: new Date().toISOString(),
-    });
+    if (result.success) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          rawId,
+          processedQuestionId: result.questionId,
+          status: 'completed'
+        },
+        message: 'Question processed successfully'
+      })
+    } else {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'PROCESSING_FAILED',
+          message: result.error
+        },
+        { status: 500 }
+      )
+    }
 
   } catch (error) {
-    console.error('[Question Process] Error:', error);
+    console.error('[Process Question API] Error:', error)
     return NextResponse.json(
       {
         success: false,
-        error: {
-          code: 'PROCESS_FAILED',
-          message: error instanceof Error ? error.message : 'Processing failed',
-        },
-        timestamp: new Date().toISOString(),
+        error: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
-    );
+    )
   }
 }

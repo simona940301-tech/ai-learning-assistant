@@ -1,0 +1,1992 @@
+🚀 Starting batch word enrichment process...
+
+
+📚 Processing level_1: 961 words
+  Batch 1/193: a, an, ability, able, about
+  ✅ Successfully inserted/updated 5 words.
+  Batch 2/193: above, abroad, across, act, action
+  ✅ Successfully inserted/updated 5 words.
+  Batch 3/193: actor, actress, add, afraid, after
+  ✅ Successfully inserted/updated 5 words.
+  Batch 4/193: afternoon, again, age, ago, agree
+  ✅ Successfully inserted/updated 5 words.
+  Batch 5/193: air, airplane, plane, airport, all
+  ✅ Successfully inserted/updated 5 words.
+  Batch 6/193: allow, almost, along, already, also
+  ✅ Successfully inserted/updated 5 words.
+  Batch 7/193: although, always, am, a.m., and
+  ✅ Successfully inserted/updated 5 words.
+  Batch 8/193: angry, animal, another, answer, ant
+  ✅ Successfully inserted/updated 5 words.
+  Batch 9/193: any, anybody, anyone, anything, apartment
+  ✅ Successfully inserted/updated 5 words.
+  Batch 10/193: appear, apple, area, arm, around
+  ✅ Successfully inserted/updated 5 words.
+  Batch 11/193: arrive, art, as, ask, at
+  ✅ Successfully inserted/updated 5 words.
+  Batch 12/193: attack, aunt, away, baby, back
+  ✅ Successfully inserted/updated 5 words.
+  Batch 13/193: bad, bag, ball, banana, band
+  ✅ Successfully inserted/updated 5 words.
+  Batch 14/193: bank, baseball, basket, basketball, bat
+  ❌ Supabase Upsert Error: {
+  code: '21000',
+  details: null,
+  hint: 'Ensure that no rows proposed for insertion within the same command have duplicate constrained values.',
+  message: 'ON CONFLICT DO UPDATE command cannot affect row a second time'
+}
+  Batch 15/193: bath, bathroom, be, beach, bean
+  ✅ Successfully inserted/updated 5 words.
+  Batch 16/193: bear, beautiful, because, become, bed
+  ✅ Successfully inserted/updated 5 words.
+  Batch 17/193: bedroom, bee, beef, before, begin
+AI Generation failed: SyntaxError: Unterminated string in JSON at position 9106 (line 70 column 6146)
+    at JSON.parse (<anonymous>)
+    at generateWordData (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:74:27)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async processLevel (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:115:30)
+    at async main (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:156:5)
+  ⚠️ No valid data generated for this batch. Skipping.
+  Batch 18/193: behind, believe, bell, belong, below
+  ✅ Successfully inserted/updated 5 words.
+  Batch 19/193: belt, bench, beside, best, between
+  ✅ Successfully inserted/updated 5 words.
+  Batch 20/193: bicycle, bike, big, bird, bite
+  ✅ Successfully inserted/updated 5 words.
+  Batch 21/193: black, blind, block, blow, blue
+  ✅ Successfully inserted/updated 5 words.
+  Batch 22/193: boat, body, book, bored, boring
+  ✅ Successfully inserted/updated 5 words.
+  Batch 23/193: born, borrow, boss, both, bottle
+  ✅ Successfully inserted/updated 5 words.
+  Batch 24/193: bottom, bow, bowl, box, boy
+  ✅ Successfully inserted/updated 5 words.
+  Batch 25/193: brave, bread, break, breakfast, bridge
+  ✅ Successfully inserted/updated 5 words.
+  Batch 26/193: bright, bring, brother, brown, bug
+  ✅ Successfully inserted/updated 5 words.
+  Batch 27/193: build, bus, business, busy, but
+  ✅ Successfully inserted/updated 5 words.
+  Batch 28/193: butter, butterfly, button, buy, by
+  ✅ Successfully inserted/updated 5 words.
+  Batch 29/193: cake, call, camera, camp, can
+  ✅ Successfully inserted/updated 5 words.
+  Batch 30/193: cap, car, card, care, careful
+  ✅ Successfully inserted/updated 5 words.
+  Batch 31/193: carrot, carry, case, cat, catch
+  ✅ Successfully inserted/updated 5 words.
+  Batch 32/193: celebrate, cellphone, cent, center, certain
+  ✅ Successfully inserted/updated 5 words.
+  Batch 33/193: chair, chance, change, cheap, check
+  ✅ Successfully inserted/updated 5 words.
+  Batch 34/193: cheese, chicken, child, chocolate, choice
+  ✅ Successfully inserted/updated 5 words.
+  Batch 35/193: choose, church, circle, city, class
+  ✅ Successfully inserted/updated 5 words.
+  Batch 36/193: clean, clear, clerk, climb, clock
+  ✅ Successfully inserted/updated 5 words.
+  Batch 37/193: close, clothes, cloud, club, coat
+  ✅ Successfully inserted/updated 5 words.
+  Batch 38/193: coffee, cold, collect, color, come
+  ✅ Successfully inserted/updated 5 words.
+  Batch 39/193: comfortable, common, computer, convenient, cook
+  ✅ Successfully inserted/updated 5 words.
+  Batch 40/193: cookie, cool, copy, corner, correct
+  ✅ Successfully inserted/updated 5 words.
+  Batch 41/193: cost, couch, count, country, course
+  ✅ Successfully inserted/updated 5 words.
+  Batch 42/193: cousin, cover, cow, crazy, cross
+  ✅ Successfully inserted/updated 5 words.
+  Batch 43/193: cry, cup, cut, cute, dance
+  ✅ Successfully inserted/updated 5 words.
+  Batch 44/193: dangerous, dark, date, daughter, day
+  ✅ Successfully inserted/updated 5 words.
+  Batch 45/193: dead, deal, dear, death, decide
+  ✅ Successfully inserted/updated 5 words.
+  Batch 46/193: deep, define, desk, dictionary, die
+  ✅ Successfully inserted/updated 5 words.
+  Batch 47/193: different, difficult, dig, dinner, dirty
+  ✅ Successfully inserted/updated 5 words.
+  Batch 48/193: dish, do, doctor, doc, dog
+  ✅ Successfully inserted/updated 5 words.
+  Batch 49/193: doll, dollar, door, down, dozen
+  ✅ Successfully inserted/updated 5 words.
+  Batch 50/193: draw, dream, dress, drink, drive
+  ✅ Successfully inserted/updated 5 words.
+  Batch 51/193: driver, drop, drum, dry, duck
+  ✅ Successfully inserted/updated 5 words.
+  Batch 52/193: during, each, ear, early, earth
+  ✅ Successfully inserted/updated 5 words.
+  Batch 53/193: east, easy, eat, egg, either
+  ✅ Successfully inserted/updated 5 words.
+  Batch 54/193: elephant, else, email, end, engineer
+  ✅ Successfully inserted/updated 5 words.
+  Batch 55/193: enjoy, enough, enter, envelope, eraser
+  ✅ Successfully inserted/updated 5 words.
+  Batch 56/193: error, even, evening, ever, every
+  ✅ Successfully inserted/updated 5 words.
+  Batch 57/193: everyone, everybody, everything, example, excellent
+  ✅ Successfully inserted/updated 5 words.
+  Batch 58/193: except, excited, exciting, exercise, expect
+  ✅ Successfully inserted/updated 5 words.
+  Batch 59/193: expensive, experience, explain, eye, face
+  ✅ Successfully inserted/updated 5 words.
+  Batch 60/193: fact, factory, fail, fall, family
+  ✅ Successfully inserted/updated 5 words.
+  Batch 61/193: famous, fan, far, farm, farmer
+  ✅ Successfully inserted/updated 5 words.
+  Batch 62/193: fast, fat, father, feed, feel
+  ✅ Successfully inserted/updated 5 words.
+  Batch 63/193: festival, few, fight, file, fill
+  ✅ Successfully inserted/updated 5 words.
+  Batch 64/193: finally, find, fine, finger, finish
+  ✅ Successfully inserted/updated 5 words.
+  Batch 65/193: fire, first, fish, floor, flower
+  ✅ Successfully inserted/updated 5 words.
+  Batch 66/193: fly, follow, food, fool, foot
+  ✅ Successfully inserted/updated 5 words.
+  Batch 67/193: for, foreign, foreigner, forget, fork
+  ✅ Successfully inserted/updated 5 words.
+  Batch 68/193: free, fresh, friend, friendly, frog
+  ✅ Successfully inserted/updated 5 words.
+  Batch 69/193: from, front, fruit, full, fun
+  ✅ Successfully inserted/updated 5 words.
+  Batch 70/193: funny, future, game, garden, gate
+  ✅ Successfully inserted/updated 5 words.
+  Batch 71/193: get, ghost, giant, gift, girl
+  ✅ Successfully inserted/updated 5 words.
+  Batch 72/193: give, glad, glass, glasses, glove
+  ✅ Successfully inserted/updated 5 words.
+  Batch 73/193: go, god, goddess, good, goodbye
+  ✅ Successfully inserted/updated 5 words.
+  Batch 74/193: grade, grandfather, grandmother, grass, gray
+  ✅ Successfully inserted/updated 5 words.
+  Batch 75/193: great, green, ground, group, grow
+  ✅ Successfully inserted/updated 5 words.
+  Batch 76/193: guess, guitar, guy, habit, hair
+  ✅ Successfully inserted/updated 5 words.
+  Batch 77/193: half, ham, hand, hang, happen
+  ✅ Successfully inserted/updated 5 words.
+  Batch 78/193: happy, hard, hat, hate, have
+  ✅ Successfully inserted/updated 5 words.
+  Batch 79/193: he, head, headache, health, healthy
+  ✅ Successfully inserted/updated 5 words.
+  Batch 80/193: hear, heart, heat, heavy, height
+  ✅ Successfully inserted/updated 5 words.
+  Batch 81/193: hello, help, helpful, hen, here
+  ✅ Successfully inserted/updated 5 words.
+  Batch 82/193: hide, high, hill, history, hit
+  ✅ Successfully inserted/updated 5 words.
+  Batch 83/193: hobby, hold, holiday, home, homework
+  ✅ Successfully inserted/updated 5 words.
+  Batch 84/193: honest, honey, hope, horse, hospital
+  ✅ Successfully inserted/updated 5 words.
+  Batch 85/193: hot, hotel, hour, house, housewife
+  ✅ Successfully inserted/updated 5 words.
+  Batch 86/193: how, however, hundred, hungry, hurt
+  ✅ Successfully inserted/updated 5 words.
+  Batch 87/193: husband, i, ice, idea, if
+  ✅ Successfully inserted/updated 5 words.
+  Batch 88/193: important, in, inch, insect, inside
+  ✅ Successfully inserted/updated 5 words.
+  Batch 89/193: interest, interested, interesting, interview, into
+  ✅ Successfully inserted/updated 5 words.
+  Batch 90/193: invite, island, it, item, jacket
+  ✅ Successfully inserted/updated 5 words.
+  Batch 91/193: jeans, job, join, joke, joy
+  ✅ Successfully inserted/updated 5 words.
+  Batch 92/193: juice, jump, just, keep, key
+  ✅ Successfully inserted/updated 5 words.
+  Batch 93/193: kick, kid, kill, kind, king
+  ✅ Successfully inserted/updated 5 words.
+  Batch 94/193: kiss, kitchen, kite, knee, knife
+  ✅ Successfully inserted/updated 5 words.
+  Batch 95/193: knock, know, knowledge, lake, lamp
+  ✅ Successfully inserted/updated 5 words.
+  Batch 96/193: land, language, large, last, late
+  ✅ Successfully inserted/updated 5 words.
+  Batch 97/193: later, laugh, lawyer, lazy, lead
+  ✅ Successfully inserted/updated 5 words.
+  Batch 98/193: leader, learn, least, leave, left
+  ✅ Successfully inserted/updated 5 words.
+  Batch 99/193: leg, lemon, less, lesson, let
+  ✅ Successfully inserted/updated 5 words.
+  Batch 100/193: letter, level, library, lie, life
+  ✅ Successfully inserted/updated 5 words.
+  Batch 101/193: light, like, line, lion, lip
+  ✅ Successfully inserted/updated 5 words.
+  Batch 102/193: list, listen, little, live, lonely
+  ✅ Successfully inserted/updated 5 words.
+  Batch 103/193: long, look, lose, lot, loud
+  ✅ Successfully inserted/updated 5 words.
+  Batch 104/193: love, lovely, low, lucky, lunch
+  ✅ Successfully inserted/updated 5 words.
+  Batch 105/193: machine, mad, magic, mail, main
+  ✅ Successfully inserted/updated 5 words.
+  Batch 106/193: make, man, many, map, mark
+  ✅ Successfully inserted/updated 5 words.
+  Batch 107/193: market, married, mathematics, math, matter
+  ✅ Successfully inserted/updated 5 words.
+  Batch 108/193: may, maybe, meal, mean, meat
+  ✅ Successfully inserted/updated 5 words.
+  Batch 109/193: media, medicine, medium, meet, meeting
+  ✅ Successfully inserted/updated 5 words.
+  Batch 110/193: member, menu, middle, milk, million
+  ✅ Successfully inserted/updated 5 words.
+  Batch 111/193: mind, mine, minute, miss, mistake
+  ❌ Supabase Upsert Error: {
+  code: '21000',
+  details: null,
+  hint: 'Ensure that no rows proposed for insertion within the same command have duplicate constrained values.',
+  message: 'ON CONFLICT DO UPDATE command cannot affect row a second time'
+}
+  Batch 112/193: modern, moment, money, monkey, month
+  ✅ Successfully inserted/updated 5 words.
+  Batch 113/193: moon, more, morning, most, mother
+  ✅ Successfully inserted/updated 5 words.
+  Batch 114/193: mountain, mouse, mouth, move, movie
+  ✅ Successfully inserted/updated 5 words.
+  Batch 115/193: film, mr., mister, mrs., ms.
+  ✅ Successfully inserted/updated 5 words.
+  Batch 116/193: much, mud, museum, music, must
+  ✅ Successfully inserted/updated 5 words.
+  Batch 117/193: name, national, nature, near, neck
+  ✅ Successfully inserted/updated 5 words.
+  Batch 118/193: need, net, never, new, news
+  ✅ Successfully inserted/updated 5 words.
+  Batch 119/193: newspaper, next, nice, night, no
+  ✅ Successfully inserted/updated 5 words.
+  Batch 120/193: nope, nobody, noise, noisy, noon
+  ✅ Successfully inserted/updated 5 words.
+  Batch 121/193: north, nose, not, note, nothing
+  ✅ Successfully inserted/updated 5 words.
+  Batch 122/193: notice, now, number, nurse, o.k.
+  ✅ Successfully inserted/updated 5 words.
+  Batch 123/193: ok, okay, o’clock, of, off
+  ✅ Successfully inserted/updated 5 words.
+  Batch 124/193: office, officer, often, oil, old
+  ✅ Successfully inserted/updated 5 words.
+  Batch 125/193: on, once, online, only, open
+  ✅ Successfully inserted/updated 5 words.
+  Batch 126/193: or, orange, order, other, out
+  ✅ Successfully inserted/updated 5 words.
+  Batch 127/193: outside, over, own, pack, package
+  ✅ Successfully inserted/updated 5 words.
+  Batch 128/193: page, paint, pair, pants, paper
+  ✅ Successfully inserted/updated 5 words.
+  Batch 129/193: parent, park, part, party, pass
+  ✅ Successfully inserted/updated 5 words.
+  Batch 130/193: past, pay, pen, pencil, people
+  ✅ Successfully inserted/updated 5 words.
+  Batch 131/193: perhaps, person, pet, photograph, photo
+  ✅ Successfully inserted/updated 5 words.
+  Batch 132/193: piano, pick, picnic, picture, pie
+  ✅ Successfully inserted/updated 5 words.
+  Batch 133/193: piece, pig, pin, pink, pipe
+  ✅ Successfully inserted/updated 5 words.
+  Batch 134/193: place, plan, planet, plant, plate
+AI Generation failed: SyntaxError: Unterminated string in JSON at position 9945 (line 56 column 6466)
+    at JSON.parse (<anonymous>)
+    at generateWordData (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:74:27)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async processLevel (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:115:30)
+    at async main (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:156:5)
+  ⚠️ No valid data generated for this batch. Skipping.
+  Batch 135/193: play, player, please, pleasure, pm
+  ✅ Successfully inserted/updated 5 words.
+  Batch 136/193: p.m., pocket, point, police, polite
+  ✅ Successfully inserted/updated 5 words.
+  Batch 137/193: pond, pool, poor, popcorn, popular
+  ✅ Successfully inserted/updated 5 words.
+  Batch 138/193: possible, pot, potato, power, practice
+  ✅ Successfully inserted/updated 5 words.
+  Batch 139/193: prepare, present, pretty, price, probably
+  ✅ Successfully inserted/updated 5 words.
+  Batch 140/193: problem, program, proud, public, pull
+  ✅ Successfully inserted/updated 5 words.
+  Batch 141/193: push, put, quarter, queen, question
+  ✅ Successfully inserted/updated 5 words.
+  Batch 142/193: quick, quiet, quite, rabbit, race
+  ✅ Successfully inserted/updated 5 words.
+  Batch 143/193: radio, rain, rainbow, rainy, raise
+  ✅ Successfully inserted/updated 5 words.
+  Batch 144/193: reach, read, ready, real, really
+  ✅ Successfully inserted/updated 5 words.
+  Batch 145/193: reason, red, relative, remember, repeat
+  ✅ Successfully inserted/updated 5 words.
+  Batch 146/193: report, reporter, rest, restaurant, rice
+  ✅ Successfully inserted/updated 5 words.
+  Batch 147/193: rich, ride, right, ring, rise
+  ✅ Successfully inserted/updated 5 words.
+  Batch 148/193: river, road, robot, rock, roll
+  ✅ Successfully inserted/updated 5 words.
+  Batch 149/193: room, root, rope, rose, round
+  ✅ Successfully inserted/updated 5 words.
+  Batch 150/193: row, rule, ruler, run, sad
+  ✅ Successfully inserted/updated 5 words.
+  Batch 151/193: safe, salad, sale, salt, same
+  ✅ Successfully inserted/updated 5 words.
+  Batch 152/193: save, say, school, science, sea
+  ✅ Successfully inserted/updated 5 words.
+  Batch 153/193: season, seat, second, secretary, see
+  ✅ Successfully inserted/updated 5 words.
+  Batch 154/193: seed, sell, send, sentence, serious
+  ✅ Successfully inserted/updated 5 words.
+  Batch 155/193: service, set, several, shake, shall
+  ✅ Successfully inserted/updated 5 words.
+  Batch 156/193: shape, share, sharp, she, sheep
+  ✅ Successfully inserted/updated 5 words.
+  Batch 157/193: ship, shirt, shoe, shop, short
+  ✅ Successfully inserted/updated 5 words.
+  Batch 158/193: shorts, shoulder, shout, show, shower
+  ✅ Successfully inserted/updated 5 words.
+  Batch 159/193: sick, side, sight, sign, simple
+  ✅ Successfully inserted/updated 5 words.
+  Batch 160/193: since, sing, singer, sir, sister
+  ✅ Successfully inserted/updated 5 words.
+  Batch 161/193: sit, size, skirt, sky, sleep
+  ✅ Successfully inserted/updated 5 words.
+  Batch 162/193: slim, slow, small, smart, smell
+  ✅ Successfully inserted/updated 5 words.
+  Batch 163/193: smile, smoke, snake, snow, so
+  ✅ Successfully inserted/updated 5 words.
+  Batch 164/193: sofa, soldier, some, someone, somebody
+  ✅ Successfully inserted/updated 5 words.
+  Batch 165/193: something, sometimes, somewhere, son, song
+  ✅ Successfully inserted/updated 5 words.
+  Batch 166/193: soon, sore, sorry, sound, soup
+  ✅ Successfully inserted/updated 5 words.
+  Batch 167/193: south, space, speak, special, spell
+  ✅ Successfully inserted/updated 5 words.
+  Batch 168/193: spend, spring, square, stair, stand
+  ✅ Successfully inserted/updated 5 words.
+  Batch 169/193: star, start, station, stay, still
+  ✅ Successfully inserted/updated 5 words.
+  Batch 170/193: stop, store, story, straight, strange
+  ✅ Successfully inserted/updated 5 words.
+  Batch 171/193: street, string, strong, student, study
+  ✅ Successfully inserted/updated 5 words.
+  Batch 172/193: stupid, subject, successful, sugar, sun
+  ✅ Successfully inserted/updated 5 words.
+  Batch 173/193: sunny, supermarket, sure, surprise, surprised
+  ✅ Successfully inserted/updated 5 words.
+  Batch 174/193: sweet, table, tail, take, talk
+  ✅ Successfully inserted/updated 5 words.
+  Batch 175/193: tall, tape, taste, taxicab, taxi
+  ✅ Successfully inserted/updated 5 words.
+  Batch 176/193: cab, tea, teach, teacher, team
+  ✅ Successfully inserted/updated 5 words.
+  Batch 177/193: teenager, telephone, phone, television, tv
+  ✅ Successfully inserted/updated 5 words.
+  Batch 178/193: tell, temple, tennis, terrible, test
+  ✅ Successfully inserted/updated 5 words.
+  Batch 179/193: than, thank, that, the, theater
+  ✅ Successfully inserted/updated 5 words.
+  Batch 180/193: then, there, these, they, thick
+  ✅ Successfully inserted/updated 5 words.
+  Batch 181/193: thin, thing, think, third, this
+  ✅ Successfully inserted/updated 5 words.
+  Batch 182/193: those, though, thousand, throat, through
+  ✅ Successfully inserted/updated 5 words.
+  Batch 183/193: throw, ticket, tidy, tie, tiger
+  ✅ Successfully inserted/updated 5 words.
+  Batch 184/193: time, tip, tired, to, today
+  ✅ Successfully inserted/updated 5 words.
+  Batch 185/193: toe, together, toilet, tomato, tomorrow
+  ✅ Successfully inserted/updated 5 words.
+  Batch 186/193: tonight, too, tool, tooth, top
+  ✅ Successfully inserted/updated 5 words.
+  Batch 187/193: topic, total, touch, towel, town
+  ✅ Successfully inserted/updated 5 words.
+  Batch 188/193: toy, traffic, train, treat, tree
+  ✅ Successfully inserted/updated 5 words.
+  Batch 189/193: trip, trouble, truck, try, t-shirt
+  ✅ Successfully inserted/updated 5 words.
+  Batch 190/193: turn, twice, type, uncle, under
+  ✅ Successfully inserted/updated 5 words.
+  Batch 191/193: understand, uniform, until, up, use
+  ✅ Successfully inserted/updated 5 words.
+  Batch 192/193: useful, usually, vegetable, very, video
+  ✅ Successfully inserted/updated 5 words.
+  Batch 193/193: violin
+  ✅ Successfully inserted/updated 1 words.
+
+level_1 Summary: ✅ 941 success, ❌ 28 failed
+
+
+📚 Processing level_2: 971 words
+  Batch 1/195: visit, visitor, voice, wait, wake
+  ✅ Successfully inserted/updated 5 words.
+  Batch 2/195: walk, wall, want, warm, watch
+  ✅ Successfully inserted/updated 5 words.
+  Batch 3/195: water, wave, way, we, weak
+  ✅ Successfully inserted/updated 5 words.
+  Batch 4/195: wear, weather, week, weekend, welcome
+  ✅ Successfully inserted/updated 5 words.
+  Batch 5/195: well, west, wet, what, when
+  ✅ Successfully inserted/updated 5 words.
+  Batch 6/195: where, whether, which, while, white
+  ✅ Successfully inserted/updated 5 words.
+  Batch 7/195: who, whose, why, wide, wife
+  ✅ Successfully inserted/updated 5 words.
+  Batch 8/195: will, win, wind, window, wise
+  ✅ Successfully inserted/updated 5 words.
+  Batch 9/195: wish, with, without, woman, wonderful
+  ✅ Successfully inserted/updated 5 words.
+  Batch 10/195: word, work, worker, world, worry
+  ✅ Successfully inserted/updated 5 words.
+  Batch 11/195: write, writer, wrong, yard, year
+  ✅ Successfully inserted/updated 5 words.
+  Batch 12/195: yellow, yes, yeah, yesterday, yet
+  ✅ Successfully inserted/updated 5 words.
+  Batch 13/195: you, young, zero, zoo, absence
+  ✅ Successfully inserted/updated 5 words.
+  Batch 14/195: absent, accept, accident, account, active
+  ✅ Successfully inserted/updated 5 words.
+  Batch 15/195: activity, actual, addition, address, admit
+  ✅ Successfully inserted/updated 5 words.
+  Batch 16/195: adult, advance, advice, affair, affect
+  ✅ Successfully inserted/updated 5 words.
+  Batch 17/195: against, ahead, aid, aim, aircraft
+  ✅ Successfully inserted/updated 5 words.
+  Batch 18/195: alarm, album, alike, alive, alone
+  ✅ Successfully inserted/updated 5 words.
+  Batch 19/195: aloud, altogether, among, amount, ancient
+  ✅ Successfully inserted/updated 5 words.
+  Batch 20/195: anger, angle, ankle, anytime, anyway
+  ✅ Successfully inserted/updated 5 words.
+  Batch 21/195: anywhere, anyplace, ape, appearance, appetite
+  ✅ Successfully inserted/updated 5 words.
+  Batch 22/195: apply, appreciate, approach, argue, army
+  ✅ Successfully inserted/updated 5 words.
+  Batch 23/195: arrange, arrival, arrow, article, artist
+  ✅ Successfully inserted/updated 5 words.
+  Batch 24/195: asleep, attempt, attend, attention, author
+  ✅ Successfully inserted/updated 5 words.
+  Batch 25/195: available, average, avoid, backpack, backward
+  ✅ Successfully inserted/updated 5 words.
+  Batch 26/195: backwards, badminton, bake, bakery, balance
+  ✅ Successfully inserted/updated 5 words.
+  Batch 27/195: balcony, balloon, bar, barbecue, barber
+  ✅ Successfully inserted/updated 5 words.
+  Batch 28/195: bark, base, basic, basics, basis
+  ✅ Successfully inserted/updated 5 words.
+  Batch 29/195: bathe, battle, beard, beat, beauty
+  ✅ Successfully inserted/updated 5 words.
+  Batch 30/195: beer, beg, beginner, behave, being
+  ✅ Successfully inserted/updated 5 words.
+  Batch 31/195: belief, bend, better, beyond, bill
+  ✅ Successfully inserted/updated 5 words.
+  Batch 32/195: billion, birth, biscuit, bit, blackboard
+  ✅ Successfully inserted/updated 5 words.
+  Batch 33/195: blame, blank, blanket, blood, board
+  ✅ Successfully inserted/updated 5 words.
+  Batch 34/195: boil, bone, bookstore, border, bother
+  ✅ Successfully inserted/updated 5 words.
+  Batch 35/195: brain, branch, brand, brief, brilliant
+  ✅ Successfully inserted/updated 5 words.
+  Batch 36/195: broad, brush, building, bun, burden
+  ✅ Successfully inserted/updated 5 words.
+  Batch 37/195: burn, burst, businessman, cabbage, cafe
+  ✅ Successfully inserted/updated 5 words.
+  Batch 38/195: cage, calendar, calm, camel, cancel
+  ✅ Successfully inserted/updated 5 words.
+  Batch 39/195: cancer, candle, capital, cartoon, cash
+  ✅ Successfully inserted/updated 5 words.
+  Batch 40/195: castle, cause, ceiling, cell, centimeter
+  ✅ Successfully inserted/updated 5 words.
+  Batch 41/195: central, century, cereal, chain, chalk
+  ✅ Successfully inserted/updated 5 words.
+  Batch 42/195: challenge, channel, chapter, character, charge
+  ✅ Successfully inserted/updated 5 words.
+  Batch 43/195: chart, chase, cheat, cheer, chemical
+  ✅ Successfully inserted/updated 5 words.
+  Batch 44/195: chess, chief, childhood, childish, china
+  ✅ Successfully inserted/updated 5 words.
+  Batch 45/195: chopstick, claim, clap, classic, classical
+  ✅ Successfully inserted/updated 5 words.
+  Batch 46/195: classmate, clever, click, climate, cloth
+  ✅ Successfully inserted/updated 5 words.
+  Batch 47/195: clothing, cloudy, coal, coast, cockroach
+  ✅ Successfully inserted/updated 5 words.
+  Batch 48/195: roach, cocoa, coin, cola, coke
+  ✅ Successfully inserted/updated 5 words.
+  Batch 49/195: college, comb, combine, comic, command
+  ✅ Successfully inserted/updated 5 words.
+  Batch 50/195: commercial, company, compare, complete, complex
+  ✅ Successfully inserted/updated 5 words.
+  Batch 51/195: concern, conclude, condition, confident, conflict
+  ✅ Successfully inserted/updated 5 words.
+  Batch 52/195: congratulation, connection, consider, consideration, contact
+  ✅ Successfully inserted/updated 5 words.
+  Batch 53/195: contain, continue, contract, control, conversation
+  ✅ Successfully inserted/updated 5 words.
+  Batch 54/195: corn, countryside, couple, courage, court
+  ✅ Successfully inserted/updated 5 words.
+  Batch 55/195: cowboy, crayon, cream, create, crime
+  ✅ Successfully inserted/updated 5 words.
+  Batch 56/195: crisis, crow, crowd, cultural, culture
+  ✅ Successfully inserted/updated 5 words.
+  Batch 57/195: cure, curious, current, curtain, custom
+  ✅ Successfully inserted/updated 5 words.
+  Batch 58/195: customer, cycle, daily, damage, dancer
+  ✅ Successfully inserted/updated 5 words.
+  Batch 59/195: danger, data, deaf, debate, debt
+  ✅ Successfully inserted/updated 5 words.
+  Batch 60/195: decision, deer, degree, delay, delicious
+  ✅ Successfully inserted/updated 5 words.
+  Batch 61/195: deliver, delivery, dentist, deny, department
+  ✅ Successfully inserted/updated 5 words.
+  Batch 62/195: depend, depth, describe, description, desert
+  ✅ Successfully inserted/updated 5 words.
+  Batch 63/195: design, detail, develop, dial, dialogue
+  ✅ Successfully inserted/updated 5 words.
+  Batch 64/195: diamond, diary, diet, difference, difficulty
+  ✅ Successfully inserted/updated 5 words.
+  Batch 65/195: direct, direction, director, disagree, disappear
+  ✅ Successfully inserted/updated 5 words.
+  Batch 66/195: discover, discovery, discuss, discussion, disease
+  ✅ Successfully inserted/updated 5 words.
+  Batch 67/195: display, distance, distant, divide, division
+  ✅ Successfully inserted/updated 5 words.
+  Batch 68/195: domestic, dot, double, doubt, dove
+  ✅ Successfully inserted/updated 5 words.
+  Batch 69/195: download, downstairs, dragon, drama, drawer
+  ✅ Successfully inserted/updated 5 words.
+  Batch 70/195: drawing, drug, dryer, due, dull
+  ✅ Successfully inserted/updated 5 words.
+  Batch 71/195: duty, eagle, earn, earring, earthquake
+  ✅ Successfully inserted/updated 5 words.
+  Batch 72/195: ease, eastern, edge, edition, education
+  ✅ Successfully inserted/updated 5 words.
+  Batch 73/195: effect, effective, effort, elder, electric
+  ✅ Successfully inserted/updated 5 words.
+  Batch 74/195: electrical, emotion, emphasize, employ, employee
+  ✅ Successfully inserted/updated 5 words.
+  Batch 75/195: employer, empty, encourage, ending, enemy
+  ✅ Successfully inserted/updated 5 words.
+  Batch 76/195: energy, engine, entire, entrance, environment
+  ✅ Successfully inserted/updated 5 words.
+  Batch 77/195: environmental, equal, escape, especially, essay
+  ✅ Successfully inserted/updated 5 words.
+  Batch 78/195: eve, event, evil, exact, examination
+  ✅ Successfully inserted/updated 5 words.
+  Batch 79/195: exam, examine, excite, excuse, exist
+  ✅ Successfully inserted/updated 5 words.
+  Batch 80/195: existence, exit, expense, expert, express
+  ✅ Successfully inserted/updated 5 words.
+  Batch 81/195: expression, extra, eyebrow, brow, factor
+  ✅ Successfully inserted/updated 5 words.
+  Batch 82/195: failure, fair, false, fashion, fate
+  ✅ Successfully inserted/updated 5 words.
+  Batch 83/195: fault, favor, favorite, fear, feature
+  ✅ Successfully inserted/updated 5 words.
+  Batch 84/195: fee, feeling, fellow, female, fever
+  ✅ Successfully inserted/updated 5 words.
+  Batch 85/195: field, figure, final, fireman, firewoman
+  ✅ Successfully inserted/updated 5 words.
+  Batch 86/195: firm, fisherman, fit, fix, flag
+  ✅ Successfully inserted/updated 5 words.
+  Batch 87/195: flat, flight, flow, flu, focus
+  ✅ Successfully inserted/updated 5 words.
+  Batch 88/195: fog, folk, following, foolish, football
+  ✅ Successfully inserted/updated 5 words.
+  Batch 89/195: force, forest, forgive, form, formal
+  ✅ Successfully inserted/updated 5 words.
+  Batch 90/195: former, forth, forward, forwards, found
+  ✅ Successfully inserted/updated 5 words.
+  Batch 91/195: fox, freedom, friendship, fries, fry
+  ✅ Successfully inserted/updated 5 words.
+  Batch 92/195: function, furniture, further, gain, garbage
+  ✅ Successfully inserted/updated 5 words.
+  Batch 93/195: gardener, garlic, gather, general, generous
+  ✅ Successfully inserted/updated 5 words.
+  Batch 94/195: gentle, gentleman, giraffe, glue, goal
+  ✅ Successfully inserted/updated 5 words.
+  Batch 95/195: goat, gold, golden, goose, govern
+  ✅ Successfully inserted/updated 5 words.
+  Batch 96/195: government, gradual, grain, gram, grand
+  ✅ Successfully inserted/updated 5 words.
+  Batch 97/195: grape, greet, growth, guard, guava
+  ✅ Successfully inserted/updated 5 words.
+  Batch 98/195: guest, guide, gun, gymnasium, gym
+  ✅ Successfully inserted/updated 5 words.
+  Batch 99/195: haircut, hall, hamburger, burger, handle
+  ✅ Successfully inserted/updated 5 words.
+  Batch 100/195: handsome, hardly, heaven, hero, heroine
+  ✅ Successfully inserted/updated 5 words.
+  Batch 101/195: highly, highway, hike, hip, hippopotamus
+  ✅ Successfully inserted/updated 5 words.
+  Batch 102/195: hippo, historical, hole, hop, host
+  ✅ Successfully inserted/updated 5 words.
+  Batch 103/195: hostess, huge, human, humble, hunt
+  ✅ Successfully inserted/updated 5 words.
+  Batch 104/195: hunter, hurry, ideal, identity, ignore
+  ✅ Successfully inserted/updated 5 words.
+  Batch 105/195: ill, image, imagine, importance, impressive
+  ✅ Successfully inserted/updated 5 words.
+  Batch 106/195: improve, include, income, increase, indeed
+  ✅ Successfully inserted/updated 5 words.
+  Batch 107/195: independence, independent, indicate, individual, industry
+  ✅ Successfully inserted/updated 5 words.
+  Batch 108/195: influence, ink, insist, instance, instant
+  ✅ Successfully inserted/updated 5 words.
+  Batch 109/195: instead, instruction, instrument, internal, international
+  ✅ Successfully inserted/updated 5 words.
+  Batch 110/195: internet, introduce, introduction, iron, jam
+  ✅ Successfully inserted/updated 5 words.
+  Batch 111/195: jog, joint, journal, judge, judgment
+  ✅ Successfully inserted/updated 5 words.
+  Batch 112/195: judgement, justice, keeper, ketchup, kilogram
+  ✅ Successfully inserted/updated 5 words.
+  Batch 113/195: lack, lady, ladybug, lamb, lane
+  ✅ Successfully inserted/updated 5 words.
+  Batch 114/195: lantern, lap, latest, latter, law
+  ✅ Successfully inserted/updated 5 words.
+  Batch 115/195: lay, leadership, leaf, legal, lend
+  ✅ Successfully inserted/updated 5 words.
+  Batch 116/195: length, lens, liberal, lid, lift
+  ✅ Successfully inserted/updated 5 words.
+  Batch 117/195: likely, limit, link, liquid, listener
+  ✅ Successfully inserted/updated 5 words.
+  Batch 118/195: liver, load, local, lone, loss
+  ✅ Successfully inserted/updated 5 words.
+  Batch 119/195: lower, luck, magazine, maintain, major
+  ✅ Successfully inserted/updated 5 words.
+  Batch 120/195: male, manage, manager, mango, manner
+  ✅ Successfully inserted/updated 5 words.
+  Batch 121/195: marriage, marry, mask, mass, master
+  ✅ Successfully inserted/updated 5 words.
+  Batch 122/195: mat, match, mate, material, mature
+  ✅ Successfully inserted/updated 5 words.
+  Batch 123/195: meaning, means, measure, medical, melody
+  ✅ Successfully inserted/updated 5 words.
+  Batch 124/195: membership, memory, mention, message, metal
+  ✅ Successfully inserted/updated 5 words.
+  Batch 125/195: meter, method, midnight, mile, military
+  ✅ Successfully inserted/updated 5 words.
+  Batch 126/195: minor, minority, mirror, mix, mixture
+  ✅ Successfully inserted/updated 5 words.
+  Batch 127/195: model, mood, mop, motion, motorcycle
+  ✅ Successfully inserted/updated 5 words.
+  Batch 128/195: mug, musical, musician, nail, narrow
+  ✅ Successfully inserted/updated 5 words.
+  Batch 129/195: nation, natural, naughty, nearby, nearly
+AI Generation failed: TypeError: fetch failed
+    at node:internal/deps/undici/undici:13510:13
+    at async makeRequest (file:///Users/simonac/Desktop/moonshot-idea/node_modules/.pnpm/@google+generative-ai@0.24.1/node_modules/@google/generative-ai/dist/index.mjs:395:20)
+    at async generateContent (file:///Users/simonac/Desktop/moonshot-idea/node_modules/.pnpm/@google+generative-ai@0.24.1/node_modules/@google/generative-ai/dist/index.mjs:865:22)
+    at async generateWordData (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:72:24)
+    at async processLevel (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:115:30)
+    at async main (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:157:5)
+  ⚠️ No valid data generated for this batch. Skipping.
+  Batch 130/195: necessary, necklace, needle, negative, neighbor
+AI Generation failed: TypeError: fetch failed
+    at node:internal/deps/undici/undici:13510:13
+    at async makeRequest (file:///Users/simonac/Desktop/moonshot-idea/node_modules/.pnpm/@google+generative-ai@0.24.1/node_modules/@google/generative-ai/dist/index.mjs:395:20)
+    at async generateContent (file:///Users/simonac/Desktop/moonshot-idea/node_modules/.pnpm/@google+generative-ai@0.24.1/node_modules/@google/generative-ai/dist/index.mjs:865:22)
+    at async generateWordData (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:72:24)
+    at async processLevel (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:115:30)
+    at async main (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:157:5)
+  ⚠️ No valid data generated for this batch. Skipping.
+  Batch 131/195: neither, adv., pron., nephew, nerve
+  ✅ Successfully inserted/updated 5 words.
+  Batch 132/195: nervous, network, niece, nod, none
+  ✅ Successfully inserted/updated 5 words.
+  Batch 133/195: noodle, nor, northern, notebook, novel
+  ✅ Successfully inserted/updated 5 words.
+  Batch 134/195: nut, obey, object, obvious, occur
+  ✅ Successfully inserted/updated 5 words.
+  Batch 135/195: ocean, offer, official, operate, operator
+  ✅ Successfully inserted/updated 5 words.
+  Batch 136/195: opinion, ordinary, organ, organization, origin
+  ✅ Successfully inserted/updated 5 words.
+  Batch 137/195: owner, pain, painful, painting, pajamas
+  ✅ Successfully inserted/updated 5 words.
+  Batch 138/195: pale, pan, panda, papaya, pardon
+  ✅ Successfully inserted/updated 5 words.
+  Batch 139/195: participate, particular, partner, password, paste
+  ✅ Successfully inserted/updated 5 words.
+  Batch 140/195: path, patient, pattern, peace, peaceful
+  ✅ Successfully inserted/updated 5 words.
+  Batch 141/195: peach, peak, pear, per, perfect
+  ✅ Successfully inserted/updated 5 words.
+  Batch 142/195: period, personal, personality, phrase, pillow
+  ✅ Successfully inserted/updated 5 words.
+  Batch 143/195: pizza, plain, platform, playground, pleasant
+  ✅ Successfully inserted/updated 5 words.
+  Batch 144/195: plus, poem, poet, poetry, poison
+  ✅ Successfully inserted/updated 5 words.
+  Batch 145/195: policeman, cop, policy, pop, population
+  ✅ Successfully inserted/updated 5 words.
+  Batch 146/195: pork, port, pose, position, positive
+  ✅ Successfully inserted/updated 5 words.
+  Batch 147/195: possibility, post, postcard, pound, powerful
+  ✅ Successfully inserted/updated 5 words.
+  Batch 148/195: praise, pray, prayer, prefer, president
+  ✅ Successfully inserted/updated 5 words.
+  Batch 149/195: press, pressure, pride, priest, primary
+AI Generation failed: SyntaxError: Expected ',' or '}' after property value in JSON at position 80926 (line 14 column 80480)
+    at JSON.parse (<anonymous>)
+    at generateWordData (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:74:27)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async processLevel (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:115:30)
+    at async main (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:157:5)
+  ⚠️ No valid data generated for this batch. Skipping.
+  Batch 150/195: prince, princess, principal, principle, print
+  ✅ Successfully inserted/updated 5 words.
+  Batch 151/195: printer, prison, prisoner, private, prize
+  ✅ Successfully inserted/updated 5 words.
+  Batch 152/195: produce, production, progress, project, promise
+  ✅ Successfully inserted/updated 5 words.
+  Batch 153/195: proper, propose, protect, protective, prove
+  ✅ Successfully inserted/updated 5 words.
+  Batch 154/195: provide, pudding, pumpkin, punish, pupil
+  ✅ Successfully inserted/updated 5 words.
+  Batch 155/195: puppy, purple, purpose, puzzle, quality
+  ✅ Successfully inserted/updated 5 words.
+  Batch 156/195: quantity, quiz, railroad, railway, raincoat
+  ✅ Successfully inserted/updated 5 words.
+  Batch 157/195: range, rapid, rare, rat, rather
+  ✅ Successfully inserted/updated 5 words.
+  Batch 158/195: reality, realize, receive, recent, record
+  ✅ Successfully inserted/updated 5 words.
+  Batch 159/195: recover, refrigerator, fridge, refuse, regard
+  ✅ Successfully inserted/updated 5 words.
+  Batch 160/195: region, regular, reject, relate, relation
+  ✅ Successfully inserted/updated 5 words.
+  Batch 161/195: relationship, religion, remove, rent, repair
+  ✅ Successfully inserted/updated 5 words.
+  Batch 162/195: reply, require, respect, respond, responsible
+  ✅ Successfully inserted/updated 5 words.
+  Batch 163/195: restroom, result, return, review, riches
+  ✅ Successfully inserted/updated 5 words.
+  Batch 164/195: rocky, role, roof, rooster, royal
+  ✅ Successfully inserted/updated 5 words.
+  Batch 165/195: rub, rubber, rude, runner, safety
+  ✅ Successfully inserted/updated 5 words.
+  Batch 166/195: sail, sailor, saleswoman, salty, sample
+  ✅ Successfully inserted/updated 5 words.
+  Batch 167/195: sand, sandwich, satisfy, saw, scare
+  ✅ Successfully inserted/updated 5 words.
+  Batch 168/195: scared, scene, schedule, scooter, score
+  ✅ Successfully inserted/updated 5 words.
+  Batch 169/195: screen, seafood, search, secondary, secret
+  ✅ Successfully inserted/updated 5 words.
+  Batch 170/195: section, seek, seem, seesaw, seldom
+  ✅ Successfully inserted/updated 5 words.
+  Batch 171/195: select, selection, self, selfish, sense
+  ✅ Successfully inserted/updated 5 words.
+  Batch 172/195: sensitive, separate, servant, serve, settle
+  ✅ Successfully inserted/updated 5 words.
+  Batch 173/195: sex, shame, shark, sheet, shelf
+  ✅ Successfully inserted/updated 5 words.
+  Batch 174/195: shell, shine, shock, shoot, shopkeeper
+  ✅ Successfully inserted/updated 5 words.
+  Batch 175/195: shore, shot, shut, shy, sidewalk
+  ✅ Successfully inserted/updated 5 words.
+  Batch 176/195: silence, silent, silly, silver, similar
+  ✅ Successfully inserted/updated 5 words.
+  Batch 177/195: simply, single, skill, skilled, skin
+  ✅ Successfully inserted/updated 5 words.
+  Batch 178/195: sleepy, slide, slip, slipper, smooth
+  ✅ Successfully inserted/updated 5 words.
+  Batch 179/195: snack, snail, snowy, soap, soccer
+  ✅ Successfully inserted/updated 5 words.
+  Batch 180/195: social, society, sock, soda, soft
+  ✅ Successfully inserted/updated 5 words.
+  Batch 181/195: soil, solution, solve, somewhat, sort
+  ✅ Successfully inserted/updated 5 words.
+  Batch 182/195: soul, sour, source, southern, soybean
+  ✅ Successfully inserted/updated 5 words.
+  Batch 183/195: speaker, speech, speed, spelling, spider
+  ✅ Successfully inserted/updated 5 words.
+  Batch 184/195: spirit, spoon, sport, spot, spread
+  ✅ Successfully inserted/updated 5 words.
+  Batch 185/195: stage, stamp, standard, state, steak
+  ✅ Successfully inserted/updated 5 words.
+  Batch 186/195: steel, step, stick, stomachache, stone
+  ✅ Successfully inserted/updated 5 words.
+  Batch 187/195: storm, stranger, strawberry, stream, stress
+  ✅ Successfully inserted/updated 5 words.
+  Batch 188/195: stretch, strict, strike, struggle, style
+  ✅ Successfully inserted/updated 5 words.
+  Batch 189/195: metro, succeed, success, such, sudden
+  ✅ Successfully inserted/updated 5 words.
+  Batch 190/195: suggest, suit, suitable, super, supper
+  ✅ Successfully inserted/updated 5 words.
+  Batch 191/195: supply, support, suppose, surf, surface
+  ✅ Successfully inserted/updated 5 words.
+  Batch 192/195: survival, survive, swallow, sweater, sweep
+  ✅ Successfully inserted/updated 5 words.
+  Batch 193/195: swim, swimsuit, swing, switch, symbol
+  ✅ Successfully inserted/updated 5 words.
+  Batch 194/195: system, tale, target, task, tax
+  ✅ Successfully inserted/updated 5 words.
+  Batch 195/195: teapot
+  ✅ Successfully inserted/updated 1 words.
+
+level_2 Summary: ✅ 956 success, ❌ 15 failed
+
+
+📚 Processing level_3: 1206 words
+  Batch 1/242: tear, technology, teens, temperature, term
+  ❌ Supabase Upsert Error: {
+  code: '21000',
+  details: null,
+  hint: 'Ensure that no rows proposed for insertion within the same command have duplicate constrained values.',
+  message: 'ON CONFLICT DO UPDATE command cannot affect row a second time'
+}
+  Batch 2/242: terrorism, terrorist, text, textbook, therefore
+  ✅ Successfully inserted/updated 5 words.
+  Batch 3/242: thief, thirsty, thought, throughout, thunder
+  ✅ Successfully inserted/updated 5 words.
+  Batch 4/242: thus, till, tiny, tire, tissue
+  ✅ Successfully inserted/updated 5 words.
+  Batch 5/242: title, toast, tofu, tone, tongue
+  ✅ Successfully inserted/updated 5 words.
+  Batch 6/242: toothache, toothbrush, tour, toward, towards
+  ✅ Successfully inserted/updated 5 words.
+  Batch 7/242: track, trade, tradition, traditional, trap
+  ✅ Successfully inserted/updated 5 words.
+  Batch 8/242: trash, travel, treasure, trial, triangle
+  ✅ Successfully inserted/updated 5 words.
+  Batch 9/242: trick, true, trust, truth, tube
+  ✅ Successfully inserted/updated 5 words.
+  Batch 10/242: turtle, typhoon, typical, ugly, umbrella
+  ✅ Successfully inserted/updated 5 words.
+  Batch 11/242: unit, universe, university, unless, upload
+  ✅ Successfully inserted/updated 5 words.
+  Batch 12/242: upon, upper, upset, upstairs, used
+  ✅ Successfully inserted/updated 5 words.
+  Batch 13/242: user, usual, vacation, valley, valuable
+  ✅ Successfully inserted/updated 5 words.
+  Batch 14/242: value, victory, view, village, vote
+  ✅ Successfully inserted/updated 5 words.
+  Batch 15/242: waist, waiter, waitress, wallet, war
+  ✅ Successfully inserted/updated 5 words.
+  Batch 16/242: wash, waste, watermelon, wealth, wedding
+  ✅ Successfully inserted/updated 5 words.
+  Batch 17/242: weekday, weigh, weight, western, whale
+  ✅ Successfully inserted/updated 5 words.
+  Batch 18/242: whatever, wheel, whenever, wherever, whisper
+  ✅ Successfully inserted/updated 5 words.
+  Batch 19/242: whoever, whole, whom, width, wild
+  ✅ Successfully inserted/updated 5 words.
+  Batch 20/242: willing, windy, wine, wing, wire
+  ✅ Successfully inserted/updated 5 words.
+  Batch 21/242: within, wolf, wonder, wood, wooden
+  ✅ Successfully inserted/updated 5 words.
+  Batch 22/242: wool, workbook, worm, worse, worst
+  ✅ Successfully inserted/updated 5 words.
+  Batch 23/242: worth, wound, yam, youth, zebra
+  ✅ Successfully inserted/updated 5 words.
+  Batch 24/242: aboard, acceptable, accurate, ache, achieve
+  ✅ Successfully inserted/updated 5 words.
+  Batch 25/242: additional, admire, advanced, advantage, adventure
+  ✅ Successfully inserted/updated 5 words.
+  Batch 26/242: ad, advise, adviser, advisor, afford
+  ✅ Successfully inserted/updated 5 words.
+  Batch 27/242: afterward, afterwards, agriculture, airline, alley
+  ✅ Successfully inserted/updated 5 words.
+  Batch 28/242: almond, alphabet, amaze, ambassador, ambition
+  ✅ Successfully inserted/updated 5 words.
+  Batch 29/242: ambulance, angel, announce, anxious, anyhow
+  ✅ Successfully inserted/updated 5 words.
+  Batch 30/242: apart, apologize, appeal, approve, apron
+  ✅ Successfully inserted/updated 5 words.
+  Batch 31/242: armed, arrest, ash, aside, assist
+  ✅ Successfully inserted/updated 5 words.
+  Batch 32/242: assistant, assume, athlete, attitude, attract
+  ✅ Successfully inserted/updated 5 words.
+  Batch 33/242: attractive, audience, automatic, automobile, auto
+  ✅ Successfully inserted/updated 5 words.
+  Batch 34/242: avenue, awake, awaken, award, aware
+  ✅ Successfully inserted/updated 5 words.
+  Batch 35/242: awful, awkward, background, bacon, bacteria
+  ✅ Successfully inserted/updated 5 words.
+  Batch 36/242: badly, baggage, bait, bamboo, bang
+  ✅ Successfully inserted/updated 5 words.
+  Batch 37/242: banker, bare, barely, barn, barrel
+  ✅ Successfully inserted/updated 5 words.
+  Batch 38/242: basement, bay, bead, beam, beast
+  ✅ Successfully inserted/updated 5 words.
+  Batch 39/242: beetle, beneath, benefit, berry, besides
+  ✅ Successfully inserted/updated 5 words.
+  Batch 40/242: bet, bind, bitter, bleed, bless
+  ✅ Successfully inserted/updated 5 words.
+  Batch 41/242: bloody, blouse, bold, bomb, bookcase
+AI Generation failed: SyntaxError: Unterminated string in JSON at position 8970 (line 38 column 5839)
+    at JSON.parse (<anonymous>)
+    at generateWordData (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:74:27)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async processLevel (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:115:30)
+    at async main (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:158:5)
+  ⚠️ No valid data generated for this batch. Skipping.
+  Batch 42/242: boot, bore, bowling, brake, brass
+  ✅ Successfully inserted/updated 5 words.
+  Batch 43/242: bravery, breast, breath, breathe, breeze
+  ✅ Successfully inserted/updated 5 words.
+  Batch 44/242: brick, bride, broadcast, brunch, bubble
+  ✅ Successfully inserted/updated 5 words.
+  Batch 45/242: bucket, bud, budget, buffalo, buffet
+  ✅ Successfully inserted/updated 5 words.
+  Batch 46/242: bulb, bull, bullet, bump, bunch
+  ✅ Successfully inserted/updated 5 words.
+  Batch 47/242: bundle, bury, bush, buzz, cabin
+  ✅ Successfully inserted/updated 5 words.
+  Batch 48/242: cable, cafeteria, campus, canyon, capable
+  ✅ Successfully inserted/updated 5 words.
+  Batch 49/242: captain, capture, career, carpenter, carpet
+  ✅ Successfully inserted/updated 5 words.
+  Batch 50/242: carriage, cart, cast, casual, cattle
+  ✅ Successfully inserted/updated 5 words.
+  Batch 51/242: cave, champion, charm, chat, cheek
+  ✅ Successfully inserted/updated 5 words.
+  Batch 52/242: cheerful, cherry, chest, chill, chilly
+  ✅ Successfully inserted/updated 5 words.
+  Batch 53/242: chimney, chin, chip, chop, cigarette
+  ✅ Successfully inserted/updated 5 words.
+  Batch 54/242: cinema, circus, citizen, civil, clay
+  ✅ Successfully inserted/updated 5 words.
+  Batch 55/242: cleaner, client, clinic, clip, closet
+  ✅ Successfully inserted/updated 5 words.
+  Batch 56/242: clothe, clown, clue, coach, cock
+  ✅ Successfully inserted/updated 5 words.
+  Batch 57/242: cocktail, coconut, collar, collection, colony
+  ✅ Successfully inserted/updated 5 words.
+  Batch 58/242: colorful, column, comfort, comma, committee
+  ✅ Successfully inserted/updated 5 words.
+  Batch 59/242: communicate, comparison, compete, complain, complaint
+  ✅ Successfully inserted/updated 5 words.
+  Batch 60/242: concert, conclusion, cone, confirm, confuse
+  ✅ Successfully inserted/updated 5 words.
+  Batch 61/242: connect, conscious, considerable, constant, continent
+  ✅ Successfully inserted/updated 5 words.
+  Batch 62/242: controller, cooker, costly, cotton, cough
+  ✅ Successfully inserted/updated 5 words.
+  Batch 63/242: countable, county, crab, cradle, crane
+  ✅ Successfully inserted/updated 5 words.
+  Batch 64/242: crash, crawl, creative, creator, creature
+  ✅ Successfully inserted/updated 5 words.
+  Batch 65/242: credit, crew, cricket, criminal, crispy
+  ✅ Successfully inserted/updated 5 words.
+  Batch 66/242: crop, crown, cruel, cupboard, dairy
+  ✅ Successfully inserted/updated 5 words.
+  Batch 67/242: dam, dare, darling, dash, database
+  ✅ Successfully inserted/updated 5 words.
+  Batch 68/242: dawn, dealer, decade, deck, decorate
+  ✅ Successfully inserted/updated 5 words.
+  Batch 69/242: decrease, deed, deepen, definition, democracy
+  ✅ Successfully inserted/updated 5 words.
+  Batch 70/242: democratic, deposit, designer, desirable, desire
+  ✅ Successfully inserted/updated 5 words.
+  Batch 71/242: dessert, destroy, detect, determine, devil
+  ✅ Successfully inserted/updated 5 words.
+  Batch 72/242: dim, dime, dine, dinosaur, dip
+  ✅ Successfully inserted/updated 5 words.
+  Batch 73/242: dirt, discount, dishonest, disk, disc
+  ✅ Successfully inserted/updated 5 words.
+  Batch 74/242: dislike, ditch, dive, dizzy, dock
+  ✅ Successfully inserted/updated 5 words.
+  Batch 75/242: dolphin, donkey, dose, doubtful, doughnut
+  ✅ Successfully inserted/updated 5 words.
+  Batch 76/242: downtown, drag, dragonfly, drain, dramatic
+  ✅ Successfully inserted/updated 5 words.
+  Batch 77/242: drip, drown, drugstore, drunk, dumb
+  ✅ Successfully inserted/updated 5 words.
+  Batch 78/242: dump, dumpling, dust, eager, echo
+  ✅ Successfully inserted/updated 5 words.
+  Batch 79/242: edit, editor, educate, educational, efficient
+  ✅ Successfully inserted/updated 5 words.
+  Batch 80/242: elbow, elderly, elect, election, electricity
+  ✅ Successfully inserted/updated 5 words.
+  Batch 81/242: electronic, element, elevator, emergency, emotional
+  ✅ Successfully inserted/updated 5 words.
+  Batch 82/242: emperor, enable, energetic, engage, enjoyable
+  ✅ Successfully inserted/updated 5 words.
+  Batch 83/242: entry, envy, erase, excellence, exchange
+  ✅ Successfully inserted/updated 5 words.
+  Batch 84/242: exhibition, expectation, experiment, explode, explore
+  ✅ Successfully inserted/updated 5 words.
+  Batch 85/242: export, expressive, extreme, fade, faint
+  ✅ Successfully inserted/updated 5 words.
+  Batch 86/242: fairly, fairy, faith, fake, familiar
+  ✅ Successfully inserted/updated 5 words.
+  Batch 87/242: fancy, fare, farther, fashionable, faucet
+  ✅ Successfully inserted/updated 5 words.
+  Batch 88/242: fearful, feather, fence, fighter, firework
+  ✅ Successfully inserted/updated 5 words.
+  Batch 89/242: fist, flame, flash, flashlight, flavor
+  ✅ Successfully inserted/updated 5 words.
+  Batch 90/242: flesh, float, flock, flood, flour
+  ✅ Successfully inserted/updated 5 words.
+  Batch 91/242: flute, foggy, fold, follower, fond
+  ✅ Successfully inserted/updated 5 words.
+  Batch 92/242: forever, fortune, fountain, frank, freeze
+  ✅ Successfully inserted/updated 5 words.
+  Batch 93/242: freezer, frequent, fright, frighten, fuel
+  ✅ Successfully inserted/updated 5 words.
+  Batch 94/242: fund, fur, gallon, gamble, gang
+  ✅ Successfully inserted/updated 5 words.
+  Batch 95/242: gap, garage, gasoline, gas, geography
+  ✅ Successfully inserted/updated 5 words.
+  Batch 96/242: gesture, glance, global, glory, glow
+  ✅ Successfully inserted/updated 5 words.
+  Batch 97/242: golf, gossip, governor, grab, graduate
+  ✅ Successfully inserted/updated 5 words.
+  Batch 98/242: grasp, grasshopper, grassy, greedy, greenhouse
+  ✅ Successfully inserted/updated 5 words.
+  Batch 99/242: grin, grocery, guidance, gum, hairdresser
+  ✅ Successfully inserted/updated 5 words.
+  Batch 100/242: hallway, hammer, handful, handkerchief, handy
+  ✅ Successfully inserted/updated 5 words.
+  Batch 101/242: hanger, harbor, harm, harmful, harvest
+  ✅ Successfully inserted/updated 5 words.
+  Batch 102/242: hasty, hatch, hateful, hay, headline
+  ✅ Successfully inserted/updated 5 words.
+  Batch 103/242: headquarters, heal, heap, heater, heel
+  ✅ Successfully inserted/updated 5 words.
+  Batch 104/242: hell, helmet, hesitate, hint, hire
+  ✅ Successfully inserted/updated 5 words.
+  Batch 105/242: historian, historic, holder, hollow, holy
+  ✅ Successfully inserted/updated 5 words.
+  Batch 106/242: homesick, hometown, honesty, honor, hopeful
+  ✅ Successfully inserted/updated 5 words.
+  Batch 107/242: horn, horrible, horror, hourly, housekeeper
+  ✅ Successfully inserted/updated 5 words.
+  Batch 108/242: hug, hum, humid, humor, humorous
+  ✅ Successfully inserted/updated 5 words.
+  Batch 109/242: hunger, hut, icy, imagination, immediate
+  ✅ Successfully inserted/updated 5 words.
+  Batch 110/242: import, impress, indoor, indoors, industrial
+  ✅ Successfully inserted/updated 5 words.
+  Batch 111/242: inferior, inform, information, injury, inn
+  ✅ Successfully inserted/updated 5 words.
+  Batch 112/242: inner, innocent, inspect, inspector, intelligent
+  ✅ Successfully inserted/updated 5 words.
+  Batch 113/242: interrupt, invent, inventor, investigate, invitation
+  ✅ Successfully inserted/updated 5 words.
+  Batch 114/242: ivory, jail, jar, jaw, jazz
+  ✅ Successfully inserted/updated 5 words.
+  Batch 115/242: jealous, jeep, jelly, jet, jewel
+  ✅ Successfully inserted/updated 5 words.
+  Batch 116/242: jewelry, journey, joyful, juicy, jungle
+  ✅ Successfully inserted/updated 5 words.
+  Batch 117/242: junior, junk, kangaroo, keyboard, kidney
+  ✅ Successfully inserted/updated 5 words.
+  Batch 118/242: kilometer, kindergarten, kingdom, kit, knight
+  ✅ Successfully inserted/updated 5 words.
+  Batch 119/242: knit, knot, koala, label, lace
+  ✅ Successfully inserted/updated 5 words.
+  Batch 120/242: ladder, lately, laughter, laundry, lawn
+  ✅ Successfully inserted/updated 5 words.
+  Batch 121/242: leak, leap, learning, leather, leisure
+  ✅ Successfully inserted/updated 5 words.
+  Batch 122/242: lemonade, leopard, lettuce, liberty, lick
+  ✅ Successfully inserted/updated 5 words.
+  Batch 123/242: lifetime, lighthouse, lightning, lily, limb
+AI Generation failed: SyntaxError: Bad control character in string literal in JSON at position 2894 (line 66 column 67)
+    at JSON.parse (<anonymous>)
+    at generateWordData (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:74:27)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async processLevel (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:115:30)
+    at async main (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:158:5)
+  ⚠️ No valid data generated for this batch. Skipping.
+  Batch 124/242: litter, lively, loaf, lobby, locate
+  ✅ Successfully inserted/updated 5 words.
+  Batch 125/242: location, lock, log, lollipop, loose
+  ✅ Successfully inserted/updated 5 words.
+  Batch 126/242: lord, loser, lover, luggage, lung
+  ✅ Successfully inserted/updated 5 words.
+  Batch 127/242: magical, magician, magnet, maid, majority
+  ✅ Successfully inserted/updated 5 words.
+  Batch 128/242: mall, mankind, humankind, marble, march
+  ✅ Successfully inserted/updated 5 words.
+  Batch 129/242: marker, marvelous, mathematical, mayor, meadow
+  ✅ Successfully inserted/updated 5 words.
+  Batch 130/242: meaningful, meanwhile, medal, medium, media
+  ✅ Successfully inserted/updated 5 words.
+  Batch 131/242: melon, melt, mend, mental, merry
+  ✅ Successfully inserted/updated 5 words.
+  Batch 132/242: mess, microphone, mike, microwave, mighty
+  ✅ Successfully inserted/updated 5 words.
+  Batch 133/242: minus, miracle, misery, missile, missing
+  ✅ Successfully inserted/updated 5 words.
+  Batch 134/242: mission, mist, mob, mobile, moist
+  ✅ Successfully inserted/updated 5 words.
+  Batch 135/242: moisture, monk, monster, monthly, moral
+  ✅ Successfully inserted/updated 5 words.
+  Batch 136/242: mosquito, mostly, motel, moth, motor
+  ✅ Successfully inserted/updated 5 words.
+  Batch 137/242: multiply, murder, muscle, mushroom, mystery
+  ✅ Successfully inserted/updated 5 words.
+  Batch 138/242: naked, nap, napkin, native, navy
+  ✅ Successfully inserted/updated 5 words.
+  Batch 139/242: neat, necessity, necktie, neighborhood, nest
+  ✅ Successfully inserted/updated 5 words.
+  Batch 140/242: nickname, normal, novelist, nun, oak
+  ✅ Successfully inserted/updated 5 words.
+  Batch 141/242: observe, occasion, odd, omit, ongoing
+  ✅ Successfully inserted/updated 5 words.
+  Batch 142/242: onion, onto, operation, opportunity, opposite
+  ✅ Successfully inserted/updated 5 words.
+  Batch 143/242: optimistic, oral, organic, organize, original
+  ✅ Successfully inserted/updated 5 words.
+  Batch 144/242: outdoor, outdoors, outer, outline, oven
+  ✅ Successfully inserted/updated 5 words.
+  Batch 145/242: overseas, owe, owl, ownership, ox
+  ✅ Successfully inserted/updated 5 words.
+  Batch 146/242: pad, painter, pal, palace, palm
+  ✅ Successfully inserted/updated 5 words.
+  Batch 147/242: pancake, panic, parade, paradise, parcel
+  ✅ Successfully inserted/updated 5 words.
+  Batch 148/242: parrot, passage, passenger, passion, passport
+  ✅ Successfully inserted/updated 5 words.
+  Batch 149/242: pat, patience, pause, pave, pea
+  ✅ Successfully inserted/updated 5 words.
+  Batch 150/242: peanut, pearl, peel, penguin, penny
+  ✅ Successfully inserted/updated 5 words.
+  Batch 151/242: pepper, perform, performance, permission, permit
+  ✅ Successfully inserted/updated 5 words.
+  Batch 152/242: persuade, photographer, pigeon, pile, pill
+  ✅ Successfully inserted/updated 5 words.
+  Batch 153/242: pilot, pine, pineapple, pint, pit
+  ✅ Successfully inserted/updated 5 words.
+  Batch 154/242: pitch, pity, plastic, playful, plenty
+  ✅ Successfully inserted/updated 5 words.
+  Batch 155/242: plug, pole, political, politician, politics
+  ✅ Successfully inserted/updated 5 words.
+  Batch 156/242: poll, pollute, pollution, porcelain, portion
+  ✅ Successfully inserted/updated 5 words.
+  Batch 157/242: portrait, poster, postpone, pottery, pour
+  ✅ Successfully inserted/updated 5 words.
+  Batch 158/242: poverty, powder, practical, precious, preparation
+  ✅ Successfully inserted/updated 5 words.
+  Batch 159/242: presence, pretend, prevent, previous, probable
+  ✅ Successfully inserted/updated 5 words.
+  Batch 160/242: process, producer, product, professor, profit
+  ✅ Successfully inserted/updated 5 words.
+  Batch 161/242: promote, pronounce, proof, property, protection
+  ✅ Successfully inserted/updated 5 words.
+  Batch 162/242: pub, pump, punch, puppet, pure
+  ✅ Successfully inserted/updated 5 words.
+  Batch 163/242: purse, queer, quit, quote, racial
+  ✅ Successfully inserted/updated 5 words.
+  Batch 164/242: rag, rank, rate, raw, ray
+  ✅ Successfully inserted/updated 5 words.
+  Batch 165/242: razor, react, reaction, reasonable, receipt
+  ✅ Successfully inserted/updated 5 words.
+  Batch 166/242: receiver, recognize, recorder, rectangle, reduce
+  ✅ Successfully inserted/updated 5 words.
+  Batch 167/242: regional, regret, relax, release, reliable
+  ✅ Successfully inserted/updated 5 words.
+  Batch 168/242: relief, religious, rely, remain, remind
+  ✅ Successfully inserted/updated 5 words.
+  Batch 169/242: remote, replace, represent, representative, republic
+  ✅ Successfully inserted/updated 5 words.
+  Batch 170/242: request, reserve, resist, resource, response
+  ✅ Successfully inserted/updated 5 words.
+  Batch 171/242: responsibility, restrict, reveal, ribbon, rid
+  ✅ Successfully inserted/updated 5 words.
+  Batch 172/242: ripe, risk, roar, roast, rob
+  ✅ Successfully inserted/updated 5 words.
+  Batch 173/242: robbery, robe, rocket, romantic, rot
+  ✅ Successfully inserted/updated 5 words.
+  Batch 174/242: rotten, rough, roughly, routine, rug
+  ✅ Successfully inserted/updated 5 words.
+  Batch 175/242: rumor, rush, rust, sack, sake
+  ✅ Successfully inserted/updated 5 words.
+  Batch 176/242: salary, satisfactory, sauce, saucer, sausage
+  ✅ Successfully inserted/updated 5 words.
+  Batch 177/242: saving, scale, scarce, scarf, scary
+  ✅ Successfully inserted/updated 5 words.
+  Batch 178/242: scatter, scholar, scholarship, scientific, scientist
+  ✅ Successfully inserted/updated 5 words.
+  Batch 179/242: scissors, scout, scream, screw, scrub
+  ✅ Successfully inserted/updated 5 words.
+  Batch 180/242: seal, security, semester, senior, sensible
+  ✅ Successfully inserted/updated 5 words.
+  Batch 181/242: separation, sexual, sexy, shadow, shallow
+  ✅ Successfully inserted/updated 5 words.
+  Batch 182/242: shampoo, shepherd, shiny, shorten, shortly
+  ✅ Successfully inserted/updated 5 words.
+  Batch 183/242: shovel, shrimp, shrink, sigh, signal
+  ✅ Successfully inserted/updated 5 words.
+  Batch 184/242: significant, silk, similarity, sin, sincere
+  ✅ Successfully inserted/updated 5 words.
+  Batch 185/242: sink, sip, situation, skate, ski
+  ✅ Successfully inserted/updated 5 words.
+  Batch 186/242: skillful, skinny, skip, slave, sleeve
+  ✅ Successfully inserted/updated 5 words.
+  Batch 187/242: slender, slice, slippery, slope, snap
+  ✅ Successfully inserted/updated 5 words.
+  Batch 188/242: solid, someday, somehow, sometime, sorrow
+  ✅ Successfully inserted/updated 5 words.
+  Batch 189/242: spaghetti, specific, spice, spill, spin
+  ✅ Successfully inserted/updated 5 words.
+  Batch 190/242: spinach, spit, spite, splash, spoil
+  ✅ Successfully inserted/updated 5 words.
+  Batch 191/242: spray, spy, squeeze, squirrel, stable
+  ✅ Successfully inserted/updated 5 words.
+  Batch 192/242: stadium, staff, stale, stare, starve
+  ✅ Successfully inserted/updated 5 words.
+  Batch 193/242: statue, steady, steal, steam, steep
+  ✅ Successfully inserted/updated 5 words.
+  Batch 194/242: sticky, stiff, sting, stir, stitch
+  ✅ Successfully inserted/updated 5 words.
+  Batch 195/242: stomach, stool, stormy, stove, strategy
+  ✅ Successfully inserted/updated 5 words.
+  Batch 196/242: straw, strength, strip, structure, stubborn
+  ✅ Successfully inserted/updated 5 words.
+  Batch 197/242: studio, stuff, substance, subtract, suburb
+  ✅ Successfully inserted/updated 5 words.
+  Batch 198/242: suck, suffer, sufficient, suicide, sum
+  ✅ Successfully inserted/updated 5 words.
+  Batch 199/242: summary, summit, superior, surround, survey
+  ✅ Successfully inserted/updated 5 words.
+  Batch 200/242: survivor, suspect, suspicion, swan, swear
+  ✅ Successfully inserted/updated 5 words.
+  Batch 201/242: sweat, swell, swift, sword, tablet
+  ✅ Successfully inserted/updated 5 words.
+  Batch 202/242: tag, tailor, talent, talkative, tame
+  ✅ Successfully inserted/updated 5 words.
+  Batch 203/242: tangerine, tank, tap, tasty, tease
+  ✅ Successfully inserted/updated 5 words.
+  Batch 204/242: technical, technique, teenage, temper, temporary
+  ✅ Successfully inserted/updated 5 words.
+  Batch 205/242: tend, tender, tent, terrific, territory
+  ✅ Successfully inserted/updated 5 words.
+  Batch 206/242: thankful, theory, thirst, thread, threat
+  ✅ Successfully inserted/updated 5 words.
+  Batch 207/242: threaten, thumb, tide, tight, tighten
+  ✅ Successfully inserted/updated 5 words.
+  Batch 208/242: timber, tobacco, ton, toss, tough
+  ✅ Successfully inserted/updated 5 words.
+  Batch 209/242: tourism, tourist, tow, tower, trace
+  ✅ Successfully inserted/updated 5 words.
+  Batch 210/242: trader, trail, transport, traveler, tray
+  ✅ Successfully inserted/updated 5 words.
+  Batch 211/242: trend, tribe, tricky, troop, tropical
+  ✅ Successfully inserted/updated 5 words.
+  Batch 212/242: trumpet, trunk, truthful, tub, tug
+  ✅ Successfully inserted/updated 5 words.
+  Batch 213/242: tune, tunnel, tutor, twin, twist
+  ✅ Successfully inserted/updated 5 words.
+  Batch 214/242: underlying, underwear, union, unique, unite
+  ✅ Successfully inserted/updated 5 words.
+  Batch 215/242: unity, urban, vacant, van, vanish
+  ✅ Successfully inserted/updated 5 words.
+  Batch 216/242: variety, various, vary, vase, vehicle
+  ✅ Successfully inserted/updated 5 words.
+  Batch 217/242: verse, vest, victim, violence, violent
+  ✅ Successfully inserted/updated 5 words.
+  Batch 218/242: violet, visible, vision, vitamin, vivid
+  ✅ Successfully inserted/updated 5 words.
+  Batch 219/242: vocabulary, volleyball, volume, voter, wage
+  ✅ Successfully inserted/updated 5 words.
+  Batch 220/242: wagon, wander, warmth, warn, waterfall
+  ✅ Successfully inserted/updated 5 words.
+  Batch 221/242: wax, weaken, wealthy, weapon, weave
+  ❌ Supabase Upsert Error: {
+  message: 'TypeError: fetch failed',
+  details: 'TypeError: fetch failed\n' +
+    '\n' +
+    'Caused by: ConnectTimeoutError: Connect Timeout Error (attempted address: umzqjgxsetsmwzhniemw.supabase.co:443, timeout: 10000ms) (UND_ERR_CONNECT_TIMEOUT)\n' +
+    'ConnectTimeoutError: Connect Timeout Error (attempted address: umzqjgxsetsmwzhniemw.supabase.co:443, timeout: 10000ms)\n' +
+    '    at onConnectTimeout (node:internal/deps/undici/undici:2602:28)\n' +
+    '    at Immediate._onImmediate (node:internal/deps/undici/undici:2583:11)\n' +
+    '    at process.processImmediate (node:internal/timers:485:21)',
+  hint: '',
+  code: ''
+}
+  Batch 222/242: web, wed, weed, weekly, weep
+AI Generation failed: TypeError: fetch failed
+    at node:internal/deps/undici/undici:13510:13
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async makeRequest (file:///Users/simonac/Desktop/moonshot-idea/node_modules/.pnpm/@google+generative-ai@0.24.1/node_modules/@google/generative-ai/dist/index.mjs:395:20)
+    at async generateContent (file:///Users/simonac/Desktop/moonshot-idea/node_modules/.pnpm/@google+generative-ai@0.24.1/node_modules/@google/generative-ai/dist/index.mjs:865:22)
+    at async generateWordData (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:72:24)
+    at async processLevel (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:115:30)
+    at async main (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:158:5)
+  ⚠️ No valid data generated for this batch. Skipping.
+  Batch 223/242: wheat, whip, whistle, wicked, widen
+AI Generation failed: TypeError: fetch failed
+    at node:internal/deps/undici/undici:13510:13
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async makeRequest (file:///Users/simonac/Desktop/moonshot-idea/node_modules/.pnpm/@google+generative-ai@0.24.1/node_modules/@google/generative-ai/dist/index.mjs:395:20)
+    at async generateContent (file:///Users/simonac/Desktop/moonshot-idea/node_modules/.pnpm/@google+generative-ai@0.24.1/node_modules/@google/generative-ai/dist/index.mjs:865:22)
+    at async generateWordData (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:72:24)
+    at async processLevel (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:115:30)
+    at async main (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:158:5)
+  ⚠️ No valid data generated for this batch. Skipping.
+  Batch 224/242: wipe, wisdom, wrap, wrist, yearly
+AI Generation failed: TypeError: fetch failed
+    at node:internal/deps/undici/undici:13510:13
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async makeRequest (file:///Users/simonac/Desktop/moonshot-idea/node_modules/.pnpm/@google+generative-ai@0.24.1/node_modules/@google/generative-ai/dist/index.mjs:395:20)
+    at async generateContent (file:///Users/simonac/Desktop/moonshot-idea/node_modules/.pnpm/@google+generative-ai@0.24.1/node_modules/@google/generative-ai/dist/index.mjs:865:22)
+    at async generateWordData (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:72:24)
+    at async processLevel (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:115:30)
+    at async main (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:158:5)
+  ⚠️ No valid data generated for this batch. Skipping.
+  Batch 225/242: yell, yolk, youngster, zipper, zone
+AI Generation failed: TypeError: fetch failed
+    at node:internal/deps/undici/undici:13510:13
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async makeRequest (file:///Users/simonac/Desktop/moonshot-idea/node_modules/.pnpm/@google+generative-ai@0.24.1/node_modules/@google/generative-ai/dist/index.mjs:395:20)
+    at async generateContent (file:///Users/simonac/Desktop/moonshot-idea/node_modules/.pnpm/@google+generative-ai@0.24.1/node_modules/@google/generative-ai/dist/index.mjs:865:22)
+    at async generateWordData (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:72:24)
+    at async processLevel (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:115:30)
+    at async main (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:158:5)
+  ⚠️ No valid data generated for this batch. Skipping.
+  Batch 226/242: abandon, absolute, absorb, abstract, academic
+AI Generation failed: TypeError: fetch failed
+    at node:internal/deps/undici/undici:13510:13
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async makeRequest (file:///Users/simonac/Desktop/moonshot-idea/node_modules/.pnpm/@google+generative-ai@0.24.1/node_modules/@google/generative-ai/dist/index.mjs:395:20)
+    at async generateContent (file:///Users/simonac/Desktop/moonshot-idea/node_modules/.pnpm/@google+generative-ai@0.24.1/node_modules/@google/generative-ai/dist/index.mjs:865:22)
+    at async generateWordData (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:72:24)
+    at async processLevel (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:115:30)
+    at async main (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:158:5)
+  ⚠️ No valid data generated for this batch. Skipping.
+  Batch 227/242: accent, acceptance, access, accidental, accompany
+AI Generation failed: TypeError: fetch failed
+    at node:internal/deps/undici/undici:13510:13
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async makeRequest (file:///Users/simonac/Desktop/moonshot-idea/node_modules/.pnpm/@google+generative-ai@0.24.1/node_modules/@google/generative-ai/dist/index.mjs:395:20)
+    at async generateContent (file:///Users/simonac/Desktop/moonshot-idea/node_modules/.pnpm/@google+generative-ai@0.24.1/node_modules/@google/generative-ai/dist/index.mjs:865:22)
+    at async generateWordData (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:72:24)
+    at async processLevel (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:115:30)
+    at async main (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:158:5)
+  ⚠️ No valid data generated for this batch. Skipping.
+  Batch 228/242: accomplish, accountant, accuracy, accuse, acid
+AI Generation failed: TypeError: fetch failed
+    at node:internal/deps/undici/undici:13510:13
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async makeRequest (file:///Users/simonac/Desktop/moonshot-idea/node_modules/.pnpm/@google+generative-ai@0.24.1/node_modules/@google/generative-ai/dist/index.mjs:395:20)
+    at async generateContent (file:///Users/simonac/Desktop/moonshot-idea/node_modules/.pnpm/@google+generative-ai@0.24.1/node_modules/@google/generative-ai/dist/index.mjs:865:22)
+    at async generateWordData (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:72:24)
+    at async processLevel (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:115:30)
+    at async main (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:158:5)
+  ⚠️ No valid data generated for this batch. Skipping.
+  Batch 229/242: acquaintance, acquire, adapt, addict, adequate
+AI Generation failed: TypeError: fetch failed
+    at node:internal/deps/undici/undici:13510:13
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async makeRequest (file:///Users/simonac/Desktop/moonshot-idea/node_modules/.pnpm/@google+generative-ai@0.24.1/node_modules/@google/generative-ai/dist/index.mjs:395:20)
+    at async generateContent (file:///Users/simonac/Desktop/moonshot-idea/node_modules/.pnpm/@google+generative-ai@0.24.1/node_modules/@google/generative-ai/dist/index.mjs:865:22)
+    at async generateWordData (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:72:24)
+    at async processLevel (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:115:30)
+    at async main (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:158:5)
+  ⚠️ No valid data generated for this batch. Skipping.
+  Batch 230/242: adjust, admirable, admiration, admission, adopt
+AI Generation failed: TypeError: fetch failed
+    at node:internal/deps/undici/undici:13510:13
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async makeRequest (file:///Users/simonac/Desktop/moonshot-idea/node_modules/.pnpm/@google+generative-ai@0.24.1/node_modules/@google/generative-ai/dist/index.mjs:395:20)
+    at async generateContent (file:///Users/simonac/Desktop/moonshot-idea/node_modules/.pnpm/@google+generative-ai@0.24.1/node_modules/@google/generative-ai/dist/index.mjs:865:22)
+    at async generateWordData (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:72:24)
+    at async processLevel (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:115:30)
+    at async main (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:158:5)
+  ⚠️ No valid data generated for this batch. Skipping.
+  Batch 231/242: agency, agent, aggressive, agreeable, alcohol
+  ✅ Successfully inserted/updated 5 words.
+  Batch 232/242: alert, allowance, alternative, amateur, ambiguous
+  ✅ Successfully inserted/updated 5 words.
+  Batch 233/242: ambitious, amuse, analysis, analyze, ancestor
+  ✅ Successfully inserted/updated 5 words.
+  Batch 234/242: anniversary, annoy, annual, anxiety, apology
+  ✅ Successfully inserted/updated 5 words.
+  Batch 235/242: apparent, applicant, application, appoint, appreciation
+  ✅ Successfully inserted/updated 5 words.
+  Batch 236/242: appropriate, approval, aquarium, arch, arise
+  ✅ Successfully inserted/updated 5 words.
+  Batch 237/242: arms, artificial, artistic, ashamed, aspect
+  ✅ Successfully inserted/updated 5 words.
+  Batch 238/242: aspirin, assemble, assembly, assign, assistance
+  ✅ Successfully inserted/updated 5 words.
+  Batch 239/242: associate, association, assurance, assure, athletic
+  ✅ Successfully inserted/updated 5 words.
+  Batch 240/242: atmosphere, atom, atomic, attach, attraction
+  ✅ Successfully inserted/updated 5 words.
+  Batch 241/242: audio, authentic, authority, autobiography, autograph
+  ✅ Successfully inserted/updated 5 words.
+  Batch 242/242: await
+  ✅ Successfully inserted/updated 1 words.
+
+level_3 Summary: ✅ 1141 success, ❌ 66 failed
+
+
+📚 Processing level_4: 960 words
+  Batch 1/192: bald, ballet, bandage, bankrupt, bargain
+  ✅ Successfully inserted/updated 5 words.
+  Batch 2/192: barrier, basin, battery, beggar, behavior
+  ✅ Successfully inserted/updated 5 words.
+  Batch 3/192: bin, biography, biology, blade, blend
+  ✅ Successfully inserted/updated 5 words.
+  Batch 4/192: blessing, blink, bloom, blossom, boast
+  ✅ Successfully inserted/updated 5 words.
+  Batch 5/192: bond, bounce, bracelet, breed, bridegroom
+  ✅ Successfully inserted/updated 5 words.
+  Batch 6/192: groom, broke, broom, brutal, bulletin
+  ✅ Successfully inserted/updated 5 words.
+  Batch 7/192: burglar, cabinet, calculate, calculation, calorie
+  ✅ Successfully inserted/updated 5 words.
+  Batch 8/192: campaign, candidate, cane, canoe, capacity
+  ✅ Successfully inserted/updated 5 words.
+  Batch 9/192: capital, capitalist, cargo, carrier, carve
+  ✅ Successfully inserted/updated 5 words.
+  Batch 10/192: catalogue, category, cease, celebration, chamber
+  ✅ Successfully inserted/updated 5 words.
+  Batch 11/192: championship, characteristic, charity, chemistry, cherish
+  ✅ Successfully inserted/updated 5 words.
+  Batch 12/192: chew, choke, chorus, circular, circulate
+  ✅ Successfully inserted/updated 5 words.
+  Batch 13/192: circulation, circumstance, civilian, civilization, clarify
+AI Generation failed: SyntaxError: Unterminated string in JSON at position 10287 (line 38 column 8705)
+    at JSON.parse (<anonymous>)
+    at generateWordData (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:74:27)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async processLevel (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:115:30)
+    at async main (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:159:5)
+  ⚠️ No valid data generated for this batch. Skipping.
+  Batch 14/192: clash, classification, classify, claw, cliff
+  ✅ Successfully inserted/updated 5 words.
+  Batch 15/192: clumsy, coarse, code, collapse, colleague
+  ✅ Successfully inserted/updated 5 words.
+  Batch 16/192: combination, comedy, commander, comment, commerce
+  ✅ Successfully inserted/updated 5 words.
+  Batch 17/192: commit, communication, community, companion, competition
+  ✅ Successfully inserted/updated 5 words.
+  Batch 18/192: competitive, competitor, complicate, compose, composer
+  ✅ Successfully inserted/updated 5 words.
+  Batch 19/192: composition, concentrate, concentration, concept, concerning
+  ✅ Successfully inserted/updated 5 words.
+  Batch 20/192: concrete, conductor, conference, confess, confidence
+  ✅ Successfully inserted/updated 5 words.
+  Batch 21/192: confusion, congratulate, congress, conquer, conscience
+  ✅ Successfully inserted/updated 5 words.
+  Batch 22/192: consequence, consequent, conservative, consist, consistent
+  ✅ Successfully inserted/updated 5 words.
+  Batch 23/192: constitute, constitution, construct, construction, constructive
+  ✅ Successfully inserted/updated 5 words.
+  Batch 24/192: consult, consultant, consume, consumer, container
+  ✅ Successfully inserted/updated 5 words.
+  Batch 25/192: content, contest, context, continual, continuous
+  ✅ Successfully inserted/updated 5 words.
+  Batch 26/192: contrary, contrast, contribute, contribution, convenience
+  ✅ Successfully inserted/updated 5 words.
+  Batch 27/192: convention, conventional, converse, convey, convince
+  ✅ Successfully inserted/updated 5 words.
+  Batch 28/192: cooperate, cooperation, cooperative, cope, copper
+  ✅ Successfully inserted/updated 5 words.
+  Batch 29/192: cord, correspond, costume, cottage, council
+  ✅ Successfully inserted/updated 5 words.
+  Batch 30/192: counter, courageous, courtesy, coward, crack
+  ✅ Successfully inserted/updated 5 words.
+  Batch 31/192: craft, creation, creativity, creep, critic
+  ✅ Successfully inserted/updated 5 words.
+  Batch 32/192: critical, criticism, criticize, cruelty, crunchy
+  ✅ Successfully inserted/updated 5 words.
+  Batch 33/192: crush, cube, cue, cunning, curiosity
+  ✅ Successfully inserted/updated 5 words.
+  Batch 34/192: curl, curse, curve, cushion, damp
+  ✅ Successfully inserted/updated 5 words.
+  Batch 35/192: deadline, declare, decoration, defeat, defend
+  ✅ Successfully inserted/updated 5 words.
+  Batch 36/192: defense, defensible, defensive, definite, delicate
+  ✅ Successfully inserted/updated 5 words.
+  Batch 37/192: delight, delightful, demand, demonstrate, demonstration
+  ✅ Successfully inserted/updated 5 words.
+  Batch 38/192: dense, depart, departure, dependent, depression
+  ✅ Successfully inserted/updated 5 words.
+  Batch 39/192: deserve, desperate, despite, destruction, detective
+  ✅ Successfully inserted/updated 5 words.
+  Batch 40/192: determination, device, devise, devote, dew
+  ✅ Successfully inserted/updated 5 words.
+  Batch 41/192: diagram, differ, digest, digital, dignity
+  ✅ Successfully inserted/updated 5 words.
+  Batch 42/192: diligence, diligent, diploma, diplomat, disability
+  ✅ Successfully inserted/updated 5 words.
+  Batch 43/192: disadvantage, disappoint, disaster, discipline, discourage
+  ✅ Successfully inserted/updated 5 words.
+  Batch 44/192: disguise, disgust, dismiss, disorder, dispute
+  ✅ Successfully inserted/updated 5 words.
+  Batch 45/192: distinct, distinguish, distinguished, distribute, distribution
+  ✅ Successfully inserted/updated 5 words.
+  Batch 46/192: district, disturb, diverse, diversity, divine
+  ✅ Successfully inserted/updated 5 words.
+  Batch 47/192: divorce, dodge, dominant, dominate, draft
+  ✅ Successfully inserted/updated 5 words.
+  Batch 48/192: dread, drift, drill, drowsy, durable
+AI Generation failed: SyntaxError: Unterminated string in JSON at position 234850 (line 14 column 234338)
+    at JSON.parse (<anonymous>)
+    at generateWordData (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:74:27)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async processLevel (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:115:30)
+    at async main (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:159:5)
+  ⚠️ No valid data generated for this batch. Skipping.
+  Batch 49/192: dusty, dye, dynamic, dynasty, earnest
+  ✅ Successfully inserted/updated 5 words.
+  Batch 50/192: earphone, economic, economical, economics, economist
+  ✅ Successfully inserted/updated 5 words.
+  Batch 51/192: economy, efficiency, elastic, electronics, elegant
+  ✅ Successfully inserted/updated 5 words.
+  Batch 52/192: elementary, eliminate, elsewhere, embarrass, embassy
+  ✅ Successfully inserted/updated 5 words.
+  Batch 53/192: emerge, emphasis, empire, enclose, encounter
+  ✅ Successfully inserted/updated 5 words.
+  Batch 54/192: endanger, endure, enforce, engineering, enlarge
+  ✅ Successfully inserted/updated 5 words.
+  Batch 55/192: enormous, ensure, entertain, enthusiasm, equality
+  ✅ Successfully inserted/updated 5 words.
+  Batch 56/192: equip, era, essential, establish, estimate
+  ✅ Successfully inserted/updated 5 words.
+  Batch 57/192: ethnic, evaluate, evaluation, eventual, evidence
+  ✅ Successfully inserted/updated 5 words.
+  Batch 58/192: evident, exaggerate, exception, exhaust, exhibit
+  ✅ Successfully inserted/updated 5 words.
+  Batch 59/192: expand, expansion, experimental, explanation, explosion
+  ✅ Successfully inserted/updated 5 words.
+  Batch 60/192: explosive, expose, exposure, extend, extent
+  ✅ Successfully inserted/updated 5 words.
+  Batch 61/192: facial, facility, faithful, fame, fantastic
+  ✅ Successfully inserted/updated 5 words.
+  Batch 62/192: fantasy, farewell, fasten, fatal, favorable
+  ✅ Successfully inserted/updated 5 words.
+  Batch 63/192: fax, feast, feedback, ferry, fertile
+  ✅ Successfully inserted/updated 5 words.
+  Batch 64/192: fetch, fiction, fierce, finance, financial
+  ✅ Successfully inserted/updated 5 words.
+  Batch 65/192: fireplace, flatter, flea, flee, flexible
+  ✅ Successfully inserted/updated 5 words.
+  Batch 66/192: fluent, flush, foam, forbid, forecast
+  ✅ Successfully inserted/updated 5 words.
+  Batch 67/192: formation, formula, fort, fortunate, fossil
+  ✅ Successfully inserted/updated 5 words.
+  Batch 68/192: foundation, founder, fragile, frame, frequency
+  ✅ Successfully inserted/updated 5 words.
+  Batch 69/192: freshman, frost, frown, frustrate, frustration
+  ✅ Successfully inserted/updated 5 words.
+  Batch 70/192: fulfill, functional, fundamental, funeral, furious
+  ✅ Successfully inserted/updated 5 words.
+  Batch 71/192: furnish, furthermore, gallery, gaze, gear
+  ✅ Successfully inserted/updated 5 words.
+  Batch 72/192: gender, gene, generation, generosity, genius
+  ✅ Successfully inserted/updated 5 words.
+  Batch 73/192: genuine, germ, gifted, gigantic, giggle
+  ✅ Successfully inserted/updated 5 words.
+  Batch 74/192: ginger, glimpse, globe, glorious, goods
+  ✅ Successfully inserted/updated 5 words.
+  Batch 75/192: gown, grace, graceful, gracious, graduation
+  ✅ Successfully inserted/updated 5 words.
+  Batch 76/192: grammar, grammatical, graph, grateful, gratitude
+  ✅ Successfully inserted/updated 5 words.
+  Batch 77/192: grave, greasy, greeting, grief, grind
+  ✅ Successfully inserted/updated 5 words.
+  Batch 78/192: guarantee, guardian, guilt, guilty, gulf
+  ✅ Successfully inserted/updated 5 words.
+  Batch 79/192: habitual, halt, handwriting, hardship, hardware
+  ✅ Successfully inserted/updated 5 words.
+  Batch 80/192: harmony, harsh, haste, hasten, hatred
+  ✅ Successfully inserted/updated 5 words.
+  Batch 81/192: hawk, helicopter, herd, hesitation, hive
+  ✅ Successfully inserted/updated 5 words.
+  Batch 82/192: homeland, honeymoon, hook, horizon, horrify
+  ✅ Successfully inserted/updated 5 words.
+  Batch 83/192: hose, household, housework, humanity, humidity
+  ✅ Successfully inserted/updated 5 words.
+  Batch 84/192: hurricane, hush, hydrogen, identical, identification
+  ✅ Successfully inserted/updated 5 words.
+  Batch 85/192: identify, idiom, idle, idol, ignorance
+  ✅ Successfully inserted/updated 5 words.
+  Batch 86/192: ignorant, illustrate, illustration, imaginary, imaginative
+  ✅ Successfully inserted/updated 5 words.
+  Batch 87/192: imitate, imitation, immigrant, immigrate, immigration
+  ✅ Successfully inserted/updated 5 words.
+  Batch 88/192: impact, imply, impose, impression, incident
+  ✅ Successfully inserted/updated 5 words.
+  Batch 89/192: including, incredible, indication, infant, infection
+  ✅ Successfully inserted/updated 5 words.
+  Batch 90/192: inflation, influential, informative, ingredient, initial
+  ✅ Successfully inserted/updated 5 words.
+  Batch 91/192: injure, innocence, input, insert, inspection
+  ✅ Successfully inserted/updated 5 words.
+  Batch 92/192: inspiration, inspire, install, instinct, instruct
+  ✅ Successfully inserted/updated 5 words.
+  Batch 93/192: instructor, insult, insurance, intellectual, intelligence
+  ✅ Successfully inserted/updated 5 words.
+  Batch 94/192: intend, intense, intensity, intensive, intention
+  ✅ Successfully inserted/updated 5 words.
+  Batch 95/192: interact, interaction, interfere, intermediate, interpret
+  ✅ Successfully inserted/updated 5 words.
+  Batch 96/192: interruption, intimate, intuition, invade, invasion
+  ✅ Successfully inserted/updated 5 words.
+  Batch 97/192: invention, invest, investigation, involve, isolate
+  ✅ Successfully inserted/updated 5 words.
+  Batch 98/192: isolation, issue, jealousy, keen, kettle
+  ✅ Successfully inserted/updated 5 words.
+  Batch 99/192: kneel, knob, labor, laboratory, lab
+  ✅ Successfully inserted/updated 5 words.
+  Batch 100/192: lag, landmark, landscape, largely, launch
+  ✅ Successfully inserted/updated 5 words.
+  Batch 101/192: lawful, lean, learned, lecture, lecturer
+  ✅ Successfully inserted/updated 5 words.
+  Batch 102/192: legend, leisurely, lengthen, liar, librarian
+  ✅ Successfully inserted/updated 5 words.
+  Batch 103/192: license, lifeguard, limitation, linen, lipstick
+  ✅ Successfully inserted/updated 5 words.
+  Batch 104/192: liquor, literary, literature, loan, lobster
+  ✅ Successfully inserted/updated 5 words.
+  Batch 105/192: logic, logical, loosen, lousy, loyal
+  ✅ Successfully inserted/updated 5 words.
+  Batch 106/192: loyalty, luxurious, luxury, machinery, magnetic
+  ✅ Successfully inserted/updated 5 words.
+  Batch 107/192: magnificent, makeup, manual, manufacture, manufacturer
+  ✅ Successfully inserted/updated 5 words.
+  Batch 108/192: marathon, margin, maturity, maximum, measurable
+  ✅ Successfully inserted/updated 5 words.
+  Batch 109/192: measure, mechanic, mechanical, memorable, memorial
+  ✅ Successfully inserted/updated 5 words.
+  Batch 110/192: memorize, merchant, mercy, mere, merit
+  ✅ Successfully inserted/updated 5 words.
+  Batch 111/192: messenger, messy, microscope, mild, mill
+  ✅ Successfully inserted/updated 5 words.
+  Batch 112/192: millionaire, miner, mineral, minimum, minister
+  ✅ Successfully inserted/updated 5 words.
+  Batch 113/192: ministry, mischief, miserable, misfortune, mislead
+  ✅ Successfully inserted/updated 5 words.
+  Batch 114/192: misunderstand, moderate, modest, modesty, monitor
+  ✅ Successfully inserted/updated 5 words.
+  Batch 115/192: monument, moreover, motivate, motivation, mountainous
+  ✅ Successfully inserted/updated 5 words.
+  Batch 116/192: muddy, mule, multiple, murderer, murmur
+  ✅ Successfully inserted/updated 5 words.
+  Batch 117/192: mutual, mysterious, namely, nationality, needy
+  ✅ Successfully inserted/updated 5 words.
+  Batch 118/192: neglect, negotiate, nevertheless, nightmare, noble
+  ✅ Successfully inserted/updated 5 words.
+  Batch 119/192: nonsense, nowadays, nuclear, numerous, nursery
+  ✅ Successfully inserted/updated 5 words.
+  Batch 120/192: nutritious, obedience, obedient, objection, objective
+  ✅ Successfully inserted/updated 5 words.
+  Batch 121/192: observation, obstacle, obtain, occasional, occupation
+  ✅ Successfully inserted/updated 5 words.
+  Batch 122/192: occupy, offend, offense, offensive, opera
+  ✅ Successfully inserted/updated 5 words.
+  Batch 123/192: oppose, option, orbit, orchestra, orientation
+  ✅ Successfully inserted/updated 5 words.
+  Batch 124/192: orphan, otherwise, outcome, outstanding, oval
+  ✅ Successfully inserted/updated 5 words.
+  Batch 125/192: overcoat, overcome, overlook, overnight, overthrow
+  ✅ Successfully inserted/updated 5 words.
+  Batch 126/192: oxygen, pace, panel, parachute, paragraph
+  ✅ Successfully inserted/updated 5 words.
+  Batch 127/192: partial, participation, partnership, passive, pasta
+  ✅ Successfully inserted/updated 5 words.
+  Batch 128/192: paw, peculiar, peep, peer, penalty
+  ✅ Successfully inserted/updated 5 words.
+  Batch 129/192: percent, percentage, perfection, perfume, permanent
+  ✅ Successfully inserted/updated 5 words.
+  Batch 130/192: persuasion, persuasive, pessimistic, pest, phenomenon
+  ✅ Successfully inserted/updated 5 words.
+  Batch 131/192: philosopher, philosophical, philosophy, photography, physical
+  ✅ Successfully inserted/updated 5 words.
+  Batch 132/192: physician, physicist, physics, pickle, pioneer
+  ✅ Successfully inserted/updated 5 words.
+  Batch 133/192: plentiful, plot, plum, plumber, poisonous
+  ✅ Successfully inserted/updated 5 words.
+  Batch 134/192: polish, popularity, portable, portray, possess
+  ✅ Successfully inserted/updated 5 words.
+  Batch 135/192: possession, postage, potential, precise, predict
+  ✅ Successfully inserted/updated 5 words.
+  Batch 136/192: prediction, pregnancy, pregnant, presentation, preservation
+  ✅ Successfully inserted/updated 5 words.
+  Batch 137/192: preserve, prevention, prime, primitive, priority
+  ✅ Successfully inserted/updated 5 words.
+  Batch 138/192: privacy, privilege, procedure, proceed, productive
+  ✅ Successfully inserted/updated 5 words.
+  Batch 139/192: profession, professional, profitable, prominent, promising
+  ✅ Successfully inserted/updated 5 words.
+  Batch 140/192: promotion, prompt, pronunciation, proposal, prosper
+  ✅ Successfully inserted/updated 5 words.
+  Batch 141/192: prosperity, prosperous, protein, protest, psychological
+  ✅ Successfully inserted/updated 5 words.
+  Batch 142/192: psychologist, psychology, publication, publicity, publish
+  ✅ Successfully inserted/updated 5 words.
+  Batch 143/192: publisher, pursue, pursuit, quarrel, quilt
+  ✅ Successfully inserted/updated 5 words.
+  Batch 144/192: quotation, radar, rage, rainfall, raisin
+  ✅ Successfully inserted/updated 5 words.
+  Batch 145/192: realistic, rebel, recall, reception, recipe
+  ✅ Successfully inserted/updated 5 words.
+  Batch 146/192: recognition, recovery, recreation, recycle, reduction
+  ✅ Successfully inserted/updated 5 words.
+  Batch 147/192: refer, reference, reflect, reflection, reform
+  ✅ Successfully inserted/updated 5 words.
+  Batch 148/192: refugee, refund, refusal, regarding, register
+  ✅ Successfully inserted/updated 5 words.
+  Batch 149/192: registration, regulate, regulation, rejection, relaxation
+  ✅ Successfully inserted/updated 5 words.
+  Batch 150/192: relevant, relieve, reluctant, remark, remarkable
+  ✅ Successfully inserted/updated 5 words.
+  Batch 151/192: remedy, renew, repetition, representation, reputation
+  ✅ Successfully inserted/updated 5 words.
+  Batch 152/192: rescue, research, researcher, resemble, reservation
+  ✅ Successfully inserted/updated 5 words.
+  Batch 153/192: resign, resignation, resistance, resolution, resolve
+  ✅ Successfully inserted/updated 5 words.
+  Batch 154/192: respectable, respectful, restore, restriction, retain
+  ✅ Successfully inserted/updated 5 words.
+  Batch 155/192: retire, retreat, reunion, revenge, revise
+  ✅ Successfully inserted/updated 5 words.
+  Batch 156/192: revision, revolution, revolutionary, reward, rhyme
+  ✅ Successfully inserted/updated 5 words.
+  Batch 157/192: rhythm, riddle, robber, romance, route
+  ✅ Successfully inserted/updated 5 words.
+  Batch 158/192: ruin, rural, rusty, sacrifice, satellite
+  ✅ Successfully inserted/updated 5 words.
+  Batch 159/192: satisfaction, scarcely, scenery, scold, scoop
+  ✅ Successfully inserted/updated 5 words.
+  Batch 160/192: scratch, sculpture, secure, seize, settler
+  ✅ Successfully inserted/updated 5 words.
+  Batch 161/192: severe, sew, shade, shady, shameful
+  ✅ Successfully inserted/updated 5 words.
+  Batch 162/192: shave, shelter, shift, sightseeing, signature
+  ✅ Successfully inserted/updated 5 words.
+  Batch 163/192: significance, sincerity, singular, site, sketch
+  ✅ Successfully inserted/updated 5 words.
+  Batch 164/192: skyscraper, slight, slogan, socket, software
+  ✅ Successfully inserted/updated 5 words.
+  Batch 165/192: solar, spade, spare, spark, spear
+  ✅ Successfully inserted/updated 5 words.
+  Batch 166/192: species, spiritual, splendid, split, sprinkle
+  ✅ Successfully inserted/updated 5 words.
+  Batch 167/192: stab, statistic, status, stem, stereo
+  ✅ Successfully inserted/updated 5 words.
+  Batch 168/192: stingy, stocking, strengthen, stripe, strive
+  ✅ Successfully inserted/updated 5 words.
+  Batch 169/192: stroke, submarine, sue, suggestion, summarize
+  ✅ Successfully inserted/updated 5 words.
+  Batch 170/192: surgeon, surgery, surrender, surroundings, suspicious
+  ✅ Successfully inserted/updated 5 words.
+  Batch 171/192: sway, syllable, sympathetic, sympathy, systematic
+  ✅ Successfully inserted/updated 5 words.
+  Batch 172/192: technician, technological, telegraph, telescope, tendency
+  ✅ Successfully inserted/updated 5 words.
+  Batch 173/192: tense, tension, terror, theme, thorough
+  ✅ Successfully inserted/updated 5 words.
+  Batch 174/192: thoughtful, tickle, timetable, timid, tolerable
+  ✅ Successfully inserted/updated 5 words.
+  Batch 175/192: tolerance, tolerant, tolerate, tomb, tortoise
+  ✅ Successfully inserted/updated 5 words.
+  Batch 176/192: torture, tragedy, tragic, transfer, transform
+  ✅ Successfully inserted/updated 5 words.
+  Batch 177/192: translate, translation, translator, transportation, tremble
+  ✅ Successfully inserted/updated 5 words.
+  Batch 178/192: tremendous, tribal, triumph, troublesome, tumble
+  ✅ Successfully inserted/updated 5 words.
+  Batch 179/192: twig, universal, urge, urgent, usage
+  ✅ Successfully inserted/updated 5 words.
+  Batch 180/192: vacancy, vain, vast, vegetarian, vessel
+  ✅ Successfully inserted/updated 5 words.
+  Batch 181/192: violate, violation, virtue, virus, visual
+  ✅ Successfully inserted/updated 5 words.
+  Batch 182/192: vital, voluntary, volunteer, voyage, waken
+  ✅ Successfully inserted/updated 5 words.
+  Batch 183/192: website, welfare, wink, wit, witch
+  ✅ Successfully inserted/updated 5 words.
+  Batch 184/192: wizard, withdraw, witness, workout, workplace
+  ✅ Successfully inserted/updated 5 words.
+  Batch 185/192: wreck, yawn, youthful, abnormal, abolish
+  ✅ Successfully inserted/updated 5 words.
+  Batch 186/192: abortion, abrupt, absurd, abundant, abuse
+  ❌ Supabase Upsert Error: {
+  message: 'TypeError: fetch failed',
+  details: 'TypeError: fetch failed\n' +
+    '\n' +
+    'Caused by: ConnectTimeoutError: Connect Timeout Error (attempted addresses: 172.64.149.246:443, 104.18.38.10:443, timeout: 10000ms) (UND_ERR_CONNECT_TIMEOUT)\n' +
+    'ConnectTimeoutError: Connect Timeout Error (attempted addresses: 172.64.149.246:443, 104.18.38.10:443, timeout: 10000ms)\n' +
+    '    at onConnectTimeout (node:internal/deps/undici/undici:2602:28)\n' +
+    '    at Immediate._onImmediate (node:internal/deps/undici/undici:2583:11)\n' +
+    '    at process.processImmediate (node:internal/timers:485:21)',
+  hint: '',
+  code: ''
+}
+  Batch 187/192: accelerate, accessible, accommodate, accommodation, accord
+  ✅ Successfully inserted/updated 5 words.
+  Batch 188/192: accounting, acknowledge, acquaint, acquisition, activist
+AI Generation failed: TypeError: fetch failed
+    at node:internal/deps/undici/undici:13510:13
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async makeRequest (file:///Users/simonac/Desktop/moonshot-idea/node_modules/.pnpm/@google+generative-ai@0.24.1/node_modules/@google/generative-ai/dist/index.mjs:395:20)
+    at async generateContent (file:///Users/simonac/Desktop/moonshot-idea/node_modules/.pnpm/@google+generative-ai@0.24.1/node_modules/@google/generative-ai/dist/index.mjs:865:22)
+    at async generateWordData (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:72:24)
+    at async processLevel (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:115:30)
+    at async main (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:159:5)
+  ⚠️ No valid data generated for this batch. Skipping.
+  Batch 189/192: acute, administration, administrative, administrator, adolescent
+  ✅ Successfully inserted/updated 5 words.
+  Batch 190/192: adore, adverse, advocate, affection, agenda
+  ✅ Successfully inserted/updated 5 words.
+  Batch 191/192: aggression, agony, agricultural, aisle, alcoholic
+  ✅ Successfully inserted/updated 5 words.
+  Batch 192/192: alien, allergic, allergy, alliance, allocate
+  ✅ Successfully inserted/updated 5 words.
+
+level_4 Summary: ✅ 940 success, ❌ 20 failed
+
+
+📚 Processing level_5: 961 words
+  Batch 1/193: ally, alongside, alter, alternate, amend
+  ✅ Successfully inserted/updated 5 words.
+  Batch 2/193: ample, analyst, anonymous, anticipate, antique
+  ✅ Successfully inserted/updated 5 words.
+  Batch 3/193: applause, appliance, apt, architect, architecture
+  ✅ Successfully inserted/updated 5 words.
+  Batch 4/193: arena, arouse, array, arrogant, articulate
+  ✅ Successfully inserted/updated 5 words.
+  Batch 5/193: ass, assault, assert, assess, asset
+  ✅ Successfully inserted/updated 5 words.
+  Batch 6/193: assumption, astonish, athletics, attendance, attic
+  ✅ Successfully inserted/updated 5 words.
+  Batch 7/193: attorney, attribute, auction, authorize, autonomy
+  ✅ Successfully inserted/updated 5 words.
+  Batch 8/193: awe, backyard, ballot, ban, banner
+  ✅ Successfully inserted/updated 5 words.
+  Batch 9/193: barren, batch, behalf, belongings, beloved
+  ✅ Successfully inserted/updated 5 words.
+  Batch 10/193: beneficial, betray, beware, bias, bid
+  ✅ Successfully inserted/updated 5 words.
+  Batch 11/193: biological, bizarre, blast, blur, blush
+  ✅ Successfully inserted/updated 5 words.
+  Batch 12/193: bodyguard, bolt, bonus, boom, boost
+  ✅ Successfully inserted/updated 5 words.
+  Batch 13/193: booth, boredom, bound, boundary, boxer
+  ✅ Successfully inserted/updated 5 words.
+  Batch 14/193: breakthrough, briefcase, bronze, browse, bruise
+  ✅ Successfully inserted/updated 5 words.
+  Batch 15/193: bulk, bully, bureau, bureaucracy, burial
+  ✅ Successfully inserted/updated 5 words.
+  Batch 16/193: butcher, calcium, canal, canvas, capability
+  ✅ Successfully inserted/updated 5 words.
+  Batch 17/193: carbon, carnival, casino, cathedral, caution
+  ✅ Successfully inserted/updated 5 words.
+  Batch 18/193: cautious, celebrity, cemetery, ceremony, certainty
+  ✅ Successfully inserted/updated 5 words.
+  Batch 19/193: certificate, chaos, chapel, characterize, chef
+  ✅ Successfully inserted/updated 5 words.
+  Batch 20/193: choir, chord, chore, chronic, chubby
+  ✅ Successfully inserted/updated 5 words.
+  Batch 21/193: chunk, circuit, cite, citizenship, civic
+  ✅ Successfully inserted/updated 5 words.
+  Batch 22/193: clarity, clause, cling, clinical, cluster
+  ✅ Successfully inserted/updated 5 words.
+  Batch 23/193: cocaine, coffin, cognitive, coherent, coincidence
+  ✅ Successfully inserted/updated 5 words.
+  Batch 24/193: collaboration, collective, collector, colonial, columnist
+  ✅ Successfully inserted/updated 5 words.
+  Batch 25/193: combat, comedian, commentary, commentator, commission
+  ✅ Successfully inserted/updated 5 words.
+  Batch 26/193: commitment, commodity, communism, communist, commute
+  ✅ Successfully inserted/updated 5 words.
+  Batch 27/193: commuter, compact, comparable, compassion, compassionate
+  ✅ Successfully inserted/updated 5 words.
+  Batch 28/193: compatible, compel, compensate, compensation, competence
+  ✅ Successfully inserted/updated 5 words.
+  Batch 29/193: competent, complexity, compliance, complication, compliment
+  ✅ Successfully inserted/updated 5 words.
+  Batch 30/193: comply, component, compound, comprehend, comprehension
+  ✅ Successfully inserted/updated 5 words.
+  Batch 31/193: comprise, compromise, compulsory, conceal, concede
+  ✅ Successfully inserted/updated 5 words.
+  Batch 32/193: conceive, conception, condemn, conduct, confession
+  ✅ Successfully inserted/updated 5 words.
+  Batch 33/193: confidential, confine, conform, confront, confrontation
+  ✅ Successfully inserted/updated 5 words.
+  Batch 34/193: consecutive, consensus, consent, conservation, considerate
+  ✅ Successfully inserted/updated 5 words.
+  Batch 35/193: constitutional, constraint, consultation, consumption, contagious
+  ✅ Successfully inserted/updated 5 words.
+  Batch 36/193: contaminate, contemplate, contemporary, contempt, contend
+  ✅ Successfully inserted/updated 5 words.
+  Batch 37/193: continental, contractor, contradiction, controversial, controversy
+  ✅ Successfully inserted/updated 5 words.
+  Batch 38/193: conversion, convert, convict, conviction, coordinate
+  ✅ Successfully inserted/updated 5 words.
+  Batch 39/193: copyright, core, corporate, corporation, correlation
+  ✅ Successfully inserted/updated 5 words.
+  Batch 40/193: correspondent, corridor, corrupt, corruption, counsel
+  ✅ Successfully inserted/updated 5 words.
+  Batch 41/193: counselor, courteous, coverage, credibility, creek
+  ✅ Successfully inserted/updated 5 words.
+  Batch 42/193: cripple, criterion, criteria, crucial, crude
+  ✅ Successfully inserted/updated 5 words.
+  Batch 43/193: cruise, crystal, cuisine, currency, curriculum
+  ✅ Successfully inserted/updated 5 words.
+  Batch 44/193: custody, customs, deadly, debris, debut
+AI Generation failed: SyntaxError: Unterminated string in JSON at position 5543 (line 34 column 4056)
+    at JSON.parse (<anonymous>)
+    at generateWordData (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:74:27)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async processLevel (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:115:30)
+    at async main (/Users/simonac/Desktop/moonshot-idea/apps/web/scripts/batch-seed-words.ts:160:5)
+  ⚠️ No valid data generated for this batch. Skipping.
+  Batch 45/193: decay, deceive, decent, declaration, decline
+  ✅ Successfully inserted/updated 5 words.
+  Batch 46/193: dedicate, defendant, deficit, defy, delegate
+  ✅ Successfully inserted/updated 5 words.
+  Batch 47/193: delegation, deliberate, democrat, denial, density
+  ✅ Successfully inserted/updated 5 words.
+  Batch 48/193: depict, deploy, depress, deputy, derive
+  ✅ Successfully inserted/updated 5 words.
+  Batch 49/193: descend, descriptive, despair, destination, destiny
+  ✅ Successfully inserted/updated 5 words.
+  Batch 50/193: destructive, devotion, diagnose, diagnosis, dialect
+  ✅ Successfully inserted/updated 5 words.
+  Batch 51/193: diameter, diaper, digestion, dilemma, dimension
+  ✅ Successfully inserted/updated 5 words.
+  Batch 52/193: diminish, diplomatic, directory, disapprove, disclose
+  ✅ Successfully inserted/updated 5 words.
+  Batch 53/193: disconnect, discourse, discriminate, discrimination, disrupt
+  ✅ Successfully inserted/updated 5 words.
+  Batch 54/193: dissolve, distinction, distinctive, distract, doctrine
+  ✅ Successfully inserted/updated 5 words.
+  Batch 55/193: document, documentary, domain, dome, donate
+  ✅ Successfully inserted/updated 5 words.
+  Batch 56/193: donation, donor, doorway, dough, dreadful
+  ✅ Successfully inserted/updated 5 words.
+  Batch 57/193: driveway, drought, ecological, ecology, ecosystem
+  ✅ Successfully inserted/updated 5 words.
+  Batch 58/193: ego, elaborate, eligible, eloquent, embrace
+  ✅ Successfully inserted/updated 5 words.
+  Batch 59/193: emission, endorse, enterprise, enthusiastic, entitle
+  ✅ Successfully inserted/updated 5 words.
+  Batch 60/193: entity, entrepreneur, envious, envision, epidemic
+  ✅ Successfully inserted/updated 5 words.
+  Batch 61/193: episode, equation, equity, equivalent, erect
+  ✅ Successfully inserted/updated 5 words.
+  Batch 62/193: errand, erupt, escalator, essence, estate
+  ✅ Successfully inserted/updated 5 words.
+  Batch 63/193: eternal, ethic, ethical, evolution, evolve
+  ✅ Successfully inserted/updated 5 words.
+  Batch 64/193: exaggeration, exceed, exceptional, excessive, exclaim
+  ✅ Successfully inserted/updated 5 words.
+  Batch 65/193: exclude, exclusive, execute, execution, executive
+  ✅ Successfully inserted/updated 5 words.
+  Batch 66/193: exile, exotic, expedition, expertise, explicit
+  ✅ Successfully inserted/updated 5 words.
+  Batch 67/193: exploit, exploration, extension, extensive, exterior
+  ✅ Successfully inserted/updated 5 words.
+  Batch 68/193: external, extinct, extraordinary, fabric, fabulous
+  ✅ Successfully inserted/updated 5 words.
+  Batch 69/193: facilitate, faculty, fascinate, fatigue, federal
+  ✅ Successfully inserted/updated 5 words.
+  Batch 70/193: fiber, filter, fiscal, fleet, flexibility
+  ✅ Successfully inserted/updated 5 words.
+  Batch 71/193: flip, fluency, fluid, forge, format
+  ✅ Successfully inserted/updated 5 words.
+  Batch 72/193: forum, foster, foul, fraction, fragment
+  ✅ Successfully inserted/updated 5 words.
+  Batch 73/193: framework, franchise, fraud, freight, frontier

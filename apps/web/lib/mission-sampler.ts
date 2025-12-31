@@ -114,7 +114,7 @@ async function sampleQuestionsOptimized(config: SamplerConfig): Promise<SamplerR
     return await sampleQuestionsLegacy(config);
   }
 
-  const questions = (data || []).map((q: any) => ({
+  const questions: SampledQuestion[] = (data || []).map((q: any) => ({
     id: q.question_id,
     packId: q.pack_id,
     stem: q.stem,
@@ -824,6 +824,16 @@ export async function getSimilarQuestion(
   ].filter(Boolean);
 
   try {
+    const { data: installedPacks } = await supabase
+      .from('user_pack_installations')
+      .select('pack_id')
+      .eq('user_id', userId)
+
+    const packIds = (installedPacks || []).map((p: any) => p.pack_id).filter(Boolean)
+    if (!packIds.length) {
+      return null
+    }
+
     // Sample from packs with same skill and near difficulty
     const { data, error } = await supabase
       .from('pack_questions')
@@ -840,13 +850,7 @@ export async function getSimilarQuestion(
         packs (skill)
       `
       )
-      .in(
-        'pack_id',
-        supabase
-          .from('user_pack_installations')
-          .select('pack_id')
-          .eq('user_id', userId)
-      )
+      .in('pack_id', packIds)
       .eq('has_explanation', true)
       .not('id', 'in', `(${excludeIds.join(',') || 'null'})`)
       .in('difficulty', nearDifficulties)

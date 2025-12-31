@@ -1,0 +1,6 @@
+[functions.chick_decay]
+verify_jwt = false
+
+[functions.chick_decay.triggers]
+# Runs hourly (UTC)
+schedule = "0 * * * *"

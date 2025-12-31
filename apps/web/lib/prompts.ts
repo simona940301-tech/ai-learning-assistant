@@ -221,6 +221,84 @@ export const SUMMARY_TEMPLATE = `
   "unverified": []
 }`
 
+// Summary Prompt v1
+export function summaryPromptV1(params: {
+  content: string
+  pdfMeta?: {
+    title?: string
+    totalPages?: number
+    fileId?: string
+  }
+}): string {
+  const { content, pdfMeta } = params
+
+  const contextInfo = pdfMeta?.title ? `來自檔案：「${pdfMeta.title}」` : '來自使用者提供的內容'
+
+  return `你是專業的學術總結專家。你需要將提供的內容整理成結構化的學習總結表。
+
+**輸入內容：**
+${content}
+
+**來源資訊：** ${contextInfo}
+
+**任務：** 將以上內容整理成五段式總結（WHY/WHAT/HOW/CHECK）加上快閃卡，格式必須嚴格遵循以下 JSON 結構。
+
+**輸出格式（嚴格 JSON，無額外文字）：**
+
+{
+  "executive_summary": {
+    "text": "100-150字的總結摘要，涵蓋主題、核心觀點與學習重點",
+    "refs": [{"page": 1, "paragraph": 1}]
+  },
+  "why": {
+    "text": "為什麼需要學習這個主題？說明背景、重要性與學習動機。3-5句話。",
+    "refs": [{"page": 1, "paragraph": 2}]
+  },
+  "what": {
+    "text": "核心概念與知識點整理。列出3-5個主要觀點，每個觀點1-2句說明。",
+    "refs": [{"page": 2, "paragraph": 1}]
+  },
+  "how": {
+    "text": "如何應用這些概念？提供實用的學習方法、應用場景或實作步驟。",
+    "refs": [{"page": 3, "paragraph": 1}]
+  },
+  "check": {
+    "text": "常見盲點與注意事項。提醒學生容易混淆的概念或應避免的錯誤。",
+    "refs": [{"page": 4, "paragraph": 1}]
+  },
+  "flashcards": [
+    {
+      "id": "fc-1",
+      "question": "具體的問題（例如：什麼是核心概念X？）",
+      "answer": "簡潔的答案（2-3句）",
+      "refs": [{"page": 1, "paragraph": 1}],
+      "tags": ["核心概念", "重要觀點"]
+    }
+  ],
+  "coverage": [
+    {"section": "executive_summary", "refs": [{"page": 1, "paragraph": 1}]},
+    {"section": "why", "refs": [{"page": 1, "paragraph": 2}]},
+    {"section": "what", "refs": [{"page": 2, "paragraph": 1}]},
+    {"section": "how", "refs": [{"page": 3, "paragraph": 1}]},
+    {"section": "check", "refs": [{"page": 4, "paragraph": 1}]}
+  ],
+  "references": [
+    {"page": 1, "paragraph": 1},
+    {"page": 2, "paragraph": 2}
+  ]
+}
+
+**規則：**
+1. **所有文字使用繁體中文**
+2. **refs 必須指向實際內容來源**，page/paragraph 編號從 1 開始
+3. **executive_summary**：簡潔有力，100-150字
+4. **why/what/how/check**：每個區塊 3-5 句話，邏輯清晰
+5. **flashcards**：生成 4-8 張，問題具體，答案精準，標籤相關
+6. **coverage**：標記每個區塊涵蓋的內容來源
+7. **references**：列出所有使用的參考來源
+8. **只輸出 JSON，無其他文字或格式**`
+}
+
 // Self-check prompts
 export const SELF_CHECK_INSTRUCTION = `
 **自我檢查（回覆前必做）：**

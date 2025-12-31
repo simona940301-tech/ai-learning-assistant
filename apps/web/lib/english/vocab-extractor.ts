@@ -1,4 +1,4 @@
-import { chatCompletionJSON } from '@/lib/openai'
+import { chatCompletionJSON } from '@/lib/gemini'
 import type { VocabItem, EnglishQuestionInput } from '@/lib/contracts/explain'
 
 /**

@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { AppBar } from '@/components/layout/app-bar'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { BookOpen, Globe, FlaskConical, Calculator, Languages } from 'lucide-react'
+import { EWABattleInterface } from '@/components/play/EWABattleInterface'
+import { BookOpen, Globe, FlaskConical, Calculator, Languages, Brain, Target } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 const subjects = [
@@ -24,6 +25,7 @@ const tasks = [
 export default function PlayPage() {
   const [selectedTask, setSelectedTask] = useState<number | null>(null)
   const [isWorking, setIsWorking] = useState(false)
+  const [currentMode, setCurrentMode] = useState<'tasks' | 'ewa-battle'>('tasks')
 
   const handleComplete = () => {
     setIsWorking(false)
@@ -31,12 +33,85 @@ export default function PlayPage() {
     // Animation for completion
   }
 
+  // EWA Battle 系統整合
+  const handleStartEWABattle = async (config: any) => {
+    try {
+      const response = await fetch('/api/play/pve/ewa-questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+      })
+      
+      if (!response.ok) throw new Error('Failed to start EWA battle')
+      
+      const result = await response.json()
+      return {
+        questions: result.questions,
+        analysis: result.analysis,
+        message: result.message
+      }
+    } catch (error) {
+      console.error('EWA Battle start failed:', error)
+      throw error
+    }
+  }
+
+  const handleEWAAnswerSubmit = async (questionId: string, answer: string, timeTaken: number) => {
+    try {
+      const response = await fetch('/api/play/pve/ewa-questions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question_id: questionId,
+          question_source: 'seed_questions',
+          is_correct: answer !== '', // 簡化判斷，實際需要後端驗證
+          response_time_ms: timeTaken,
+          session_id: Date.now().toString(),
+          position: 1,
+          expected_correctness: 0.75
+        })
+      })
+      
+      if (!response.ok) throw new Error('Failed to submit answer')
+    } catch (error) {
+      console.error('EWA Answer submit failed:', error)
+      throw error
+    }
+  }
+
   return (
     <>
       <AppBar title="Play" user={{ name: 'User', avatar: '' }} />
 
       <main className="mx-auto max-w-lg p-4">
-        {/* Stats */}
+        {/* 模式切換 */}
+        <div className="mb-6 grid grid-cols-2 gap-2">
+          <Button
+            variant={currentMode === 'tasks' ? 'default' : 'outline'}
+            onClick={() => setCurrentMode('tasks')}
+            className="flex items-center gap-2"
+          >
+            <BookOpen className="w-4 h-4" />
+            傳統任務
+          </Button>
+          <Button
+            variant={currentMode === 'ewa-battle' ? 'default' : 'outline'}
+            onClick={() => setCurrentMode('ewa-battle')}
+            className="flex items-center gap-2"
+          >
+            <Brain className="w-4 h-4" />
+            EWA 智能對戰
+          </Button>
+        </div>
+
+        {currentMode === 'ewa-battle' ? (
+          <EWABattleInterface 
+            onStartBattle={handleStartEWABattle}
+            onAnswerSubmit={handleEWAAnswerSubmit}
+          />
+        ) : (
+          <>
+            {/* Stats */}
         <div className="mb-6 grid grid-cols-3 gap-4">
           <Card className="p-4 text-center">
             <div className="text-2xl font-bold">7</div>
@@ -68,8 +143,8 @@ export default function PlayPage() {
           })}
         </div>
 
-        {/* Tasks */}
-        <div className="space-y-3">
+            {/* Tasks */}
+            <div className="space-y-3">
           {tasks.map((task, idx) => {
             const subject = subjects.find(s => s.id === task.subject)
             const Icon = subject?.icon || BookOpen
@@ -108,10 +183,10 @@ export default function PlayPage() {
               </motion.div>
             )
           })}
-        </div>
+            </div>
 
-        {/* Task Modal */}
-        <AnimatePresence>
+            {/* Task Modal */}
+            <AnimatePresence>
           {selectedTask && (
             <motion.div
               initial={{ opacity: 0 }}
@@ -156,7 +231,9 @@ export default function PlayPage() {
               </motion.div>
             </motion.div>
           )}
-        </AnimatePresence>
+            </AnimatePresence>
+          </>
+        )}
       </main>
     </>
   )

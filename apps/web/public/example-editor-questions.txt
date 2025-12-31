@@ -1,0 +1,323 @@
+2024 學測英文 - Editor Mode（共用選項池格式）
+
+📝 題目 1
+主題：海牛的生態與保育
+
+文章：
+Manatees, also called sea cows, are large, slow-moving animals. They are {21:aquatic} mammals because they can be found in waters and rivers, mostly in Florida of the United States. In {22:appearance}, manatees look like walruses, yet their closest relatives are elephants. Manatees have three or four tiny nails at the end of each flipper, very similar to an elephant's toenails. They also have prehensile upper lips, like elephants' trunks, to grasp and pull food into their mouths. Interestingly, manatees have to return to a freshwater river to drink while they enjoy swimming and grazing on seagrass in water.
+
+In order to survive in tough and challenging conditions, manatees make a large quantity of special adaptations for breath. For example, they normally return to the {23:surface} of the water about every two to five minutes but stay submerged for as long as 20 minutes if necessary. Manatees' lungs are quite long. The lungs extend horizontally along their backs. With each breath, manatees exchange 90 percent of the air in their lungs, while humans exchange 10 percent when they breathe.
+
+Manatees' movements look {24:elegant} just like ballet dancers. Thus they were easily {25:mistaken} for mermaids for ages. In spite of their graceful {26:characteristic}, however, manatees have a very impolite way of sinking and swimming in the sea, making farts. Manatees use their farts to swim. An adult manatee will eat between 100 and 150 pounds of {27:vegetation} each day, which means a lot of methane builds up inside.
+
+Manatees are an {28:endangered} species. This is mainly due to their large size and slow movement in water that makes them {29:vulnerable} to hunters who attempt to collect their bones and oil. The number of manatees has {30:declined} for the sake of hunting pressure. Despite law protections, threats are everywhere. The gentle beasts are often hit by motorboats, and sometimes become entangled in fishing nets. It is our duty to protect this beautiful creature with care.
+
+---
+
+正確選項（共用選項池 - 10 個）：
+(A) characteristic - 特徵（名詞）
+(B) vegetation - 植被（名詞）
+(C) declined - 下降（動詞過去分詞）
+(D) appearance - 外觀（名詞）
+(E) vulnerable - 脆弱的（形容詞）
+(F) mistaken - 誤認（動詞過去分詞）
+(G) elegant - 優雅的（形容詞）
+(H) aquatic - 水生的（形容詞）
+(I) surface - 表面（名詞）
+(J) endangered - 瀕危的（形容詞）
+
+額外干擾選項（2-3 個）：
+(K) elegance - 優雅（名詞）【詞根相同但詞性不同，與 elegant 形態相似】
+(L) apparent - 明顯的（形容詞）【字首相似 app-，與 appearance 形態相似但意思不同】
+(M) decline - 下降（動詞原形/名詞）【詞根相同但詞性不同，與 declined 形態相似】
+
+最終選項池：13 個選項（A-M）
+
+---
+
+答案與詳解：
+
+空格 21: H (aquatic)
+詞性: 形容詞 (adjective)
+中文: 水生的
+上下文判斷：
+前文：「They are ___ mammals」
+後文：「because they can be found in waters and rivers」
+分析：後文明確說明「在水域和河流中發現」，說明是水生哺乳動物。aquatic 是專業生物學用語，表示「水生的」，最符合語境。
+
+---
+
+空格 22: D (appearance)
+詞性: 名詞 (noun)
+中文: 外觀
+上下文判斷：
+前文：「In ___」
+後文：「manatees look like walruses」
+分析：「In appearance」是固定用法，表示「在外觀上」。後文說「看起來像海象」，正是在描述外觀特徵。
+⚠️ 干擾選項 (L) apparent 雖然字首相似，但是形容詞，且意思是「明顯的」，不符合「in + 名詞」的結構。
+
+---
+
+空格 23: I (surface)
+詞性: 名詞 (noun)
+中文: 表面、水面
+上下文判斷：
+前文：「return to the ___ of the water」
+後文：「about every two to five minutes」
+分析：討論呼吸行為，海牛需要「回到水面」呼吸。「return to the surface」是標準搭配。
+
+---
+
+空格 24: G (elegant)
+詞性: 形容詞 (adjective)
+中文: 優雅的
+上下文判斷：
+前文：「Manatees' movements look ___」
+後文：「just like ballet dancers」
+分析：比喻為「芭蕾舞者」，說明動作優雅。elegant 最能表達這種優美的特質。
+⚠️ 干擾選項 (K) elegance 雖然詞根相同，但是名詞，不能用在「look + 形容詞」的結構中。
+
+---
+
+空格 25: F (mistaken)
+詞性: 動詞過去分詞 (past participle)
+中文: 被誤認
+上下文判斷：
+前文：「they were easily ___」
+後文：「for mermaids」
+分析：「be mistaken for」是固定搭配，表示「被誤認為」。歷史上人們常將海牛誤認為美人魚。
+
+---
+
+空格 26: A (characteristic)
+詞性: 名詞 (noun)
+中文: 特徵、特性
+上下文判斷：
+前文：「their graceful ___」
+後文：「however, manatees have a very impolite way」
+分析：前面提到優雅的特徵，後面用 however 轉折，說明另一個不那麼優雅的行為。characteristic 表示「特徵」。
+
+---
+
+空格 27: B (vegetation)
+詞性: 名詞 (noun)
+中文: 植被、植物
+上下文判斷：
+前文：「eat between 100 and 150 pounds of ___」
+後文：「each day」
+分析：海牛是草食性動物，每天吃大量植物。vegetation 是集合名詞，表示「植被、植物」。
+
+---
+
+空格 28: J (endangered)
+詞性: 形容詞 (adjective)
+中文: 瀕危的
+上下文判斷：
+前文：「Manatees are an ___ species」
+後文：「This is mainly due to their large size and slow movement」
+分析：後文解釋面臨的威脅，說明是瀕危物種。endangered species 是生物保育的專業術語。
+
+---
+
+空格 29: E (vulnerable)
+詞性: 形容詞 (adjective)
+中文: 脆弱的、易受傷害的
+上下文判斷：
+前文：「makes them ___」
+後文：「to hunters」
+分析：「vulnerable to」是固定搭配，表示「容易受到...的傷害」。體型大、移動慢使牠們容易成為獵人的目標。
+
+---
+
+空格 30: C (declined)
+詞性: 動詞過去分詞 (past participle)
+中文: 下降、減少
+上下文判斷：
+前文：「The number of manatees has ___」
+後文：「for the sake of hunting pressure」
+分析：現在完成式「has + 過去分詞」，表示數量已經下降。declined 表示「減少」，符合保育議題的語境。
+⚠️ 干擾選項 (M) decline 雖然詞根相同，但是原形動詞或名詞，不能用在「has + 過去分詞」的結構中。
+
+---
+
+🧠 整體詳解
+
+**干擾選項分析**：
+1. **(K) elegance**：與 elegant 詞根相同，但詞性不同（名詞 vs 形容詞）
+   - 可能誤用位置：空格 24（但 look 後面要接形容詞）
+   
+2. **(L) apparent**：與 appearance 字首相似（app-），但意思完全不同
+   - apparent = 明顯的（形容詞）
+   - appearance = 外觀（名詞）
+   - 可能誤用位置：空格 22（但 in 後面要接名詞）
+
+3. **(M) decline**：與 declined 詞根相同，但詞性不同（原形 vs 過去分詞）
+   - 可能誤用位置：空格 30（但 has 後面要接過去分詞）
+
+**解題策略**：
+1. **先判斷詞性**：根據文法結構排除詞性不符的選項
+2. **注意固定搭配**：in appearance, vulnerable to, be mistaken for
+3. **小心形態相似的詞**：elegant/elegance, appearance/apparent, declined/decline
+4. **理解上下文**：不只看空格附近，要理解整句甚至整段的意思
+
+---
+
+📝 題目 2
+主題：再生能源的發展
+
+文章：
+Renewable energy has become increasingly {31:essential} in addressing climate change. Solar and wind power are now more {32:affordable} than ever before, making them {33:accessible} to a wider range of consumers. Governments worldwide are {34:implementing} policies to encourage the {35:transition} from fossil fuels to clean energy sources.
+
+The {36:efficiency} of solar panels has improved dramatically over the past decade. Modern photovoltaic cells can {37:convert} sunlight into electricity with remarkable precision. This technological {38:advancement} has made solar energy a {39:viable} alternative to traditional power sources. However, the {40:intermittent} nature of renewable energy still poses challenges for grid stability.
+
+---
+
+正確選項（共用選項池 - 10 個）：
+(A) accessible - 可取得的（形容詞）
+(B) advancement - 進步（名詞）
+(C) affordable - 負擔得起的（形容詞）
+(D) convert - 轉換（動詞）
+(E) efficiency - 效率（名詞）
+(F) essential - 必要的（形容詞）
+(G) implementing - 實施（動詞現在分詞）
+(H) intermittent - 間歇的（形容詞）
+(I) transition - 轉變（名詞）
+(J) viable - 可行的（形容詞）
+
+額外干擾選項（3 個）：
+(K) advance - 前進（動詞/名詞）【詞根相同但詞性不同，與 advancement 形態相似】
+(L) efficient - 有效率的（形容詞）【詞根相同但詞性不同，與 efficiency 形態相似】
+(M) conversion - 轉換（名詞）【詞根相同但詞性不同，與 convert 形態相似】
+
+最終選項池：13 個選項（A-M）
+
+---
+
+答案與詳解：
+
+空格 31: F (essential)
+詞性: 形容詞 (adjective)
+中文: 必要的、不可或缺的
+上下文判斷：
+前文：「has become increasingly ___」
+後文：「in addressing climate change」
+分析：「become + 形容詞」，essential 表示「必要的」，強調再生能源對應對氣候變遷的重要性。
+
+---
+
+空格 32: C (affordable)
+詞性: 形容詞 (adjective)
+中文: 負擔得起的
+上下文判斷：
+前文：「are now more ___」
+後文：「than ever before」
+分析：比較級結構「more + 形容詞 + than」，affordable 表示「價格合理的」，說明成本下降。
+
+---
+
+空格 33: A (accessible)
+詞性: 形容詞 (adjective)
+中文: 可取得的、可及的
+上下文判斷：
+前文：「making them ___」
+後文：「to a wider range of consumers」
+分析：「accessible to」是固定搭配，表示「對...而言是可取得的」。
+
+---
+
+空格 34: G (implementing)
+詞性: 動詞現在分詞 (present participle)
+中文: 實施、執行
+上下文判斷：
+前文：「Governments worldwide are ___」
+後文：「policies to encourage」
+分析：現在進行式「are + 現在分詞」，implementing policies 表示「實施政策」。
+
+---
+
+空格 35: I (transition)
+詞性: 名詞 (noun)
+中文: 轉變、過渡
+上下文判斷：
+前文：「encourage the ___」
+後文：「from fossil fuels to clean energy」
+分析：「the transition from A to B」表示「從 A 到 B 的轉變」，是標準用法。
+
+---
+
+空格 36: E (efficiency)
+詞性: 名詞 (noun)
+中文: 效率
+上下文判斷：
+前文：「The ___ of solar panels」
+後文：「has improved dramatically」
+分析：「the + 名詞 + of」結構，efficiency 表示「效率」，說明太陽能板的性能提升。
+⚠️ 干擾選項 (L) efficient 雖然詞根相同，但是形容詞，不能用在「the ___ of」的結構中。
+
+---
+
+空格 37: D (convert)
+詞性: 動詞原形 (verb)
+中文: 轉換
+上下文判斷：
+前文：「can ___」
+後文：「sunlight into electricity」
+分析：「can + 動詞原形」，convert A into B 表示「將 A 轉換成 B」。
+⚠️ 干擾選項 (M) conversion 雖然詞根相同，但是名詞，不能用在「can + 動詞」的結構中。
+
+---
+
+空格 38: B (advancement)
+詞性: 名詞 (noun)
+中文: 進步、進展
+上下文判斷：
+前文：「This technological ___」
+後文：「has made solar energy」
+分析：「形容詞 + 名詞」結構，advancement 表示「進步」，technological advancement 是常見搭配。
+⚠️ 干擾選項 (K) advance 雖然詞根相同，但在此處應該用名詞形式 advancement。
+
+---
+
+空格 39: J (viable)
+詞性: 形容詞 (adjective)
+中文: 可行的
+上下文判斷：
+前文：「made solar energy a ___」
+後文：「alternative to traditional power sources」
+分析：「a + 形容詞 + 名詞」結構，viable alternative 表示「可行的替代方案」。
+
+---
+
+空格 40: H (intermittent)
+詞性: 形容詞 (adjective)
+中文: 間歇的、斷續的
+上下文判斷：
+前文：「the ___ nature of renewable energy」
+後文：「still poses challenges」
+分析：intermittent 表示「間歇性的」，指出再生能源的缺點（不穩定、時有時無）。
+
+---
+
+🧠 整體詳解
+
+**干擾選項設計原理**：
+1. **(K) advance** vs **(B) advancement**
+   - 詞根相同：advanc-
+   - 詞性不同：動詞/名詞（原形）vs 名詞（抽象）
+   - 用法差異：advance 較少用作可數名詞，advancement 是標準的抽象名詞
+
+2. **(L) efficient** vs **(E) efficiency**
+   - 詞根相同：effici-
+   - 詞性不同：形容詞 vs 名詞
+   - 文法陷阱：「the ___ of」需要名詞，不能用形容詞
+
+3. **(M) conversion** vs **(D) convert**
+   - 詞根相同：convert/convers-
+   - 詞性不同：名詞 vs 動詞
+   - 文法陷阱：「can ___」需要動詞原形，不能用名詞
+
+**解題技巧總結**：
+1. **詞性判斷最關鍵**：先確定空格需要什麼詞性
+2. **小心詞根相同的詞**：同一個詞根可能有多種詞性變化
+3. **注意固定搭配**：accessible to, transition from...to, convert...into
+4. **理解語境**：不只看文法，也要理解文章內容的邏輯

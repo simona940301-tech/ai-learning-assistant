@@ -12,8 +12,8 @@ import type { QuestionSegment } from './tutor-types'
 export function segmentQuestions(input: string): QuestionSegment[] {
   const segments: QuestionSegment[] = []
 
-  // 先嘗試按題號分段
-  const numberPattern = /(?:^|\n)\s*(\d+)[\.)]\s*/g
+  // 先嘗試按題號分段（增強支援 (1)、(2)、（1）、（2） 等格式）
+  const numberPattern = /(?:^|\n)\s*(?:(\d+)[\.)]\s*|[(（](\d+)[)）]\s*)/g
   const parts = input.split(numberPattern).filter(Boolean)
 
   if (parts.length > 2) {

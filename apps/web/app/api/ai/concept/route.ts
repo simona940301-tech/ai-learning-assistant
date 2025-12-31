@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { chatCompletionJSON } from '@/lib/openai'
+import { getApiUser } from '@/lib/api/auth'
+import { chatCompletionJSON } from '@/lib/gemini'
 
 interface ConceptOption {
   id: string
@@ -19,6 +20,27 @@ interface ConceptRequestBody {
 
 export async function POST(request: NextRequest) {
   try {
+    const { user, errorType } = await getApiUser(request)
+
+    if (!user) {
+      const message =
+        errorType === 'invalid-jwt'
+          ? '登入狀態失效，請重新登入或清除 Cookies 後再試。'
+          : errorType === 'unauthenticated'
+          ? 'Authentication required'
+          : 'Authentication error occurred'
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'UNAUTHORIZED',
+          message,
+          errorType,
+        },
+        { status: 401 }
+      )
+    }
+
     const { question, context }: ConceptRequestBody = await request.json()
     if (!question?.trim()) {
       return NextResponse.json({ error: 'question is required' }, { status: 400 })

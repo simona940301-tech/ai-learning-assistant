@@ -1,6 +1,7 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
+import { getApiUser } from '@/lib/api/auth'
 import { ExplainCardSchema } from '@/lib/contracts/explain'
 import { generateE4TemplateStream } from '@/lib/english/templates-streaming'
 
@@ -16,6 +17,27 @@ const InputSchema = z.object({
  */
 export async function POST(request: NextRequest) {
   try {
+    const { user, errorType } = await getApiUser(request)
+
+    if (!user) {
+      const message =
+        errorType === 'invalid-jwt'
+          ? '登入狀態失效，請重新登入或清除 Cookies 後再試。'
+          : errorType === 'unauthenticated'
+          ? 'Authentication required'
+          : 'Authentication error occurred'
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'UNAUTHORIZED',
+          message,
+          errorType,
+        },
+        { status: 401 }
+      )
+    }
+
     const body = await request.json()
     const input = InputSchema.parse(body)
     const questionText = input.text || input.questionText || ''

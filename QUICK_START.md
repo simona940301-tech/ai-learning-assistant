@@ -1,107 +1,112 @@
-# ⚡ 快速開始指南
+# 🚀 快速開始：修復 Migration 錯誤
 
-## 🚀 3 分鐘啟動
+## ❌ 錯誤訊息
+```
+ERROR: 42P01: relation "user_missions" does not exist LINE 265
+```
 
-### 1. 確認環境變數
+## ✅ 已修復
+Migration 文件已重新排序，現在執行順序正確！
+
+---
+
+## 📋 你現在需要做的事（3 選 1）
+
+### 選項 1：安全執行（推薦 ⭐）
+
+**適用於**：已有數據的數據庫，不想刪除任何東西
+
+**步驟**：
+1. 打開 Supabase Dashboard (https://supabase.com/dashboard)
+2. 選擇你的專案 → SQL Editor → New Query
+3. 複製貼上這個文件的內容：
+   ```
+   supabase/migrations/SAFE_20251026_NEW_TABLES_ONLY.sql
+   ```
+4. 點擊 "Run"
+5. 查看結果，應該顯示：✅ 所有核心表已創建！
+
+**優點**：
+- ✅ 不會刪除現有數據
+- ✅ 使用 IF NOT EXISTS，安全重複執行
+- ✅ 自動驗證創建結果
+
+---
+
+### 選項 2：完整執行（全新數據庫）
+
+**適用於**：全新數據庫，或開發環境可以重置
+
+**步驟**：
+1. 打開 Supabase Dashboard
+2. 選擇你的專案 → SQL Editor → New Query
+3. 複製貼上這個文件的內容：
+   ```
+   supabase/migrations/COMBINED_20251026_ALL.sql
+   ```
+4. 點擊 "Run"
+
+---
+
+### 選項 3：本地開發（需要 Docker）
+
 ```bash
-# 檢查 .env.local 是否存在
-cat .env.local | head -3
+# 1. 啟動 Docker Desktop
+open -a Docker
 
-# 應該看到:
-# OPENAI_API_KEY=sk-...
-# NEXT_PUBLIC_SUPABASE_URL=https://...
-# NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
-```
+# 2. 啟動 Supabase
+supabase start
 
-### 2. 啟動開發服務器
-```bash
-npm run dev
-```
+# 3. 重置數據庫
+supabase db reset
 
-###3. 訪問應用
-```
-http://localhost:3000           # 首頁
-http://localhost:3000/ask       # 解題頁面
-http://localhost:3000/backpack  # 錯題本
-```
-
-### 4. 測試解題功能
-在 Ask 頁面輸入框貼上：
-```
-三角形 ABC，已知 a=5, b=7, C=60°，求 c=?
-```
-按 Enter 送出。
-
-### 5. 驗證 API
-```bash
-# 另開一個終端
-npm run verify:solve
+# 4. 查看狀態
+supabase status
 ```
 
 ---
 
-## 📱 iOS App 測試
+## 🔍 驗證執行成功
 
-### 1. 確保 Next.js 運行
-```bash
-npm run dev  # 必須運行在 http://127.0.0.1:3000
+在 Supabase Dashboard SQL Editor 執行：
+
+```sql
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema = 'public'
+  AND table_name IN (
+    'analytics_events',
+    'packs',
+    'pack_questions',
+    'missions',
+    'user_missions',
+    'error_book',
+    'user_answers'
+  )
+ORDER BY table_name;
 ```
 
-### 2. 打開 Xcode
-```bash
-cd ios-app
-open -a Xcode
-```
-
-### 3. 創建新的 iOS App 專案
-- File > New > Project
-- iOS > App
-- Interface: SwiftUI
-- Language: Swift
-
-### 4. 添加檔案
-- 拖放 `WebView.swift` 到專案
-- 拖放 `ContentView.swift` 替換現有檔案
-- 複製 `Info.plist` 內容到專案的 Info.plist
-
-### 5. 運行
-- 選擇 iPhone 模擬器
-- Product > Run (Cmd+R)
+**期望結果**：應該看到 7-11 個表
 
 ---
 
-## 🔍 除錯
+## 🎯 我的推薦
 
-### 問題: 輸入框無法貼上
-**解決**: 已修復！使用非受控 textarea。
-
-### 問題: API 回應 404
-**檢查**:
-```bash
-npm run verify:solve
-# 查看哪個階段失敗
-```
-
-### 問題: iOS App 顯示空白
-**檢查**:
-1. Next.js 是否運行？
-2. 使用 `127.0.0.1` 而非 `localhost`？
-3. Info.plist 包含 ATS 例外？
+- **第一次設置** → 使用選項 2（完整執行）
+- **已有數據** → 使用選項 1（安全執行）⭐
+- **本地開發** → 使用選項 3
 
 ---
 
-## 📊 服務器日誌範例
+## 📁 重要文件
 
-```bash
-[solve][stage=parse] Starting request
-[solve][stage=parse] Validated: { subject: 'MathA', mode: 'step' }
-[solve][stage=subject] Resolving subject: MathA
-[solve][stage=subject] Found: abc-123-...
-[solve][stage=keypoints] Loaded keypoints: 45
-[solve][stage=response] Success: { subject: 'MathA', keypoint: 'TRIG_COS_LAW' }
-```
+| 文件 | 用途 |
+|------|------|
+| `SAFE_20251026_NEW_TABLES_ONLY.sql` | 安全創建新表 ⭐ |
+| `COMBINED_20251026_ALL.sql` | 完整 migration |
+| `MIGRATION_FIX_REPORT.md` | 詳細技術報告 |
+| `MIGRATION_EXECUTION_GUIDE.md` | 完整執行指南 |
 
 ---
 
-**🎉 開始使用吧！**
-
+需要幫助？查看 MIGRATION_EXECUTION_GUIDE.md 獲取更多詳情！

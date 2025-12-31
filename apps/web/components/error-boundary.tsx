@@ -26,7 +26,17 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    // Always log to console so production can still see the root cause when Sentry is blocked
     console.error('ErrorBoundary caught an error:', error, errorInfo)
+    // Expose the last error for quick inspection in DevTools (even if Sentry is blocked)
+    if (typeof window !== 'undefined') {
+      ;(window as any).__PLMS_LAST_ERROR__ = {
+        message: error?.message,
+        stack: error?.stack,
+        componentStack: errorInfo?.componentStack,
+        timestamp: new Date().toISOString(),
+      }
+    }
     this.setState({ error, errorInfo })
     
     // 發送到錯誤追蹤服務
@@ -74,14 +84,22 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
                   重新整理頁面
                 </Button>
               </div>
-              {process.env.NODE_ENV === 'development' && this.state.error && (
+              {this.state.error && (
                 <details className="mt-4 text-left">
                   <summary className="cursor-pointer text-sm text-muted-foreground">
-                    開發者資訊
+                    開發者資訊（點擊展開）
                   </summary>
                   <pre className="mt-2 text-xs bg-muted p-2 rounded overflow-auto">
                     {this.state.error.message}
+                    {'\n'}
                     {this.state.error.stack}
+                    {this.state.errorInfo?.componentStack && (
+                      <>
+                        {'\n\n'}Component Stack:
+                        {'\n'}
+                        {this.state.errorInfo.componentStack}
+                      </>
+                    )}
                   </pre>
                 </details>
               )}

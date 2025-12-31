@@ -1,0 +1,347 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
+import { Sparkles, Loader2, AlertCircle } from 'lucide-react'
+import { FileUploader } from '@/components/ask/file-uploader'
+import { Button } from '@/components/ui/button'
+import { useAsk } from '@/lib/ask-context'
+import { cn } from '@/lib/utils'
+import ProgressiveAnalysisCard from '@/components/ask/ProgressiveAnalysisCard'
+// import ExpertQADialog from '@/components/ask/ExpertQADialog' // Disabled
+// import { RAGDataSourceList } from '@/components/ask/RAGDataSourceList' // Disabled
+import { motion, AnimatePresence } from 'framer-motion'
+
+/**
+ * Elite RAG Upload Response
+ */
+interface EliteUploadResponse {
+  success: boolean
+  fileId: string
+  analysisId: string
+  fileName: string
+  numPages: number
+  status: 'processing'
+  message: string
+}
+
+/**
+ * Error Response
+ */
+interface ErrorResponse {
+  error: string
+  message: string
+}
+
+/**
+ * SummaryWorkbench Component
+ * 
+ * World-class document analysis interface with:
+ * - Elite RAG upload with OCR support
+ * - Progressive 3-layer analysis (3s → 15s → 30s)
+ * - Premium UX with smooth animations
+ * - Comprehensive error handling
+ */
+export function SummaryWorkbench() {
+  const { attachedFiles, clearAll } = useAsk()
+
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+
+  // State management
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [analysisId, setAnalysisId] = useState<string | null>(null)
+  const [fileName, setFileName] = useState<string | null>(null)
+  // const [showExpertQA, setShowExpertQA] = useState(false) // Disabled
+
+  // Initialize from URL
+  useEffect(() => {
+    const id = searchParams.get('analysisId')
+    if (id) {
+      setAnalysisId(id)
+      // We don't have filename from URL, but ProgressiveAnalysisCard fetches data anyway
+      // It might display '未知檔案' initially until data loads
+    }
+  }, [searchParams])
+
+  // Update URL when analysisId changes
+  useEffect(() => {
+    if (analysisId) {
+      const params = new URLSearchParams(searchParams.toString())
+      params.set('analysisId', analysisId)
+      router.replace(`${pathname}?${params.toString()}`)
+    }
+  }, [analysisId, pathname, router, searchParams])
+
+  /**
+   * Handle file upload and trigger Elite RAG analysis with progress tracking
+   */
+  const handleStartAnalysis = async () => {
+    // Validation
+    if (attachedFiles.length === 0) {
+      setUploadError('請先上傳 PDF 或 TXT 檔案')
+      return
+    }
+
+    setIsUploading(true)
+    setUploadProgress(0)
+    setUploadError(null)
+    setAnalysisId(null)
+    setFileName(null)
+
+    try {
+      // Prepare FormData with ALL files
+      const formData = new FormData()
+
+      let totalSize = 0
+      for (const attachedFile of attachedFiles) {
+        if (!attachedFile.url) continue
+
+        const response = await fetch(attachedFile.url)
+        const blob = await response.blob()
+        const file = new File([blob], attachedFile.name, { type: blob.type })
+
+        // Validate individual file type
+        const isValidType =
+          file.type === 'application/pdf' ||
+          file.type === 'text/plain' ||
+          file.type.startsWith('image/') ||
+          file.name.endsWith('.pdf') ||
+          file.name.endsWith('.txt') ||
+          file.name.match(/\.(jpg|jpeg|png|gif)$/i)
+
+        if (!isValidType) {
+          throw new Error(`不支援的檔案類型: ${file.name}`)
+        }
+
+        totalSize += file.size
+        formData.append('file', file)
+      }
+
+      // Validate total size (50MB limit for multiple files)
+      const MAX_TOTAL_SIZE = 50 * 1024 * 1024
+      if (totalSize > MAX_TOTAL_SIZE) {
+        throw new Error('總文件大小不能超過 50MB')
+      }
+
+      // Get auth token for API request
+      const { supabaseBrowser } = await import('@/lib/supabase')
+      const { data: sessionData } = await supabaseBrowser.auth.getSession()
+      const accessToken = sessionData?.session?.access_token
+
+      if (!accessToken) {
+        throw new Error('請先登入')
+      }
+
+      // Upload with progress tracking using XMLHttpRequest
+      const data = await new Promise<EliteUploadResponse>((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+
+        // Track upload progress
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percentComplete = Math.round((e.loaded / e.total) * 100)
+            setUploadProgress(percentComplete)
+          }
+        })
+
+        // Handle completion
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const response = JSON.parse(xhr.responseText)
+              resolve(response)
+            } catch (err) {
+              reject(new Error('無法解析伺服器回應'))
+            }
+          } else {
+            try {
+              const errorData = JSON.parse(xhr.responseText)
+              reject(new Error(errorData.message || '上傳失敗'))
+            } catch {
+              reject(new Error('上傳失敗，請稍後再試'))
+            }
+          }
+        })
+
+        // Handle errors
+        xhr.addEventListener('error', () => {
+          reject(new Error('網路錯誤，請檢查連線'))
+        })
+
+        xhr.addEventListener('abort', () => {
+          reject(new Error('上傳已取消'))
+        })
+
+        // Send request with auth header
+        xhr.open('POST', '/api/rag/upload-elite')
+        xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`)
+        xhr.send(formData)
+      })
+
+      // Success - set analysis ID to trigger progressive display
+      setAnalysisId(data.analysisId)
+      setFileName(data.fileName)
+      setUploadProgress(100)
+
+      console.log('[SummaryWorkbench] ✅ Upload successful:', {
+        fileId: data.fileId,
+        analysisId: data.analysisId,
+        fileName: data.fileName,
+        numPages: data.numPages
+      })
+
+    } catch (err) {
+      console.error('[SummaryWorkbench] Upload error:', err)
+      setUploadError(err instanceof Error ? err.message : '上傳失敗，請稍後再試')
+      setUploadProgress(0)
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  /**
+   * Reset analysis state
+   */
+  const handleReset = () => {
+    setAnalysisId(null)
+    setFileName(null)
+    setUploadError(null)
+    setUploadProgress(0)
+    clearAll()
+  }
+
+  return (
+    <div className="mx-auto max-w-4xl px-4 pb-20 pt-8">
+      <div className="space-y-12">
+        {/* Header Section */}
+        <div className="text-center space-y-4">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
+            <Sparkles className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium text-primary-foreground">Elite RAG System</span>
+          </div>
+          <h1 className="text-4xl font-bold text-foreground">
+            世界級文件分析
+          </h1>
+          <p className="text-muted-foreground max-w-lg mx-auto leading-relaxed text-lg">
+            上傳講義，AI 為你生成學霸筆記
+          </p>
+        </div>
+
+        {/* Main Action Area */}
+        {!analysisId ? (
+          <div className="space-y-8">
+            {/* File Uploader */}
+            <FileUploader />
+
+            {/* Action Button */}
+            <div className="flex flex-col items-center gap-4">
+              <Button
+                onClick={handleStartAnalysis}
+                disabled={isUploading || attachedFiles.length === 0}
+                className={cn(
+                  "h-14 px-10 rounded-full text-lg font-medium shadow-lg transition-all duration-300",
+                  isUploading ? "w-64" : "w-48 hover:scale-105"
+                )}
+              >
+                {isUploading ? (
+                  <div className="flex items-center gap-3">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span>上傳中 {uploadProgress}%</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-5 w-5" />
+                    <span>開始分析</span>
+                  </div>
+                )}
+              </Button>
+
+              {/* Upload Progress Bar */}
+              {isUploading && uploadProgress > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="w-64 space-y-2"
+                >
+                  <div className="h-2 bg-secondary/20 rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full bg-primary rounded-full"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${uploadProgress}%` }}
+                      transition={{ duration: 0.3 }}
+                    />
+                  </div>
+                  <p className="text-xs text-center text-muted-foreground">
+                    正在上傳檔案...
+                  </p>
+                </motion.div>
+              )}
+
+              {/* Error Display */}
+              <AnimatePresence>
+                {uploadError && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20"
+                  >
+                    <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                    <span className="text-sm text-red-600">{uploadError}</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Helper Text */}
+              {attachedFiles.length === 0 && !uploadError && (
+                <p className="text-sm text-muted-foreground/60">
+                  支援 PDF、TXT 和圖片檔案，總大小不超過 50MB
+                </p>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* Progressive Analysis Display */
+          <div className="space-y-6">
+            <ProgressiveAnalysisCard
+              analysisId={analysisId}
+              fileName={fileName || '未知檔案'}
+              onAnalysisUpdate={(analysis) => {
+                console.log('[SummaryWorkbench] Analysis update:', analysis)
+                // ExpertQA disabled
+              }}
+            />
+
+            {/* Reset Button */}
+            <div className="flex justify-center pt-6">
+              <Button
+                onClick={handleReset}
+                variant="outline"
+                className="rounded-full px-6 border-border bg-card hover:bg-secondary/20 text-muted-foreground hover:text-foreground"
+              >
+                分析新文件
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Expert Q&A Dialog - DISABLED */}
+        {/* {showExpertQA && analysisId && (
+          <ExpertQADialog
+            analysisId={analysisId}
+            onClose={() => setShowExpertQA(false)}
+          />
+        )} */}
+
+        {/* Data Sources List - DISABLED */}
+        {/* <div className="pt-8 border-t border-border">
+          <RAGDataSourceList />
+        </div> */}
+      </div>
+    </div>
+  )
+}

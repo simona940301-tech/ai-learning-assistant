@@ -48,6 +48,8 @@ export interface QuestionSetAnalysis {
 const OPTION_REGEX = /(?:\(|（)\s*([A-Oa-oＡ-Ｏａ-ｏ])\s*(?:\)|）)/g
 const QUESTION_MARK_REGEX = /(^|\n|\s)(?:\d+[.)、]|Q\s*\d+[.)]?|\(\s*\d+\s*\)(?=\s*\(\s*[A-J]\s*\)))/gi
 const BLANK_REGEX = /\(\s*(?!19\d{2}|20\d{2}|[1-9]\d{2,})\d+\s*\)|_{2,}|\uFF3F{2,}/g
+// Extended blank marker regex to support __(1)__ format
+const EXTENDED_BLANK_REGEX = /__\s*\(\s*(\d+)\s*\)\s*__|\(\s*(?!19\d{2}|20\d{2}|[1-9]\d{2,})(\d+)\s*\)|_{2,}|\uFF3F{2,}/g
 
 /**
  * Normalize unicode variants and spacing.
@@ -139,6 +141,201 @@ function extractPassage(normalized: string, questionBlocks: string[]): string {
 }
 
 /**
+ * Extract context around a blank marker in passage for cloze questions.
+ * Returns the sentence or phrase containing the blank marker with surrounding context.
+ * 
+ * @param passage - The passage text containing blank markers
+ * @param questionNumber - The question number (1-indexed) to match with blank markers
+ * @returns Context string around the blank marker, or empty string if not found
+ */
+function extractBlankContext(passage: string, questionNumber: number): string {
+  if (!passage || questionNumber < 1) return ''
+
+  // Try multiple blank marker patterns: __(N)__, (N), etc.
+  // Priority: __(N)__ format first, then (N) format
+  const patterns = [
+    new RegExp(`__\\s*\\(\\s*${questionNumber}\\s*\\)\\s*__`, 'i'), // __(1)__ format
+    new RegExp(`\\(\\s*${questionNumber}\\s*\\)`, 'i'), // (1) format
+  ]
+
+  let blankIndex = -1
+
+  for (const pattern of patterns) {
+    const match = passage.match(pattern)
+    if (match && match.index !== undefined) {
+      blankIndex = match.index
+      break
+    }
+  }
+
+  if (blankIndex === -1) return ''
+
+  // Extract context: find sentence boundaries around the blank marker
+  // Look for sentence endings before and after
+  const sentenceEndings = /[.!?。！？]\s+/g
+  const beforeText = passage.slice(0, blankIndex)
+  const afterText = passage.slice(blankIndex)
+
+  // Find the start of the current sentence (last sentence ending before blank)
+  let contextStart = 0
+  let lastMatch: RegExpExecArray | null = null
+  let match: RegExpExecArray | null
+
+  while ((match = sentenceEndings.exec(beforeText)) !== null) {
+    lastMatch = match
+  }
+
+  if (lastMatch) {
+    contextStart = lastMatch.index + lastMatch[0].length
+  }
+
+  // Find the end of the current sentence (first sentence ending after blank)
+  const afterMatch = sentenceEndings.exec(afterText)
+  let contextEnd = passage.length
+
+  if (afterMatch) {
+    contextEnd = blankIndex + afterMatch.index + afterMatch[0].length
+  } else {
+    // If no sentence ending found, extend to next line break or reasonable limit
+    const nextLineBreak = afterText.indexOf('\n')
+    if (nextLineBreak > 0 && nextLineBreak < 200) {
+      contextEnd = blankIndex + nextLineBreak
+    } else {
+      // Fallback: take up to 150 characters after blank
+      contextEnd = Math.min(blankIndex + 150, passage.length)
+    }
+  }
+
+  // Extract and clean the context
+  let context = passage.slice(contextStart, contextEnd).trim()
+
+  // Ensure we include at least one sentence before if available
+  if (lastMatch && contextStart > 0) {
+    const prevSentenceStart = beforeText.lastIndexOf('.', lastMatch.index - 1)
+    if (prevSentenceStart > 0 && lastMatch.index - prevSentenceStart < 100) {
+      context = passage.slice(prevSentenceStart + 1, contextEnd).trim()
+    }
+  }
+
+  // Limit context length to prevent overly long stems (max 2-3 sentences)
+  if (context.length > 300) {
+    const sentences = context.split(/[.!?。！？]\s+/)
+    if (sentences.length > 2) {
+      context = sentences.slice(0, 2).join('. ') + '.'
+    }
+  }
+
+  return context || ''
+}
+
+/**
+ * Clean stem text by removing option markers and meaningless patterns.
+ * 
+ * @param text - Text to clean
+ * @returns Cleaned text without option markers
+ */
+function cleanStemText(text: string): string {
+  if (!text) return ''
+  
+  // Remove option markers: (A), (B), ( ) (A), etc.
+  // Use multiple passes to catch all variations
+  let cleaned = text
+    // First, remove common patterns: ( ) (A), (A), etc.
+    .replace(/\(\s*\)\s*\(\s*[A-O]\s*\)/g, '') // Remove ( ) (A) pattern
+    .replace(/\(\s*[A-O]\s*\)/g, '') // Remove (A), (B), etc.
+    .replace(/\(\s*\)/g, '') // Remove standalone ( )
+    .replace(/[（(]\s*[）)]/g, '') // Remove empty parentheses (full-width)
+    // Remove patterns like " ( )" or "( ) " with spaces
+    .replace(/\s*\(\s*\)\s*/g, ' ')
+    .replace(/\s*\(\s*[A-O]\s*\)\s*/g, ' ')
+    // Remove trailing option markers that might be at the end
+    .replace(/\s+\(\s*\)\s*\(\s*[A-O]\s*\)\s*$/g, '')
+    .replace(/\s+\(\s*[A-O]\s*\)\s*$/g, '')
+    .trim()
+  
+  // Remove leading/trailing punctuation that might be left over
+  cleaned = cleaned
+    .replace(/^[.,;:，。；：]\s*/, '')
+    .replace(/\s*[.,;:，。；：]$/, '')
+    // Remove multiple consecutive spaces
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+  
+  return cleaned
+}
+
+/**
+ * Extract stem with context from passage for cloze questions.
+ * Intelligently combines passage context with question header text.
+ * 
+ * @param chunk - The question chunk (from question number to next question)
+ * @param passage - The passage text (may contain blank markers)
+ * @param questionIndex - The question index (0-indexed)
+ * @returns Enhanced stem with context if applicable, or original stem
+ */
+function extractStemWithContext(
+  chunk: string,
+  passage: string,
+  questionIndex: number,
+): string {
+  // Extract base stem (original logic)
+  const options = extractOptions(chunk)
+  const firstOption = options[0]
+  const firstOptionIndex = firstOption ? chunk.indexOf(firstOption.text) : -1
+  const headerSegment = firstOptionIndex > 0 ? chunk.slice(0, firstOptionIndex).trim() : chunk
+  let baseStem = stripQuestionHeader(headerSegment)
+  
+  // Clean base stem: remove option markers and meaningless patterns
+  baseStem = cleanStemText(baseStem)
+
+  // Only enhance stem if:
+  // 1. Passage exists and has content
+  // 2. Passage contains blank markers
+  // 3. Base stem is very short or contains only option markers (likely missing context)
+  if (!passage || passage.length < 20) {
+    return baseStem || cleanStemText(stripQuestionHeader(chunk))
+  }
+
+  // Check if passage has blank markers
+  const hasBlanks = EXTENDED_BLANK_REGEX.test(passage)
+  if (!hasBlanks) {
+    return baseStem || cleanStemText(stripQuestionHeader(chunk))
+  }
+
+  // Question number is 1-indexed (questionIndex 0 = question 1)
+  const questionNumber = questionIndex + 1
+  const blankContext = extractBlankContext(passage, questionNumber)
+
+  // If we found context, prioritize it over base stem
+  // For cloze questions, passage context is the primary source
+  if (blankContext) {
+    // Remove the blank marker from context to avoid duplication
+    let cleanedContext = blankContext.replace(EXTENDED_BLANK_REGEX, '____').trim()
+    
+    // Only combine with baseStem if:
+    // 1. baseStem has meaningful content (not just option markers)
+    // 2. baseStem adds information not in context
+    // 3. baseStem is not just a repetition of context
+    const isBaseStemMeaningful = baseStem.length > 10 && 
+                                  !baseStem.match(/^[（(]\s*[）)]?\s*$/) &&
+                                  !baseStem.match(/^\(\s*[A-O]\s*\)/) &&
+                                  !cleanedContext.includes(baseStem) &&
+                                  !baseStem.includes(cleanedContext.substring(0, 20))
+    
+    if (isBaseStemMeaningful) {
+      // Base stem has meaningful content, combine intelligently
+      return `${cleanedContext} ${baseStem}`.trim()
+    } else {
+      // Base stem is empty, just option markers, or redundant - use context only
+      return cleanedContext
+    }
+  }
+
+  // Fallback: if no context found, use cleaned base stem
+  return baseStem || cleanStemText(stripQuestionHeader(chunk))
+}
+
+/**
  * Analyse structure of multi-question input.
  */
 export function analyseQuestionSet(raw: string): QuestionSetAnalysis {
@@ -150,14 +347,21 @@ export function analyseQuestionSet(raw: string): QuestionSetAnalysis {
 
   const questionBlocks: QuestionBlockStat[] = questionChunks.map((chunk, idx) => {
     const options = extractOptions(chunk)
-    const firstOption = options[0]
-    const firstOptionIndex = firstOption ? chunk.indexOf(firstOption.text) : -1
-    const headerSegment = firstOptionIndex > 0 ? chunk.slice(0, firstOptionIndex).trim() : chunk
-    const stem = stripQuestionHeader(headerSegment)
-    const hasBlankInStem = /_{2,}|\(\s*\)|___/.test(stem)
+    // Use enhanced stem extraction with context for cloze questions
+    let stem = extractStemWithContext(chunk, passage, idx)
+    
+    // Final cleanup: ensure stem doesn't contain option markers
+    if (!stem || stem.length === 0) {
+      stem = cleanStemText(stripQuestionHeader(chunk))
+    } else {
+      // Additional cleanup pass to ensure no option markers slipped through
+      stem = cleanStemText(stem)
+    }
+    
+    const hasBlankInStem = /_{2,}|\(\s*\)|___|__\s*\(\s*\d+\s*\)\s*__/.test(stem)
     return {
       index: idx,
-      stem: stem || stripQuestionHeader(chunk),
+      stem: stem || '',
       options,
       hasBlankInStem,
     }

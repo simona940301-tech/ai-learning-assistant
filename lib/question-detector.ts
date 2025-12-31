@@ -38,8 +38,9 @@ export function detectModeWithConfidence(text: string): DetectionResult {
   // 每 4 個連續選項視為一題
   const estimatedQuestionsFromOptions = Math.floor(optionMatches.length / 3)
 
-  // 計算題號數量
-  const numberPattern = /(?:^|\n)\s*(?:\d+[.)]\s*|Q\d+\s*|題\s*\d+)/g
+  // 計算題號數量（增強支援 (1)、(2)、（1）、（2） 等格式）
+  // 注意：要排除選項 (A)、(B)、(C)、(D)
+  const numberPattern = /(?:^|\n)\s*(?:\d+[.)]\s*|Q\d+\s*|題\s*\d+|[(（]\d+[)）](?!\s*[A-D]))/g
   const numberMatches = text.match(numberPattern) || []
 
   // 計算行數（多行通常意味著多題）
@@ -102,8 +103,9 @@ export function detectModeWithConfidence(text: string): DetectionResult {
 export function parseQuestions(text: string): Question[] {
   const questions: Question[] = [];
 
-  // 先以題號分割
-  const questionBlocks = text.split(/(?=(?:^|\n)\s*(?:\d+[.)]\s*|Q\d+\s*|題\s*\d+))/).filter(Boolean);
+  // 先以題號分割（增強支援 (1)、(2)、（1）、（2） 等格式）
+  // 使用 lookahead 來保留分隔符
+  const questionBlocks = text.split(/(?=(?:^|\n)\s*(?:\d+[.)]\s*|Q\d+\s*|題\s*\d+|[(（]\d+[)）]))/).filter(Boolean);
 
   if (questionBlocks.length <= 1) {
     // 無明確題號，嘗試以選項組分割

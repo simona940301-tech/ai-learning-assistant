@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { chatCompletionJSON } from '@/lib/openai'
+import { NextRequest } from 'next/server'
+import { getApiUser } from '@/lib/api/auth'
+import { chatCompletionJSON } from '@/lib/gemini'
+import { Api } from '@/lib/api/response'
 
 interface ConceptOption {
   id: string
@@ -24,15 +26,28 @@ interface JudgeResponseBody {
 
 export async function POST(request: NextRequest) {
   try {
+    const { user, errorType } = await getApiUser(request)
+
+    if (!user) {
+      const message =
+        errorType === 'invalid-jwt'
+          ? '登入狀態失效，請重新登入或清除 Cookies 後再試。'
+          : errorType === 'unauthenticated'
+            ? 'Authentication required'
+            : 'Authentication error occurred'
+
+      return Api.unauthorized(message)
+    }
+
     const { question, options, selected_option_id }: JudgeRequestBody = await request.json()
     if (!question?.trim()) {
-      return NextResponse.json({ error: 'question is required' }, { status: 400 })
+      return Api.badRequest('question is required')
     }
     if (!Array.isArray(options) || options.length === 0) {
-      return NextResponse.json({ error: 'options must be a non-empty array' }, { status: 400 })
+      return Api.badRequest('options must be a non-empty array')
     }
     if (!selected_option_id) {
-      return NextResponse.json({ error: 'selected_option_id is required' }, { status: 400 })
+      return Api.badRequest('selected_option_id is required')
     }
 
     const serializedOptions = options
@@ -58,14 +73,16 @@ export async function POST(request: NextRequest) {
         },
       ],
       {
-        model: 'gpt-4o-mini',
+        model: 'gemini-1.5-flash',
         temperature: 0.1,
       }
     )
 
-    return NextResponse.json(result)
+    return Api.success(result)
   } catch (error) {
     console.error('Judge API error', error)
-    return NextResponse.json({ error: (error as Error).message }, { status: 500 })
+    return Api.serverError(
+      error instanceof Error ? error.message : undefined
+    )
   }
 }

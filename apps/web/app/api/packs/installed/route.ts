@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getSupabaseClient } from '@/lib/api/auth';
 import type { PackWithStatus } from '@plms/shared/types';
 import { getConfidenceBadge } from '@plms/shared/types';
 
@@ -11,7 +11,7 @@ import { getConfidenceBadge } from '@plms/shared/types';
  */
 export async function GET(req: NextRequest) {
   try {
-    const supabase = createClient();
+    const supabase = getSupabaseClient(req);
 
     // Check authentication
     const {
@@ -75,6 +75,10 @@ export async function GET(req: NextRequest) {
           avgConfidence: pack.avg_confidence,
           confidenceBadge: getConfidenceBadge(pack.avg_confidence),
           status: pack.status,
+          visibility: pack.visibility || 'public',
+          source: pack.source || 'internal',
+          sourceName: pack.source_name || undefined,
+          sourceId: pack.source_id || undefined,
           publishedAt: pack.published_at,
           expiresAt: pack.expires_at,
           installCount: pack.install_count,

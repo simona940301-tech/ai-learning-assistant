@@ -1,9 +1,11 @@
 /**
  * Preview Flags Management - Batch 1.5 Hotfix
- * 
+ *
  * This module provides runtime access to preview flags and allows
  * toggling them without restarting the dev server.
  */
+
+import { useEffect, useState } from 'react'
 
 // Flag definitions
 export interface PreviewFlags {
@@ -89,8 +91,6 @@ export function loadPreviewFlags(): void {
 /**
  * React Hook for preview flags
  */
-import { useEffect, useState } from 'react'
-
 export function usePreviewFlags() {
   const [flags, setFlags] = useState<PreviewFlags>(getPreviewFlags)
   

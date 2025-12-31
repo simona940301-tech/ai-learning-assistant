@@ -102,7 +102,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
                 <summary className="cursor-pointer hover:text-foreground">
                   顯示錯誤詳情
                 </summary>
-                <pre className="mt-2 p-2 bg-muted rounded text-[10px] overflow-x-auto">
+                <pre className="mt-2 p-2 bg-muted rounded text-xs overflow-x-auto">
                   {this.state.error.stack}
                 </pre>
               </details>

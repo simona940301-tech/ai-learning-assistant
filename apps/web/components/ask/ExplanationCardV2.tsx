@@ -232,7 +232,7 @@ const ExplanationCardV2 = ({
             className="text-xs uppercase tracking-[0.3em]"
             style={{ color: theme.textTertiary }}
           >
-            🔍 解題步驟
+            🔍 詳解
           </h3>
           <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed">
             {steps.map((step, index) => (

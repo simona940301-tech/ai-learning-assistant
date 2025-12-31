@@ -1,0 +1,6 @@
+[functions.chick_daily_reset]
+verify_jwt = false
+
+[functions.chick_daily_reset.triggers]
+# Runs daily at 20:00 UTC (04:00 Asia/Taipei, UTC+8)
+schedule = "0 20 * * *"

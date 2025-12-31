@@ -1,0 +1,1946 @@
+/**
+ * Analytics Events Table (Batch 1.5)
+ *
+ * Purpose: Store raw analytics events from batch upload
+ * Features:
+ * - Event deduplication by event_id
+ * - Append-only (no updates/deletes)
+ * - Fast insertion (< 150ms for batch)
+ * - Queryable for 24h event volume
+ */
+
+-- Create analytics_events table
+CREATE TABLE IF NOT EXISTS analytics_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id VARCHAR(255) UNIQUE NOT NULL, -- Client-generated UUID for deduplication
+  event_name VARCHAR(100) NOT NULL, -- Event type (e.g., 'cta_practice_again_click')
+  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL, -- NULL for anonymous events
+  session_id VARCHAR(255), -- Client session ID
+  device VARCHAR(50), -- Device type
+  client_timestamp TIMESTAMPTZ NOT NULL, -- When event occurred on client
+  server_timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(), -- When received by server
+  context JSONB DEFAULT '{}', -- Contextual data (page, referrer, etc.)
+  payload JSONB DEFAULT '{}', -- Event-specific data
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_analytics_events_event_id
+  ON analytics_events(event_id); -- Fast deduplication check
+
+CREATE INDEX IF NOT EXISTS idx_analytics_events_event_name
+  ON analytics_events(event_name); -- Query by event type
+
+CREATE INDEX IF NOT EXISTS idx_analytics_events_user_id
+  ON analytics_events(user_id) WHERE user_id IS NOT NULL; -- Query by user
+
+CREATE INDEX IF NOT EXISTS idx_analytics_events_timestamp
+  ON analytics_events(server_timestamp DESC); -- Recent events query
+
+-- Removed: Cannot use NOW() in index predicate (not IMMUTABLE)
+-- For 24h queries, use WHERE clause in query instead
+-- CREATE INDEX IF NOT EXISTS idx_analytics_events_24h
+--   ON analytics_events(server_timestamp)
+--   WHERE server_timestamp > NOW() - INTERVAL '24 hours';
+
+-- RLS Policies
+ALTER TABLE analytics_events ENABLE ROW LEVEL SECURITY;
+
+-- Users can only see their own events
+CREATE POLICY "Users can view own events"
+  ON analytics_events
+  FOR SELECT
+  TO authenticated
+  USING (auth.uid() = user_id);
+
+-- Only service role can insert (batch API uses service role)
+CREATE POLICY "Service role can insert events"
+  ON analytics_events
+  FOR INSERT
+  TO service_role
+  WITH CHECK (true);
+
+-- No updates or deletes (append-only)
+-- No policy needed as RLS will block by default
+
+-- Comments
+COMMENT ON TABLE analytics_events IS 'Raw analytics events from batch upload (append-only)';
+COMMENT ON COLUMN analytics_events.event_id IS 'Client-generated UUID for deduplication';
+COMMENT ON COLUMN analytics_events.event_name IS 'Event type (e.g., cta_practice_again_click)';
+COMMENT ON COLUMN analytics_events.client_timestamp IS 'When event occurred on client';
+COMMENT ON COLUMN analytics_events.server_timestamp IS 'When received by server (for ordering)';
+COMMENT ON COLUMN analytics_events.context IS 'Contextual data (page, referrer, user_agent, etc.)';
+COMMENT ON COLUMN analytics_events.payload IS 'Event-specific data (varies by event_name)';
+
+-- Helper function: Get event count in last 24 hours
+CREATE OR REPLACE FUNCTION get_analytics_event_count_24h()
+RETURNS TABLE (
+  event_name VARCHAR,
+  event_count BIGINT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    ae.event_name,
+    COUNT(*) as event_count
+  FROM analytics_events ae
+  WHERE ae.server_timestamp > NOW() - INTERVAL '24 hours'
+  GROUP BY ae.event_name
+  ORDER BY event_count DESC;
+END;
+$$;
+
+COMMENT ON FUNCTION get_analytics_event_count_24h() IS 'Get event counts in last 24 hours (for monitoring)';
+
+-- Helper function: Check for event gaps (data quality)
+CREATE OR REPLACE FUNCTION check_analytics_event_gaps(
+  p_window_minutes INTEGER DEFAULT 60
+)
+RETURNS TABLE (
+  hour_start TIMESTAMPTZ,
+  event_count BIGINT,
+  has_gap BOOLEAN
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN QUERY
+  WITH hourly_counts AS (
+    SELECT
+      DATE_TRUNC('hour', server_timestamp) as hour_start,
+      COUNT(*) as event_count
+    FROM analytics_events
+    WHERE server_timestamp > NOW() - INTERVAL '24 hours'
+    GROUP BY DATE_TRUNC('hour', server_timestamp)
+    ORDER BY hour_start DESC
+  )
+  SELECT
+    hc.hour_start,
+    hc.event_count,
+    (hc.event_count < 10) as has_gap -- Flag if < 10 events per hour (adjust threshold)
+  FROM hourly_counts hc;
+END;
+$$;
+
+COMMENT ON FUNCTION check_analytics_event_gaps(INTEGER) IS 'Check for event gaps in last 24h (data quality monitoring)';
+
+-- Grant permissions
+GRANT EXECUTE ON FUNCTION get_analytics_event_count_24h() TO service_role;
+GRANT EXECUTE ON FUNCTION check_analytics_event_gaps(INTEGER) TO service_role;
+
+-- Cleanup policy (optional): Archive events older than 90 days
+-- This can be run as a scheduled job
+CREATE OR REPLACE FUNCTION archive_old_analytics_events()
+RETURNS INTEGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  deleted_count INTEGER;
+BEGIN
+  -- Move to archive table (if exists) or just delete
+  DELETE FROM analytics_events
+  WHERE server_timestamp < NOW() - INTERVAL '90 days';
+
+  GET DIAGNOSTICS deleted_count = ROW_COUNT;
+  RETURN deleted_count;
+END;
+$$;
+
+COMMENT ON FUNCTION archive_old_analytics_events() IS 'Archive/delete events older than 90 days (run as scheduled job)';
+
+
+-- ============================================
+-- MIGRATION 01: CREATE PACKS SCHEMA
+-- ============================================
+
+-- =============================================
+-- Module 2: Shop (題包系統) - Database Schema
+-- =============================================
+
+-- Drop existing tables if they exist (for development)
+DROP TABLE IF EXISTS user_pack_installations CASCADE;
+DROP TABLE IF EXISTS pack_questions CASCADE;
+DROP TABLE IF EXISTS pack_chapters CASCADE;
+DROP TABLE IF EXISTS packs CASCADE;
+
+-- =============================================
+-- Table: packs
+-- Stores question pack metadata
+-- =============================================
+CREATE TABLE packs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  -- Basic info
+  title VARCHAR(100) NOT NULL,
+  description TEXT,
+
+  -- Classification
+  subject VARCHAR(50) NOT NULL,
+  topic VARCHAR(100) NOT NULL,
+  skill VARCHAR(100) NOT NULL,
+  grade VARCHAR(20) NOT NULL, -- 國小/國中/高中
+
+  -- Content metadata
+  item_count INTEGER NOT NULL DEFAULT 0,
+  has_explanation BOOLEAN NOT NULL DEFAULT FALSE,
+  explanation_rate DECIMAL(3,2) NOT NULL DEFAULT 0.0 CHECK (explanation_rate >= 0 AND explanation_rate <= 1),
+
+  -- AI metadata
+  avg_confidence DECIMAL(3,2) NOT NULL DEFAULT 0.0 CHECK (avg_confidence >= 0 AND avg_confidence <= 1),
+
+  -- Status & visibility
+  status VARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived', 'expired')),
+  published_at TIMESTAMPTZ,
+  expires_at TIMESTAMPTZ,
+
+  -- Stats
+  install_count INTEGER NOT NULL DEFAULT 0,
+  completion_rate DECIMAL(3,2) DEFAULT 0.0 CHECK (completion_rate >= 0 AND completion_rate <= 1),
+
+  -- QR & aliases
+  qr_alias VARCHAR(50) UNIQUE,
+
+  -- Audit
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Indexes for performance
+CREATE INDEX idx_packs_status ON packs(status);
+CREATE INDEX idx_packs_subject_topic ON packs(subject, topic);
+CREATE INDEX idx_packs_skill ON packs(skill);
+CREATE INDEX idx_packs_grade ON packs(grade);
+CREATE INDEX idx_packs_published_at ON packs(published_at DESC);
+CREATE INDEX idx_packs_install_count ON packs(install_count DESC);
+CREATE INDEX idx_packs_avg_confidence ON packs(avg_confidence DESC);
+CREATE INDEX idx_packs_qr_alias ON packs(qr_alias);
+
+-- Full-text search on title and description
+CREATE INDEX idx_packs_title_search ON packs USING gin(to_tsvector('simple', title));
+CREATE INDEX idx_packs_description_search ON packs USING gin(to_tsvector('simple', COALESCE(description, '')));
+
+-- =============================================
+-- Table: pack_chapters
+-- Optional hierarchical structure for packs
+-- =============================================
+CREATE TABLE pack_chapters (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pack_id UUID NOT NULL REFERENCES packs(id) ON DELETE CASCADE,
+
+  title VARCHAR(100) NOT NULL,
+  description TEXT,
+  "order" INTEGER NOT NULL DEFAULT 0,
+  item_count INTEGER NOT NULL DEFAULT 0,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  UNIQUE(pack_id, "order")
+);
+
+CREATE INDEX idx_pack_chapters_pack_id ON pack_chapters(pack_id);
+CREATE INDEX idx_pack_chapters_order ON pack_chapters(pack_id, "order");
+
+-- =============================================
+-- Table: pack_questions
+-- Maps questions to packs (and optionally chapters)
+-- =============================================
+CREATE TABLE pack_questions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pack_id UUID NOT NULL REFERENCES packs(id) ON DELETE CASCADE,
+  chapter_id UUID REFERENCES pack_chapters(id) ON DELETE CASCADE,
+
+  -- Question content (denormalized for preview performance)
+  stem TEXT NOT NULL,
+  choices TEXT[] NOT NULL,
+  answer VARCHAR(10) NOT NULL,
+  explanation TEXT,
+  difficulty VARCHAR(20) CHECK (difficulty IN ('easy', 'medium', 'hard', 'expert')),
+
+  has_explanation BOOLEAN NOT NULL DEFAULT FALSE,
+  confidence DECIMAL(3,2) DEFAULT 0.0,
+
+  -- Order within chapter/pack
+  "order" INTEGER NOT NULL DEFAULT 0,
+
+  -- Reference to main questions table (if exists)
+  question_id UUID, -- Reference to questions table
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_pack_questions_pack_id ON pack_questions(pack_id);
+CREATE INDEX idx_pack_questions_chapter_id ON pack_questions(chapter_id);
+CREATE INDEX idx_pack_questions_order ON pack_questions(pack_id, "order");
+
+-- =============================================
+-- Table: user_pack_installations
+-- Tracks which users have installed which packs
+-- =============================================
+CREATE TABLE user_pack_installations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  pack_id UUID NOT NULL REFERENCES packs(id) ON DELETE CASCADE,
+
+  -- Installation metadata
+  installed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  source VARCHAR(20) NOT NULL DEFAULT 'shop' CHECK (source IN ('shop', 'qr', 'rs_suggest', 'direct')),
+  list_position INTEGER, -- Position in search results when installed
+
+  -- Progress tracking (for future use)
+  completed_count INTEGER DEFAULT 0,
+  last_practiced_at TIMESTAMPTZ,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  UNIQUE(user_id, pack_id)
+);
+
+CREATE INDEX idx_user_pack_installations_user_id ON user_pack_installations(user_id);
+CREATE INDEX idx_user_pack_installations_pack_id ON user_pack_installations(pack_id);
+CREATE INDEX idx_user_pack_installations_installed_at ON user_pack_installations(installed_at DESC);
+
+-- =============================================
+-- Row Level Security (RLS)
+-- =============================================
+
+ALTER TABLE packs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pack_chapters ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pack_questions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_pack_installations ENABLE ROW LEVEL SECURITY;
+
+-- Packs: Public can view published packs, only admins can modify
+CREATE POLICY "Public can view published packs"
+  ON packs FOR SELECT
+  USING (status = 'published' OR auth.uid() = created_by);
+
+CREATE POLICY "Admins can insert packs"
+  ON packs FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM auth.users
+      WHERE id = auth.uid() AND role IN ('admin', 'teacher')
+    )
+  );
+
+CREATE POLICY "Admins can update packs"
+  ON packs FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM auth.users
+      WHERE id = auth.uid() AND role IN ('admin', 'teacher')
+    )
+  );
+
+CREATE POLICY "Admins can delete packs"
+  ON packs FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM auth.users
+      WHERE id = auth.uid() AND role IN ('admin', 'teacher')
+    )
+  );
+
+-- Pack chapters: Follow pack visibility
+CREATE POLICY "Public can view chapters of published packs"
+  ON pack_chapters FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM packs
+      WHERE packs.id = pack_chapters.pack_id AND packs.status = 'published'
+    )
+  );
+
+-- Pack questions: Follow pack visibility
+CREATE POLICY "Public can view questions of published packs"
+  ON pack_questions FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM packs
+      WHERE packs.id = pack_questions.pack_id AND packs.status = 'published'
+    )
+  );
+
+-- User installations: Users can only see/modify their own
+CREATE POLICY "Users can view own installations"
+  ON user_pack_installations FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own installations"
+  ON user_pack_installations FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own installations"
+  ON user_pack_installations FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- =============================================
+-- Helper Functions
+-- =============================================
+
+-- Increment pack install count
+CREATE OR REPLACE FUNCTION increment_pack_install_count(pack_id UUID)
+RETURNS VOID AS $$
+BEGIN
+  UPDATE packs
+  SET install_count = install_count + 1,
+      updated_at = NOW()
+  WHERE id = pack_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Decrement pack install count
+CREATE OR REPLACE FUNCTION decrement_pack_install_count(pack_id UUID)
+RETURNS VOID AS $$
+BEGIN
+  UPDATE packs
+  SET install_count = GREATEST(install_count - 1, 0),
+      updated_at = NOW()
+  WHERE id = pack_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Update pack metadata (item count, explanation rate, avg confidence)
+CREATE OR REPLACE FUNCTION update_pack_metadata(pack_id UUID)
+RETURNS VOID AS $$
+DECLARE
+  v_item_count INTEGER;
+  v_explanation_count INTEGER;
+  v_avg_confidence DECIMAL(3,2);
+BEGIN
+  -- Count total items
+  SELECT COUNT(*) INTO v_item_count
+  FROM pack_questions
+  WHERE pack_questions.pack_id = update_pack_metadata.pack_id;
+
+  -- Count items with explanations
+  SELECT COUNT(*) INTO v_explanation_count
+  FROM pack_questions
+  WHERE pack_questions.pack_id = update_pack_metadata.pack_id
+    AND has_explanation = TRUE;
+
+  -- Calculate average confidence
+  SELECT COALESCE(AVG(confidence), 0) INTO v_avg_confidence
+  FROM pack_questions
+  WHERE pack_questions.pack_id = update_pack_metadata.pack_id;
+
+  -- Update pack
+  UPDATE packs
+  SET item_count = v_item_count,
+      has_explanation = (v_item_count > 0 AND v_explanation_count = v_item_count),
+      explanation_rate = CASE WHEN v_item_count > 0 THEN v_explanation_count::DECIMAL / v_item_count ELSE 0 END,
+      avg_confidence = v_avg_confidence,
+      updated_at = NOW()
+  WHERE id = update_pack_metadata.pack_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger to update chapter item counts
+CREATE OR REPLACE FUNCTION update_chapter_item_count()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
+    UPDATE pack_chapters
+    SET item_count = (
+      SELECT COUNT(*) FROM pack_questions
+      WHERE chapter_id = NEW.chapter_id
+    ),
+    updated_at = NOW()
+    WHERE id = NEW.chapter_id;
+  END IF;
+
+  IF TG_OP = 'DELETE' THEN
+    UPDATE pack_chapters
+    SET item_count = (
+      SELECT COUNT(*) FROM pack_questions
+      WHERE chapter_id = OLD.chapter_id
+    ),
+    updated_at = NOW()
+    WHERE id = OLD.chapter_id;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_chapter_item_count
+AFTER INSERT OR UPDATE OR DELETE ON pack_questions
+FOR EACH ROW
+EXECUTE FUNCTION update_chapter_item_count();
+
+-- =============================================
+-- Sample Data (for testing)
+-- =============================================
+
+-- Insert sample packs
+INSERT INTO packs (
+  id,
+  title,
+  description,
+  subject,
+  topic,
+  skill,
+  grade,
+  item_count,
+  has_explanation,
+  explanation_rate,
+  avg_confidence,
+  status,
+  published_at,
+  install_count,
+  qr_alias
+) VALUES
+(
+  '00000000-0000-4000-a000-000000000001',
+  '國中數學：一元一次方程式精選',
+  '涵蓋一元一次方程式的基礎題型，適合國中七年級學生',
+  '數學',
+  '代數',
+  '一元一次方程式',
+  '國中',
+  25,
+  true,
+  1.0,
+  0.92,
+  'published',
+  NOW(),
+  0,
+  'math-linear-eq-001'
+),
+(
+  '00000000-0000-4000-a000-000000000002',
+  '高中英文：不定詞與動名詞',
+  '精選高中英文文法題目，專注於不定詞和動名詞的用法',
+  '英文',
+  '文法',
+  '不定詞與動名詞',
+  '高中',
+  30,
+  true,
+  0.95,
+  0.88,
+  'published',
+  NOW(),
+  0,
+  'eng-infinitive-001'
+),
+(
+  '00000000-0000-4000-a000-000000000003',
+  '國中理化：力學基礎',
+  '包含力、功、能量等基本概念',
+  '理化',
+  '力學',
+  '力與運動',
+  '國中',
+  22,
+  false,
+  0.65,
+  0.75,
+  'published',
+  NOW(),
+  0,
+  'phy-mechanics-001'
+);
+
+COMMENT ON TABLE packs IS 'Module 2: Question packs (題包) for shop system';
+COMMENT ON TABLE pack_chapters IS 'Optional hierarchical structure for packs';
+COMMENT ON TABLE pack_questions IS 'Questions within packs (denormalized for performance)';
+COMMENT ON TABLE user_pack_installations IS 'Tracks user pack installations with analytics metadata';
+
+
+-- ============================================
+-- MIGRATION 02: CREATE MISSIONS SCHEMA
+-- ============================================
+
+-- =============================================
+-- Module 3: Micro-Mission Cards - Database Schema
+-- =============================================
+
+-- =============================================
+-- 0. Optimization: Add composite index for Shop V2
+-- =============================================
+
+-- As suggested: Index combo (subject, grade, source) for faster multi-filter queries
+CREATE INDEX IF NOT EXISTS idx_packs_subject_grade_source
+  ON packs(subject, grade, source);
+
+-- Add default for source_name when null
+DO $$
+BEGIN
+  -- Update existing packs with null source_name
+  UPDATE packs
+  SET source_name = 'PLMS 內部內容'
+  WHERE source_name IS NULL AND source = 'internal';
+END $$;
+
+-- Add trigger to auto-populate source_name
+CREATE OR REPLACE FUNCTION set_default_source_name()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.source_name IS NULL AND NEW.source = 'internal' THEN
+    NEW.source_name := 'PLMS 內部內容';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_set_default_source_name ON packs;
+CREATE TRIGGER trigger_set_default_source_name
+  BEFORE INSERT OR UPDATE ON packs
+  FOR EACH ROW
+  EXECUTE FUNCTION set_default_source_name();
+
+-- =============================================
+-- 1. Mission Templates Table
+-- =============================================
+
+DROP TABLE IF EXISTS mission_logs CASCADE;
+DROP TABLE IF EXISTS user_missions CASCADE;
+DROP TABLE IF EXISTS missions CASCADE;
+
+CREATE TABLE missions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  -- Mission metadata
+  title VARCHAR(100) NOT NULL,
+  description TEXT,
+
+  -- Target
+  target_skill VARCHAR(100), -- e.g., "一元一次方程式"
+  target_topic VARCHAR(100), -- e.g., "代數"
+  target_grade VARCHAR(20),  -- e.g., "國中"
+
+  -- Difficulty & configuration
+  difficulty VARCHAR(20) CHECK (difficulty IN ('easy', 'medium', 'hard', 'expert')),
+  num_questions INTEGER NOT NULL DEFAULT 5 CHECK (num_questions BETWEEN 3 AND 10),
+
+  -- Source mix (percentages)
+  pack_ratio DECIMAL(3,2) DEFAULT 0.7 CHECK (pack_ratio BETWEEN 0 AND 1),
+  error_book_ratio DECIMAL(3,2) DEFAULT 0.3 CHECK (error_book_ratio BETWEEN 0 AND 1),
+
+  -- Mission type
+  mission_type VARCHAR(20) DEFAULT 'daily' CHECK (mission_type IN ('daily', 'skill_focus', 'review', 'challenge')),
+
+  -- Status
+  status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'archived')),
+
+  -- Timestamps
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_by UUID REFERENCES auth.users(id)
+);
+
+-- Indexes
+CREATE INDEX idx_missions_status ON missions(status);
+CREATE INDEX idx_missions_skill ON missions(target_skill);
+CREATE INDEX idx_missions_type ON missions(mission_type);
+
+-- =============================================
+-- 2. User Missions Table (Instance per user)
+-- =============================================
+
+CREATE TABLE user_missions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+
+  -- Mission reference (can be null for auto-generated daily missions)
+  mission_id UUID REFERENCES missions(id) ON DELETE SET NULL,
+
+  -- Mission date (for daily missions)
+  mission_date DATE NOT NULL DEFAULT CURRENT_DATE,
+
+  -- Questions selected for this mission
+  question_ids UUID[] NOT NULL, -- Array of pack_question IDs
+  question_count INTEGER NOT NULL,
+
+  -- Metadata about question sources
+  pack_count INTEGER DEFAULT 0,
+  error_book_count INTEGER DEFAULT 0,
+
+  -- Progress
+  status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed', 'abandoned')),
+
+  -- Results
+  correct_count INTEGER DEFAULT 0,
+  total_answered INTEGER DEFAULT 0,
+
+  -- Timing
+  started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  time_spent_seconds INTEGER DEFAULT 0,
+
+  -- Audit
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  -- Constraint: One mission per user per day
+  UNIQUE(user_id, mission_date)
+);
+
+-- Indexes
+CREATE INDEX idx_user_missions_user_id ON user_missions(user_id);
+CREATE INDEX idx_user_missions_date ON user_missions(mission_date DESC);
+CREATE INDEX idx_user_missions_status ON user_missions(status);
+CREATE INDEX idx_user_missions_user_date ON user_missions(user_id, mission_date);
+
+-- =============================================
+-- 3. Mission Logs Table (Analytics & History)
+-- =============================================
+
+CREATE TABLE mission_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_mission_id UUID NOT NULL REFERENCES user_missions(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+
+  -- Event type
+  event_type VARCHAR(50) NOT NULL, -- 'start', 'answer', 'complete', 'abandon'
+
+  -- Event payload (flexible JSON)
+  payload JSONB,
+
+  -- Specific fields for common events
+  question_id UUID, -- For 'answer' events
+  is_correct BOOLEAN, -- For 'answer' events
+  time_spent_ms INTEGER, -- For 'answer' events
+
+  -- Timestamp
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Indexes
+CREATE INDEX idx_mission_logs_user_mission ON mission_logs(user_mission_id);
+CREATE INDEX idx_mission_logs_user_id ON mission_logs(user_id);
+CREATE INDEX idx_mission_logs_event_type ON mission_logs(event_type);
+CREATE INDEX idx_mission_logs_created_at ON mission_logs(created_at DESC);
+
+-- =============================================
+-- 4. Question Selection History (Deduplication)
+-- =============================================
+
+CREATE TABLE user_question_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  question_id UUID NOT NULL,
+
+  -- When was this question shown?
+  shown_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  -- Context
+  context VARCHAR(50), -- 'mission', 'challenge', 'practice'
+
+  -- Result
+  was_correct BOOLEAN,
+
+  -- Constraint: Track each question once per context
+  UNIQUE(user_id, question_id, context, shown_at)
+);
+
+-- Indexes
+CREATE INDEX idx_user_question_history_user ON user_question_history(user_id);
+CREATE INDEX idx_user_question_history_shown_at ON user_question_history(shown_at DESC);
+CREATE INDEX idx_user_question_history_question ON user_question_history(question_id);
+
+-- =============================================
+-- 5. Row Level Security (RLS)
+-- =============================================
+
+ALTER TABLE missions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_missions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mission_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_question_history ENABLE ROW LEVEL SECURITY;
+
+-- Missions: Public can view active missions
+CREATE POLICY "Users can view active missions"
+  ON missions FOR SELECT
+  USING (status = 'active');
+
+CREATE POLICY "Admins can manage missions"
+  ON missions FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM users
+      WHERE id = auth.uid() AND role IN ('admin', 'teacher')
+    )
+  );
+
+-- User Missions: Users can only see/modify their own
+CREATE POLICY "Users can view own missions"
+  ON user_missions FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own missions"
+  ON user_missions FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own missions"
+  ON user_missions FOR UPDATE
+  USING (auth.uid() = user_id);
+
+-- Mission Logs: Users can only see/insert their own
+CREATE POLICY "Users can view own mission logs"
+  ON mission_logs FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own mission logs"
+  ON mission_logs FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+-- Question History: Users can only see/modify their own
+CREATE POLICY "Users can view own question history"
+  ON user_question_history FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own question history"
+  ON user_question_history FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+-- =============================================
+-- 6. Helper Functions
+-- =============================================
+
+-- Function: Get user's recently seen questions (for deduplication)
+CREATE OR REPLACE FUNCTION get_recent_questions(
+  p_user_id UUID,
+  p_days INTEGER DEFAULT 7
+)
+RETURNS TABLE(question_id UUID) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT DISTINCT uqh.question_id
+  FROM user_question_history uqh
+  WHERE uqh.user_id = p_user_id
+    AND uqh.shown_at > NOW() - (p_days || ' days')::INTERVAL;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function: Sample questions from installed packs
+CREATE OR REPLACE FUNCTION sample_pack_questions(
+  p_user_id UUID,
+  p_count INTEGER,
+  p_difficulty VARCHAR DEFAULT NULL,
+  p_skill VARCHAR DEFAULT NULL,
+  p_exclude_ids UUID[] DEFAULT ARRAY[]::UUID[]
+)
+RETURNS TABLE(
+  question_id UUID,
+  pack_id UUID,
+  stem TEXT,
+  choices TEXT[],
+  answer VARCHAR,
+  explanation TEXT,
+  difficulty VARCHAR,
+  has_explanation BOOLEAN,
+  skill VARCHAR
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    pq.id,
+    pq.pack_id,
+    pq.stem,
+    pq.choices,
+    pq.answer,
+    pq.explanation,
+    pq.difficulty,
+    pq.has_explanation,
+    p.skill
+  FROM pack_questions pq
+  JOIN packs p ON p.id = pq.pack_id
+  JOIN user_pack_installations upi ON upi.pack_id = pq.pack_id
+  WHERE upi.user_id = p_user_id
+    AND pq.has_explanation = TRUE
+    AND (p_difficulty IS NULL OR pq.difficulty = p_difficulty)
+    AND (p_skill IS NULL OR p.skill = p_skill)
+    AND NOT (pq.id = ANY(p_exclude_ids))
+  ORDER BY RANDOM()
+  LIMIT p_count;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function: Update mission progress
+CREATE OR REPLACE FUNCTION update_mission_progress(
+  p_user_mission_id UUID,
+  p_is_correct BOOLEAN
+)
+RETURNS VOID AS $$
+BEGIN
+  UPDATE user_missions
+  SET
+    total_answered = total_answered + 1,
+    correct_count = correct_count + CASE WHEN p_is_correct THEN 1 ELSE 0 END,
+    updated_at = NOW()
+  WHERE id = p_user_mission_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function: Complete mission
+CREATE OR REPLACE FUNCTION complete_mission(
+  p_user_mission_id UUID,
+  p_time_spent_seconds INTEGER
+)
+RETURNS VOID AS $$
+BEGIN
+  UPDATE user_missions
+  SET
+    status = 'completed',
+    completed_at = NOW(),
+    time_spent_seconds = p_time_spent_seconds,
+    updated_at = NOW()
+  WHERE id = p_user_mission_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =============================================
+-- 7. Sample Data
+-- =============================================
+
+-- Create a default daily mission template
+INSERT INTO missions (
+  id,
+  title,
+  description,
+  target_skill,
+  target_topic,
+  num_questions,
+  pack_ratio,
+  error_book_ratio,
+  mission_type,
+  status
+) VALUES (
+  'mission-daily-001',
+  '每日練習',
+  '每天 3-5 題精選練習，保持學習節奏',
+  NULL, -- Auto-match user's weak skills
+  NULL,
+  5,
+  0.7,
+  0.3,
+  'daily',
+  'active'
+) ON CONFLICT (id) DO NOTHING;
+
+-- =============================================
+-- Comments
+-- =============================================
+
+COMMENT ON TABLE missions IS 'Module 3: Mission templates (daily, skill-focus, review, challenge)';
+COMMENT ON TABLE user_missions IS 'Module 3: User mission instances (one per user per day)';
+COMMENT ON TABLE mission_logs IS 'Module 3: Mission event logs for analytics';
+COMMENT ON TABLE user_question_history IS 'Module 3: Question deduplication history (7-day window)';
+
+COMMENT ON COLUMN user_missions.question_ids IS 'Array of pack_question IDs selected for this mission';
+COMMENT ON COLUMN user_missions.pack_count IS 'Number of questions from installed packs (70%)';
+COMMENT ON COLUMN user_missions.error_book_count IS 'Number of questions from error book (30%)';
+
+COMMENT ON FUNCTION sample_pack_questions IS 'Module 3: Sample questions from user installed packs with deduplication';
+COMMENT ON FUNCTION get_recent_questions IS 'Module 3: Get questions shown in last N days (default 7)';
+
+
+-- ============================================
+-- MIGRATION 03: ENHANCE MISSIONS V2
+-- ============================================
+
+/**
+ * Module 3 Enhancement v2: Database Schema Updates
+ *
+ * Changes:
+ * 1. Add window_date to user_missions (Asia/Taipei 05:00 boundary)
+ * 2. Add blacklist columns to pack_questions
+ * 3. Add answerable_until to user_missions
+ * 4. Add suspicious flag to mission_logs
+ * 5. Update RLS policies
+ */
+
+-- ============================================================================
+-- Enhancement 2: Window Date (Asia/Taipei timezone with 05:00 boundary)
+-- ============================================================================
+
+-- Add window_date column
+ALTER TABLE user_missions
+ADD COLUMN IF NOT EXISTS window_date DATE;
+
+-- Create function to calculate window_date
+-- Mission window: 05:00 today → 04:59:59 tomorrow
+CREATE OR REPLACE FUNCTION calculate_window_date(ts TIMESTAMPTZ DEFAULT NOW())
+RETURNS DATE
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  taipei_time TIMESTAMPTZ;
+  window_date DATE;
+BEGIN
+  -- Convert to Asia/Taipei timezone
+  taipei_time := ts AT TIME ZONE 'Asia/Taipei';
+
+  -- If before 05:00, use previous day; otherwise use current day
+  IF EXTRACT(HOUR FROM taipei_time) < 5 THEN
+    window_date := (taipei_time - INTERVAL '1 day')::DATE;
+  ELSE
+    window_date := taipei_time::DATE;
+  END IF;
+
+  RETURN window_date;
+END;
+$$;
+
+-- Populate existing rows with window_date
+UPDATE user_missions
+SET window_date = calculate_window_date(created_at)
+WHERE window_date IS NULL;
+
+-- Make window_date NOT NULL after populating
+ALTER TABLE user_missions
+ALTER COLUMN window_date SET NOT NULL;
+
+-- Create index for window_date lookups
+CREATE INDEX IF NOT EXISTS idx_user_missions_window_date
+  ON user_missions(user_id, window_date);
+
+-- Drop old unique constraint on (user_id, mission_date)
+ALTER TABLE user_missions
+DROP CONSTRAINT IF EXISTS user_missions_user_id_mission_date_key;
+
+-- Add new unique constraint on (user_id, window_date)
+ALTER TABLE user_missions
+ADD CONSTRAINT user_missions_user_id_window_date_key
+  UNIQUE(user_id, window_date);
+
+-- Trigger to auto-populate window_date on insert
+CREATE OR REPLACE FUNCTION set_window_date()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.window_date IS NULL THEN
+    NEW.window_date := calculate_window_date(NEW.created_at);
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_set_window_date ON user_missions;
+CREATE TRIGGER trigger_set_window_date
+  BEFORE INSERT ON user_missions
+  FOR EACH ROW
+  EXECUTE FUNCTION set_window_date();
+
+-- ============================================================================
+-- Enhancement 4: Answerable Timeout (2 hours)
+-- ============================================================================
+
+-- Add answerable_until column
+ALTER TABLE user_missions
+ADD COLUMN IF NOT EXISTS answerable_until TIMESTAMPTZ;
+
+-- Populate existing rows (2 hours from started_at)
+UPDATE user_missions
+SET answerable_until = started_at + INTERVAL '2 hours'
+WHERE answerable_until IS NULL
+  AND started_at IS NOT NULL;
+
+-- Trigger to set answerable_until on mission start
+CREATE OR REPLACE FUNCTION set_answerable_until()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.started_at IS NOT NULL AND OLD.started_at IS NULL THEN
+    NEW.answerable_until := NEW.started_at + INTERVAL '2 hours';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_set_answerable_until ON user_missions;
+CREATE TRIGGER trigger_set_answerable_until
+  BEFORE UPDATE ON user_missions
+  FOR EACH ROW
+  EXECUTE FUNCTION set_answerable_until();
+
+-- ============================================================================
+-- Enhancement 5: Question Blacklist
+-- ============================================================================
+
+-- Add blacklist columns to pack_questions
+ALTER TABLE pack_questions
+ADD COLUMN IF NOT EXISTS is_blacklisted BOOLEAN DEFAULT FALSE NOT NULL,
+ADD COLUMN IF NOT EXISTS blacklist_reason TEXT,
+ADD COLUMN IF NOT EXISTS blacklisted_at TIMESTAMPTZ;
+
+-- Create index for blacklist filtering
+CREATE INDEX IF NOT EXISTS idx_pack_questions_blacklist
+  ON pack_questions(is_blacklisted)
+  WHERE is_blacklisted = false;
+
+-- Function to blacklist a question
+CREATE OR REPLACE FUNCTION blacklist_question(
+  p_question_id UUID,
+  p_reason TEXT
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  UPDATE pack_questions
+  SET
+    is_blacklisted = TRUE,
+    blacklist_reason = p_reason,
+    blacklisted_at = NOW()
+  WHERE id = p_question_id;
+END;
+$$;
+
+-- Function to un-blacklist a question
+CREATE OR REPLACE FUNCTION unblacklist_question(p_question_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  UPDATE pack_questions
+  SET
+    is_blacklisted = FALSE,
+    blacklist_reason = NULL,
+    blacklisted_at = NULL
+  WHERE id = p_question_id;
+END;
+$$;
+
+-- ============================================================================
+-- Enhancement 4: Suspicious Activity Detection
+-- ============================================================================
+
+-- Add suspicious flag to mission_logs
+ALTER TABLE mission_logs
+ADD COLUMN IF NOT EXISTS suspicious BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS suspicious_reason TEXT;
+
+-- ============================================================================
+-- Enhancement 5: Question Reencounter Tracking
+-- ============================================================================
+
+-- Update user_question_history to enforce 7-day reencounter limit
+-- Add index for efficient reencounter checks
+CREATE INDEX IF NOT EXISTS idx_user_question_history_reencounter
+  ON user_question_history(user_id, question_id, shown_at DESC);
+
+-- Function to check if question was shown recently
+CREATE OR REPLACE FUNCTION was_question_shown_recently(
+  p_user_id UUID,
+  p_question_id UUID,
+  p_days INTEGER DEFAULT 7
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  recent_count INTEGER;
+BEGIN
+  SELECT COUNT(*)
+  INTO recent_count
+  FROM user_question_history
+  WHERE user_id = p_user_id
+    AND question_id = p_question_id
+    AND shown_at > NOW() - (p_days || ' days')::INTERVAL;
+
+  -- Allow max 1 reencounter within 7 days
+  RETURN recent_count >= 1;
+END;
+$$;
+
+-- Enhanced get_recent_questions to include reencounter count
+CREATE OR REPLACE FUNCTION get_recent_questions_with_count(
+  p_user_id UUID,
+  p_days INTEGER DEFAULT 7
+)
+RETURNS TABLE (
+  question_id UUID,
+  shown_count BIGINT,
+  last_shown_at TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    uqh.question_id,
+    COUNT(*) as shown_count,
+    MAX(uqh.shown_at) as last_shown_at
+  FROM user_question_history uqh
+  WHERE uqh.user_id = p_user_id
+    AND uqh.shown_at > NOW() - (p_days || ' days')::INTERVAL
+  GROUP BY uqh.question_id;
+END;
+$$;
+
+-- ============================================================================
+-- Update sample_pack_questions to exclude blacklisted questions
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION sample_pack_questions(
+  p_user_id UUID,
+  p_count INTEGER,
+  p_difficulty VARCHAR DEFAULT NULL,
+  p_skill VARCHAR DEFAULT NULL,
+  p_exclude_ids UUID[] DEFAULT ARRAY[]::UUID[]
+)
+RETURNS TABLE (
+  question_id UUID,
+  pack_id UUID,
+  stem TEXT,
+  choices TEXT[],
+  answer TEXT,
+  explanation TEXT,
+  difficulty VARCHAR,
+  has_explanation BOOLEAN,
+  skill VARCHAR
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    pq.id as question_id,
+    pq.pack_id,
+    pq.stem,
+    pq.choices,
+    pq.answer,
+    pq.explanation,
+    pq.difficulty,
+    pq.has_explanation,
+    p.skill
+  FROM pack_questions pq
+  JOIN packs p ON p.id = pq.pack_id
+  JOIN user_pack_installations upi ON upi.pack_id = pq.pack_id
+  WHERE upi.user_id = p_user_id
+    AND pq.has_explanation = TRUE
+    AND pq.is_blacklisted = FALSE  -- NEW: Exclude blacklisted questions
+    AND (p_difficulty IS NULL OR pq.difficulty = p_difficulty)
+    AND (p_skill IS NULL OR p.skill = p_skill)
+    AND NOT (pq.id = ANY(p_exclude_ids))
+  ORDER BY RANDOM()
+  LIMIT p_count;
+END;
+$$;
+
+-- ============================================================================
+-- Comments
+-- ============================================================================
+
+COMMENT ON COLUMN user_missions.window_date IS 'Mission window date (Asia/Taipei timezone, 05:00 boundary)';
+COMMENT ON COLUMN user_missions.answerable_until IS 'Questions are answerable until this timestamp (2 hours from start)';
+COMMENT ON COLUMN pack_questions.is_blacklisted IS 'Whether this question is blacklisted (e.g., error in content, inappropriate)';
+COMMENT ON COLUMN pack_questions.blacklist_reason IS 'Reason for blacklisting';
+COMMENT ON COLUMN mission_logs.suspicious IS 'Whether this event was flagged as suspicious (anti-cheat)';
+COMMENT ON COLUMN mission_logs.suspicious_reason IS 'Reason for suspicious flag';
+
+COMMENT ON FUNCTION calculate_window_date(TIMESTAMPTZ) IS 'Calculate mission window date (05:00 boundary in Asia/Taipei)';
+COMMENT ON FUNCTION was_question_shown_recently(UUID, UUID, INTEGER) IS 'Check if question was shown to user recently (max 1 reencounter in 7 days)';
+COMMENT ON FUNCTION blacklist_question(UUID, TEXT) IS 'Blacklist a question with reason';
+COMMENT ON FUNCTION unblacklist_question(UUID) IS 'Remove question from blacklist';
+
+-- ============================================================================
+-- Grant permissions
+-- ============================================================================
+
+-- Allow authenticated users to check recent questions
+GRANT EXECUTE ON FUNCTION was_question_shown_recently(UUID, UUID, INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_recent_questions_with_count(UUID, INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION calculate_window_date(TIMESTAMPTZ) TO authenticated;
+
+-- Only service role can blacklist/unblacklist
+GRANT EXECUTE ON FUNCTION blacklist_question(UUID, TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION unblacklist_question(UUID) TO service_role;
+
+
+-- ============================================
+-- MIGRATION 04: UPDATE PACKS SCHEMA V2
+-- ============================================
+
+-- =============================================
+-- Module 2: Shop (題包系統) - Schema Update V2
+-- Adds: source, visibility, class_challenges
+-- =============================================
+
+-- =============================================
+-- 1. Extend packs table with source and visibility
+-- =============================================
+
+-- Add source column (publisher, school, internal)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'packs' AND column_name = 'source'
+  ) THEN
+    ALTER TABLE packs ADD COLUMN source VARCHAR(20) DEFAULT 'internal'
+      CHECK (source IN ('publisher', 'school', 'internal'));
+  END IF;
+END $$;
+
+-- Add visibility column (public, limited, hidden)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'packs' AND column_name = 'visibility'
+  ) THEN
+    ALTER TABLE packs ADD COLUMN visibility VARCHAR(20) DEFAULT 'public'
+      CHECK (visibility IN ('public', 'limited', 'hidden'));
+  END IF;
+END $$;
+
+-- Add source metadata (for publisher/school attribution)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'packs' AND column_name = 'source_name'
+  ) THEN
+    ALTER TABLE packs ADD COLUMN source_name VARCHAR(100);
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'packs' AND column_name = 'source_id'
+  ) THEN
+    ALTER TABLE packs ADD COLUMN source_id VARCHAR(50);
+  END IF;
+END $$;
+
+-- Create indexes for new filters
+CREATE INDEX IF NOT EXISTS idx_packs_source ON packs(source);
+CREATE INDEX IF NOT EXISTS idx_packs_visibility ON packs(visibility);
+CREATE INDEX IF NOT EXISTS idx_packs_source_name ON packs(source_name);
+
+-- Update sample data with source and visibility
+UPDATE packs
+SET source = 'internal',
+    visibility = 'public',
+    source_name = 'PLMS 內部團隊'
+WHERE id = 'pack-math-001';
+
+UPDATE packs
+SET source = 'publisher',
+    visibility = 'public',
+    source_name = '康軒出版社',
+    source_id = 'publisher-knsh'
+WHERE id = 'pack-eng-001';
+
+UPDATE packs
+SET source = 'school',
+    visibility = 'public',
+    source_name = '建國中學',
+    source_id = 'school-cksh'
+WHERE id = 'pack-phy-001';
+
+-- =============================================
+-- 2. Add validation rules enforcement
+-- =============================================
+
+-- Ensure all packs have has_explanation = true by default
+ALTER TABLE packs
+  ALTER COLUMN has_explanation SET DEFAULT TRUE;
+
+-- Add constraint to ensure published packs meet requirements
+CREATE OR REPLACE FUNCTION validate_pack_before_publish()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.status = 'published' THEN
+    -- Must have explanation
+    IF NEW.has_explanation = FALSE THEN
+      RAISE EXCEPTION 'Cannot publish pack without explanations (has_explanation must be true)';
+    END IF;
+
+    -- Must have at least 20 items
+    IF NEW.item_count < 20 THEN
+      RAISE EXCEPTION 'Cannot publish pack with less than 20 items (current: %)', NEW.item_count;
+    END IF;
+
+    -- Must have required tags
+    IF NEW.topic IS NULL OR NEW.skill IS NULL OR NEW.grade IS NULL THEN
+      RAISE EXCEPTION 'Cannot publish pack without required tags (topic, skill, grade)';
+    END IF;
+
+    -- Must have confidence score
+    IF NEW.avg_confidence IS NULL OR NEW.avg_confidence < 0 THEN
+      RAISE EXCEPTION 'Cannot publish pack without valid AI confidence score';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_validate_pack_before_publish ON packs;
+CREATE TRIGGER trigger_validate_pack_before_publish
+  BEFORE INSERT OR UPDATE ON packs
+  FOR EACH ROW
+  EXECUTE FUNCTION validate_pack_before_publish();
+
+-- =============================================
+-- 3. Update RLS policies for visibility
+-- =============================================
+
+-- Drop old policy
+DROP POLICY IF EXISTS "Public can view published packs" ON packs;
+
+-- Create new policy with visibility check
+CREATE POLICY "Public can view visible published packs"
+  ON packs FOR SELECT
+  USING (
+    (status = 'published' AND visibility = 'public')
+    OR auth.uid() = created_by
+    OR EXISTS (
+      SELECT 1 FROM users
+      WHERE id = auth.uid() AND role IN ('admin', 'teacher')
+    )
+  );
+
+-- =============================================
+-- 4. Create class_challenges schema
+-- =============================================
+
+-- Drop if exists (for development)
+DROP TABLE IF EXISTS class_challenge_participants CASCADE;
+DROP TABLE IF EXISTS class_challenges CASCADE;
+
+-- Main challenges table
+CREATE TABLE class_challenges (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  -- Basic info
+  title VARCHAR(100) NOT NULL,
+  description TEXT,
+
+  -- Pack reference
+  pack_id UUID REFERENCES packs(id) ON DELETE CASCADE,
+
+  -- Challenge settings
+  num_questions INTEGER NOT NULL CHECK (num_questions > 0),
+  question_types TEXT[], -- Array of question types (varies by subject)
+
+  -- Timing
+  deadline TIMESTAMPTZ,
+  duration_minutes INTEGER, -- Optional time limit per attempt
+
+  -- Display settings
+  leaderboard_visible BOOLEAN DEFAULT TRUE,
+  show_correct_answers BOOLEAN DEFAULT FALSE, -- After submission
+  allow_retry BOOLEAN DEFAULT FALSE,
+
+  -- Visibility
+  visibility VARCHAR(20) DEFAULT 'class' CHECK (visibility IN ('class', 'school', 'public')),
+  target_class_id VARCHAR(50), -- Reference to class/group
+  target_grade VARCHAR(20),
+
+  -- Creator
+  created_by UUID NOT NULL REFERENCES auth.users(id),
+
+  -- Audit
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  -- Status
+  status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'closed', 'archived'))
+);
+
+-- Participants tracking
+CREATE TABLE class_challenge_participants (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  challenge_id UUID NOT NULL REFERENCES class_challenges(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+
+  -- Participation status
+  status VARCHAR(20) DEFAULT 'invited' CHECK (status IN ('invited', 'started', 'submitted', 'late_submitted')),
+
+  -- Results
+  score INTEGER DEFAULT 0,
+  correct_count INTEGER DEFAULT 0,
+  total_count INTEGER DEFAULT 0,
+  time_spent_seconds INTEGER DEFAULT 0,
+
+  -- Ranking
+  rank INTEGER, -- Position in leaderboard
+
+  -- Timestamps
+  started_at TIMESTAMPTZ,
+  submitted_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  UNIQUE(challenge_id, user_id)
+);
+
+-- Indexes
+CREATE INDEX idx_class_challenges_pack_id ON class_challenges(pack_id);
+CREATE INDEX idx_class_challenges_status ON class_challenges(status);
+CREATE INDEX idx_class_challenges_deadline ON class_challenges(deadline);
+CREATE INDEX idx_class_challenges_created_by ON class_challenges(created_by);
+CREATE INDEX idx_class_challenges_target_class ON class_challenges(target_class_id);
+
+CREATE INDEX idx_challenge_participants_challenge_id ON class_challenge_participants(challenge_id);
+CREATE INDEX idx_challenge_participants_user_id ON class_challenge_participants(user_id);
+CREATE INDEX idx_challenge_participants_rank ON class_challenge_participants(challenge_id, rank);
+CREATE INDEX idx_challenge_participants_score ON class_challenge_participants(challenge_id, score DESC);
+
+-- RLS for class_challenges
+ALTER TABLE class_challenges ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view challenges they can access"
+  ON class_challenges FOR SELECT
+  USING (
+    status = 'active'
+    OR created_by = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM users
+      WHERE id = auth.uid() AND role IN ('admin', 'teacher')
+    )
+  );
+
+CREATE POLICY "Teachers can create challenges"
+  ON class_challenges FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM users
+      WHERE id = auth.uid() AND role IN ('admin', 'teacher')
+    )
+  );
+
+CREATE POLICY "Creators can update own challenges"
+  ON class_challenges FOR UPDATE
+  USING (
+    created_by = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM users
+      WHERE id = auth.uid() AND role = 'admin'
+    )
+  );
+
+-- RLS for participants
+ALTER TABLE class_challenge_participants ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own participation"
+  ON class_challenge_participants FOR SELECT
+  USING (
+    user_id = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM class_challenges
+      WHERE class_challenges.id = class_challenge_participants.challenge_id
+        AND class_challenges.created_by = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can update own participation"
+  ON class_challenge_participants FOR UPDATE
+  USING (user_id = auth.uid());
+
+-- =============================================
+-- 5. Helper Functions for Challenges
+-- =============================================
+
+-- Calculate and update leaderboard ranks
+CREATE OR REPLACE FUNCTION update_challenge_leaderboard(p_challenge_id UUID)
+RETURNS VOID AS $$
+BEGIN
+  WITH ranked_participants AS (
+    SELECT
+      id,
+      ROW_NUMBER() OVER (
+        ORDER BY
+          score DESC,
+          time_spent_seconds ASC,
+          submitted_at ASC
+      ) as new_rank
+    FROM class_challenge_participants
+    WHERE challenge_id = p_challenge_id
+      AND status IN ('submitted', 'late_submitted')
+  )
+  UPDATE class_challenge_participants p
+  SET rank = rp.new_rank,
+      updated_at = NOW()
+  FROM ranked_participants rp
+  WHERE p.id = rp.id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Auto-update leaderboard on submission
+CREATE OR REPLACE FUNCTION trigger_update_leaderboard()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.status IN ('submitted', 'late_submitted') AND OLD.status != NEW.status THEN
+    PERFORM update_challenge_leaderboard(NEW.challenge_id);
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_participant_submission
+  AFTER UPDATE ON class_challenge_participants
+  FOR EACH ROW
+  EXECUTE FUNCTION trigger_update_leaderboard();
+
+-- =============================================
+-- 6. Sample Challenge Data
+-- =============================================
+
+-- Insert sample challenge
+INSERT INTO class_challenges (
+  id,
+  title,
+  description,
+  pack_id,
+  num_questions,
+  question_types,
+  deadline,
+  duration_minutes,
+  leaderboard_visible,
+  show_correct_answers,
+  created_by,
+  status,
+  visibility,
+  target_grade
+) VALUES (
+  'challenge-001',
+  '國中數學週挑戰：一元一次方程式',
+  '本週挑戰題組，完成前 5 名可獲得獎勵！',
+  'pack-math-001',
+  15,
+  ARRAY['選擇題', '計算題'],
+  NOW() + INTERVAL '7 days',
+  30,
+  TRUE,
+  TRUE,
+  (SELECT id FROM users WHERE role = 'teacher' LIMIT 1),
+  'active',
+  'class',
+  '國中'
+) ON CONFLICT (id) DO NOTHING;
+
+-- =============================================
+-- Comments
+-- =============================================
+
+COMMENT ON COLUMN packs.source IS 'Pack source type: publisher (出版商), school (學校), internal (內部)';
+COMMENT ON COLUMN packs.visibility IS 'Pack visibility: public (公開), limited (受限), hidden (隱藏)';
+COMMENT ON COLUMN packs.source_name IS 'Human-readable source name (e.g., 康軒出版社, 建國中學)';
+COMMENT ON COLUMN packs.source_id IS 'Machine-readable source identifier';
+
+COMMENT ON TABLE class_challenges IS 'Module 2 Extension: Class challenges for student engagement';
+COMMENT ON TABLE class_challenge_participants IS 'Tracks student participation in class challenges';
+
+
+-- ============================================
+-- MIGRATION 05: OPTIMIZE SAMPLER PERFORMANCE
+-- ============================================
+
+/**
+ * Batch 1.5: Sampler Performance Optimization
+ * Target: P95 < 80ms for question sampling
+ *
+ * Optimizations:
+ * 1. Add indexes for common query patterns
+ * 2. Create materialized view for hot collections
+ * 3. Replace ORDER BY random() with efficient sampling
+ * 4. Add database function for parallel sampling
+ */
+
+-- ============================================================================
+-- 0. SAFETY: Ensure prerequisite tables exist
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS error_book (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  question_id UUID NOT NULL REFERENCES pack_questions(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'active',
+  last_attempted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  notes JSONB DEFAULT '{}'::JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS user_answers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  question_id UUID NOT NULL REFERENCES pack_questions(id) ON DELETE CASCADE,
+  is_correct BOOLEAN,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  metadata JSONB DEFAULT '{}'::JSONB
+);
+
+-- ============================================================================
+-- 1. INDEXES FOR COMMON QUERY PATTERNS
+-- ============================================================================
+
+-- Index for error book queries (user_id + status + last_attempted_at)
+CREATE INDEX IF NOT EXISTS idx_error_book_sampling
+ON error_book (user_id, status, last_attempted_at)
+WHERE status = 'active';
+
+-- Index for pack questions with explanation filtering
+ALTER TABLE pack_questions
+ADD COLUMN IF NOT EXISTS is_blacklisted BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS blacklist_reason TEXT,
+ADD COLUMN IF NOT EXISTS blacklisted_at TIMESTAMPTZ;
+
+CREATE INDEX IF NOT EXISTS idx_pack_questions_sampling
+ON pack_questions (pack_id, has_explanation, is_blacklisted, difficulty)
+WHERE has_explanation = true AND is_blacklisted = false;
+
+-- Ensure status column exists for user pack installations (default active)
+ALTER TABLE user_pack_installations
+ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
+
+CREATE INDEX IF NOT EXISTS idx_user_pack_installations_lookup
+ON user_pack_installations (user_id, pack_id)
+WHERE status = 'active';
+
+-- Ensure packs have confidence badge column for metadata index
+ALTER TABLE packs
+ADD COLUMN IF NOT EXISTS confidence_badge TEXT DEFAULT 'standard';
+
+CREATE INDEX IF NOT EXISTS idx_packs_metadata
+ON packs (subject, skill, confidence_badge);
+
+-- Composite index for recent questions deduplication
+CREATE INDEX IF NOT EXISTS idx_user_answers_recent
+ON user_answers (user_id, created_at, question_id);
+
+-- ============================================================================
+-- 2. EFFICIENT RANDOM SAMPLING FUNCTION
+-- ============================================================================
+
+/**
+ * Fast random sampling using tablesample + limit
+ * Replaces slow ORDER BY random()
+ */
+CREATE OR REPLACE FUNCTION sample_questions_fast(
+  p_table_name TEXT,
+  p_count INTEGER,
+  p_where_clause TEXT DEFAULT ''
+)
+RETURNS TABLE (
+  id UUID,
+  pack_id UUID,
+  stem TEXT,
+  choices JSONB,
+  answer TEXT,
+  explanation TEXT,
+  difficulty TEXT,
+  has_explanation BOOLEAN
+) AS $$
+BEGIN
+  -- Use TABLESAMPLE for fast random sampling
+  -- Note: TABLESAMPLE is approximate but much faster than ORDER BY random()
+  RETURN QUERY EXECUTE format(
+    'SELECT id, pack_id, stem, choices, answer, explanation, difficulty, has_explanation
+     FROM %I TABLESAMPLE SYSTEM (10)
+     WHERE %s
+     LIMIT %L',
+    p_table_name,
+    CASE WHEN p_where_clause = '' THEN 'TRUE' ELSE p_where_clause END,
+    p_count
+  );
+END;
+$$ LANGUAGE plpgsql;
+
+-- ============================================================================
+-- 3. OPTIMIZED PARALLEL SAMPLING FUNCTION
+-- ============================================================================
+
+/**
+ * Sample from error book + packs in parallel
+ * Returns combined results with performance tracking
+ */
+CREATE OR REPLACE FUNCTION sample_mission_questions_optimized(
+  p_user_id UUID,
+  p_total_count INTEGER DEFAULT 5,
+  p_error_book_ratio DECIMAL DEFAULT 0.3,
+  p_target_skill TEXT DEFAULT NULL,
+  p_target_difficulty TEXT DEFAULT NULL,
+  p_difficulty_band_min INTEGER DEFAULT NULL,
+  p_difficulty_band_max INTEGER DEFAULT NULL,
+  p_exclude_ids UUID[] DEFAULT ARRAY[]::UUID[]
+)
+RETURNS TABLE (
+  question_id UUID,
+  pack_id UUID,
+  stem TEXT,
+  choices JSONB,
+  answer TEXT,
+  explanation TEXT,
+  difficulty TEXT,
+  has_explanation BOOLEAN,
+  skill TEXT,
+  source TEXT,
+  fallback_tier INTEGER,
+  difficulty_score INTEGER
+) AS $$
+DECLARE
+  error_book_count INTEGER;
+  pack_count INTEGER;
+  difficulty_map JSONB := '{"easy": 1, "medium": 2, "hard": 3, "expert": 4}';
+BEGIN
+  -- Calculate counts
+  error_book_count := FLOOR(p_total_count * p_error_book_ratio);
+  pack_count := CEIL(p_total_count * (1 - p_error_book_ratio));
+
+  -- Return combined results from CTE
+  RETURN QUERY
+  WITH
+  -- Get recent questions for deduplication (indexed query)
+  recent_questions AS (
+    SELECT DISTINCT question_id
+    FROM user_answers
+    WHERE user_id = p_user_id
+      AND created_at > NOW() - INTERVAL '7 days'
+    LIMIT 100  -- Limit to prevent huge exclude list
+  ),
+
+  -- Sample from error book (optimized with indexes)
+  error_book_sample AS (
+    SELECT
+      pq.id,
+      pq.pack_id,
+      pq.stem,
+      pq.choices,
+      pq.answer,
+      pq.explanation,
+      pq.difficulty,
+      pq.has_explanation,
+      p.skill,
+      'error_book'::TEXT AS source,
+      0 AS fallback_tier,
+      (difficulty_map ->> pq.difficulty)::INTEGER AS difficulty_score
+    FROM error_book eb
+    INNER JOIN pack_questions pq ON pq.id = eb.question_id
+    INNER JOIN packs p ON p.id = pq.pack_id
+    WHERE eb.user_id = p_user_id
+      AND eb.status = 'active'
+      AND pq.has_explanation = true
+      AND pq.is_blacklisted = false
+      AND NOT (pq.id = ANY(p_exclude_ids))
+      AND NOT EXISTS (
+        SELECT 1 FROM recent_questions rq WHERE rq.question_id = pq.id
+      )
+      AND (p_target_skill IS NULL OR p.skill = p_target_skill)
+      AND (p_target_difficulty IS NULL OR pq.difficulty = p_target_difficulty)
+      AND (
+        p_difficulty_band_min IS NULL
+        OR (difficulty_map ->> pq.difficulty)::INTEGER BETWEEN p_difficulty_band_min AND p_difficulty_band_max
+      )
+    ORDER BY eb.last_attempted_at ASC  -- Spaced repetition priority
+    LIMIT error_book_count
+  ),
+
+  -- Sample from installed packs (Tier 0)
+  installed_packs_sample AS (
+    SELECT
+      pq.id,
+      pq.pack_id,
+      pq.stem,
+      pq.choices,
+      pq.answer,
+      pq.explanation,
+      pq.difficulty,
+      pq.has_explanation,
+      p.skill,
+      'pack'::TEXT AS source,
+      0 AS fallback_tier,
+      (difficulty_map ->> pq.difficulty)::INTEGER AS difficulty_score
+    FROM user_pack_installations upi
+    INNER JOIN pack_questions pq ON pq.pack_id = upi.pack_id
+    INNER JOIN packs p ON p.id = pq.pack_id
+    WHERE upi.user_id = p_user_id
+      AND upi.status = 'active'
+      AND pq.has_explanation = true
+      AND pq.is_blacklisted = false
+      AND NOT (pq.id = ANY(p_exclude_ids))
+      AND NOT EXISTS (
+        SELECT 1 FROM recent_questions rq WHERE rq.question_id = pq.id
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM error_book_sample ebs WHERE ebs.id = pq.id
+      )
+      AND (p_target_skill IS NULL OR p.skill = p_target_skill)
+      AND (p_target_difficulty IS NULL OR pq.difficulty = p_target_difficulty)
+      AND (
+        p_difficulty_band_min IS NULL
+        OR (difficulty_map ->> pq.difficulty)::INTEGER BETWEEN p_difficulty_band_min AND p_difficulty_band_max
+      )
+    ORDER BY RANDOM()  -- For small result sets, RANDOM() is acceptable
+    LIMIT pack_count
+  )
+
+  -- Combine and return
+  SELECT * FROM error_book_sample
+  UNION ALL
+  SELECT * FROM installed_packs_sample;
+
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+-- Grant execute permissions
+GRANT EXECUTE ON FUNCTION sample_mission_questions_optimized TO authenticated;
+GRANT EXECUTE ON FUNCTION sample_questions_fast TO authenticated;
+
+-- ============================================================================
+-- 4. PERFORMANCE MONITORING VIEW
+-- ============================================================================
+
+CREATE OR REPLACE VIEW sampler_performance_metrics AS
+SELECT
+  DATE_TRUNC('hour', created_at) AS hour,
+  COUNT(*) AS total_missions,
+  AVG((metadata->>'samplingTimeMs')::INTEGER) AS avg_sampling_time_ms,
+  PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY (metadata->>'samplingTimeMs')::INTEGER) AS p50_sampling_time_ms,
+  PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY (metadata->>'samplingTimeMs')::INTEGER) AS p95_sampling_time_ms,
+  PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY (metadata->>'samplingTimeMs')::INTEGER) AS p99_sampling_time_ms,
+  MAX((metadata->>'samplingTimeMs')::INTEGER) AS max_sampling_time_ms
+FROM user_missions
+WHERE metadata ? 'samplingTimeMs'
+  AND created_at > NOW() - INTERVAL '7 days'
+GROUP BY DATE_TRUNC('hour', created_at)
+ORDER BY hour DESC;
+
+-- ============================================================================
+-- 5. VACUUM AND ANALYZE
+-- ============================================================================
+
+-- Ensure statistics are up to date for query planner
+ANALYZE pack_questions;
+ANALYZE error_book;
+ANALYZE user_pack_installations;
+ANALYZE user_answers;
+ANALYZE packs;
+
+-- ============================================================================
+-- VERIFICATION QUERIES
+-- ============================================================================
+
+-- Test the optimized function
+-- SELECT * FROM sample_mission_questions_optimized(
+--   p_user_id := 'your-user-id'::UUID,
+--   p_total_count := 5,
+--   p_error_book_ratio := 0.3,
+--   p_target_skill := '一元一次方程式',
+--   p_difficulty_band_min := 1,
+--   p_difficulty_band_max := 3
+-- );
+
+-- Check index usage
+-- EXPLAIN ANALYZE
+-- SELECT * FROM sample_mission_questions_optimized(
+--   p_user_id := 'your-user-id'::UUID,
+--   p_total_count := 5
+-- );

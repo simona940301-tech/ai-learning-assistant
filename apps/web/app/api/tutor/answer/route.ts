@@ -1,227 +1,92 @@
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { ZodError } from 'zod'
-import { supabase, getConceptById } from '@/lib/tutor-utils'
+import { getApiUser } from '@/lib/api/auth'
+import { getSupabaseClient } from '@/lib/api/auth'
+import { AnswerService } from '@/lib/services/answer-service'
+import { OptionRepo } from '@/lib/dal/option-repo'
+import { QuestionRepo } from '@/lib/dal/question-repo'
+import { ConceptRepo } from '@/lib/dal/concept-repo'
+import { ok, fail, ERROR_CODES } from '@/lib/utils/api-response-builder'
 import {
   TutorAnswerRequestSchema,
   type TutorAnswerRequest,
-  type TutorAnswerResponse
 } from '@/src/schemas/answer'
 
-function isValidUUID(str: string): boolean {
-  const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/
-  return uuidRegex.test(str)
-}
-
+/**
+ * POST /api/tutor/answer
+ * 
+ * 答案 API - 控制器層（樣板）
+ * 職責：接收請求 → 調用服務層 → 處理響應
+ */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const input = TutorAnswerRequestSchema.parse(body)
+    // Authentication check
+    const { user, errorType } = await getApiUser(request)
 
-    const {
-      questionId,
-      userAnswer,
-      option_id: optionId,
-      session_id: sessionIdOverride
-    } = input
+    if (!user) {
+      const message =
+        errorType === 'invalid-jwt'
+          ? '登入狀態失效，請重新登入或清除 Cookies 後再試。'
+          : errorType === 'unauthenticated'
+          ? 'Authentication required'
+          : 'Authentication error occurred'
 
-    let conceptId: string | null = input.concept_id ?? null
-    let optionRecord: {
-      id: string
-      session_id: string | null
-      label: string | null
-      is_answer: boolean | null
-      concept_id: string | null
-    } | null = null
-
-    // Try to fetch option from database only if optionId looks like a UUID
-    if (!conceptId && optionId && isValidUUID(optionId)) {
-      const { data: option, error } = await supabase
-        .from('solve_options')
-        .select('id, session_id, label, is_answer, concept_id')
-        .eq('id', optionId)
-        .maybeSingle()
-
-      if (error) {
-        console.error('Failed to load solve option:', error)
-      }
-      optionRecord = option ?? null
-      conceptId = conceptId ?? option?.concept_id ?? null
-    }
-
-    if (!conceptId && input.keypoint_id) {
-      conceptId = await mapKeypointToConceptId(input.keypoint_id)
-    }
-
-    let sessionId = optionRecord?.session_id ?? sessionIdOverride ?? null
-
-    let expectedAnswer: string | null = null
-
-    // Only query database if we have valid UUIDs
-    if (questionId && isValidUUID(questionId)) {
-      expectedAnswer = await resolveExpectedAnswer(
-        questionId,
-        sessionId,
-        optionRecord?.label ?? null
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'UNAUTHORIZED',
+          message,
+          errorType,
+        },
+        { status: 401 }
       )
     }
 
-    if (!expectedAnswer && optionRecord?.is_answer) {
-      expectedAnswer = optionRecord.label ?? null
-    }
+    console.log('[tutor/answer][stage=parse] Starting request')
 
-    if (!conceptId && sessionId && isValidUUID(sessionId)) {
-      const { data: correctOption } = await supabase
-        .from('solve_options')
-        .select('concept_id, label')
-        .eq('session_id', sessionId)
-        .eq('is_answer', true)
-        .maybeSingle()
-      if (correctOption) {
-        conceptId = correctOption.concept_id ?? conceptId
-        expectedAnswer = expectedAnswer ?? (correctOption.label ?? null)
-      }
-    }
+    // Step 1: 解析和驗證請求
+    const body = await request.json()
+    const input = TutorAnswerRequestSchema.parse(body)
+    console.log('[tutor/answer][stage=parse] Validated:', {
+      questionId: input.questionId,
+      option_id: input.option_id,
+      session_id: input.session_id,
+    })
 
-    const correct = deriveCorrectness(userAnswer, expectedAnswer, optionRecord?.is_answer ?? null)
-    const rationale = await maybeFetchRationale(conceptId, questionId || 'unknown')
+    // Step 2: 創建依賴（依賴注入）
+    const db = getSupabaseClient(request)
+    const optionRepo = new OptionRepo(db)
+    const questionRepo = new QuestionRepo(db)
+    const conceptRepo = new ConceptRepo(db)
 
-    // Only try to insert if we have valid UUIDs
-    if (sessionId && optionId && isValidUUID(sessionId) && isValidUUID(optionId)) {
-      try {
-        await supabase
-          .from('solve_responses')
-          .insert({
-            session_id: sessionId,
-            option_id: optionId,
-            selected_concept_id: conceptId,
-            is_correct: correct,
-            latency_ms: null,
-            feedback: rationale ? { rationale } : null
-          })
-      } catch (error) {
-        console.warn('Failed to record solve response:', error)
-      }
-    }
+    // Step 3: 創建服務實例
+    const service = new AnswerService(optionRepo, questionRepo, conceptRepo)
 
-    const payload: TutorAnswerResponse = {
-      correct,
-      expected: expectedAnswer ?? null,
-      concept_id: conceptId,
-      rationale
-    }
+    // Step 4: 調用服務層執行業務邏輯
+    const result = await service.processAnswer(input)
 
-    return NextResponse.json(payload)
+    console.log('[tutor/answer][stage=response] Success:', {
+      correct: result.correct,
+      concept_id: result.concept_id,
+    })
+
+    // Step 5: 返回成功響應
+    return NextResponse.json(ok(result))
   } catch (error) {
+    console.error('[tutor/answer][stage=fatal]', error)
+
+    // 驗證錯誤處理
     if (error instanceof ZodError) {
       return NextResponse.json(
-        {
-          error: 'Invalid payload for /api/tutor/answer',
-          details: error.issues
-        },
+        fail(ERROR_CODES.VALIDATION_ERROR, 'Invalid payload for /api/tutor/answer'),
         { status: 400 }
       )
     }
 
-    console.error('Answer API error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal error' },
-      { status: 500 }
-    )
+    // 系統錯誤
+    const errorMessage = error instanceof Error ? error.message : 'internal_error'
+    return NextResponse.json(fail(ERROR_CODES.INTERNAL_ERROR, errorMessage), { status: 500 })
   }
 }
-
-async function mapKeypointToConceptId(keypointId: string): Promise<string | null> {
-  try {
-    // Support both keypoint_id and keypoint_code
-    const { data, error } = await supabase
-      .from('keypoint_concepts')
-      .select('concept_id')
-      .or(`keypoint_id.eq.${keypointId},keypoint_code.eq.${keypointId}`)
-      .maybeSingle()
-
-    if (error) {
-      console.warn('Unable to map keypoint to concept:', error)
-      return null
-    }
-
-    return data?.concept_id ?? null
-  } catch (error) {
-    console.warn('mapKeypointToConceptId failed:', error)
-    return null
-  }
-}
-
-async function resolveExpectedAnswer(
-  questionId: string,
-  sessionId: string | null,
-  optionLabel: string | null
-): Promise<string | null> {
-  if (sessionId) {
-    const { data, error } = await supabase
-      .from('solve_options')
-      .select('label')
-      .eq('session_id', sessionId)
-      .eq('is_answer', true)
-      .maybeSingle()
-
-    if (!error && data) {
-      return data.label ?? null
-    }
-  }
-
-  const { data: question, error: questionError } = await supabase
-    .from('questions')
-    .select('answer')
-    .eq('id', questionId)
-    .maybeSingle()
-
-  if (questionError) {
-    console.warn('Unable to load question answer:', questionError)
-    return optionLabel
-  }
-
-  const answer = question?.answer
-  if (!answer) return optionLabel
-
-  if (typeof answer === 'string') return answer
-  if (Array.isArray(answer)) return answer.join(',')
-  return optionLabel
-}
-
-function deriveCorrectness(
-  userAnswer: string,
-  expectedAnswer: string | null,
-  optionIsCorrect: boolean | null
-) {
-  if (expectedAnswer) {
-    return normalize(userAnswer) === normalize(expectedAnswer)
-  }
-  if (typeof optionIsCorrect === 'boolean') {
-    return optionIsCorrect
-  }
-  return false
-}
-
-function normalize(input: string | null | undefined) {
-  return (input ?? '').trim().toUpperCase()
-}
-
-async function maybeFetchRationale(conceptId: string | null, questionId: string): Promise<string | null> {
-  if (!conceptId) return null
-
-  try {
-    const concept = await getConceptById(conceptId)
-    if (!concept) return null
-
-    if (concept.ai_hint) return concept.ai_hint
-    if (Array.isArray(concept.recognition_cues) && concept.recognition_cues.length > 0) {
-      return `考點提示：${concept.recognition_cues[0]}`
-    }
-
-    return `考點 ${concept.name} 與題目 ${questionId} 相關。`
-  } catch (error) {
-    console.warn('Failed to fetch concept rationale:', error)
-    return null
-  }
-}
-

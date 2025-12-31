@@ -1,0 +1,19 @@
+policy:
+  show_caps_in_help: true
+  allow_near_miss_fx: false
+tiers:
+  beginner:
+    on_correct:
+      double_score: 0.01
+      bonus_xp: 0.08
+      shard: 0.03
+      energy: 0.02
+  advanced:
+    on_correct:
+      double_score: 0.03
+      bonus_xp: 0.10
+      shard: 0.06
+      energy: 0.03
+cooldowns:
+  double_score_per_match: 2
+  energy_per_day: 3

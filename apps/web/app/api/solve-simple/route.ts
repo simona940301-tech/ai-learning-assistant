@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import type { Subject } from '@/lib/contract-v2'
+import { Api } from '@/lib/api/response'
 
 const SolveRequestSchema = z
   .object({
@@ -169,7 +170,7 @@ export async function POST(request: NextRequest) {
     const latency = Date.now() - startTime
     trackAPICall('/api/solve-simple', latency, true, contractResponse)
 
-    return NextResponse.json(contractResponse)
+    return Api.success(contractResponse)
 
   } catch (error) {
     const { trackAPICall, trackError } = await import('@/lib/heartbeat')
@@ -180,24 +181,12 @@ export async function POST(request: NextRequest) {
 
     if (error instanceof z.ZodError) {
       trackError('Validation error in /api/solve-simple')
-      return NextResponse.json(
-        {
-          error: 'invalid_request',
-          details: error.issues
-        },
-        { status: 400 }
-      )
+      return Api.badRequest('invalid_request', error.issues)
     }
 
     const errorMessage = error instanceof Error ? error.message : 'Internal server error'
     trackError(`Solve error: ${errorMessage}`)
 
-    return NextResponse.json(
-      {
-        error: 'internal_error',
-        message: errorMessage
-      },
-      { status: 500 }
-    )
+    return Api.serverError('internal_error', { message: errorMessage })
   }
 }

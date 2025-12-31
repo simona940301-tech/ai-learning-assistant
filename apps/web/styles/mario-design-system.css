@@ -1,0 +1,366 @@
+/**
+ * 🎮 Super Mario 風格設計系統
+ *
+ * 設計原則:
+ * 1. 明快 - 高對比度、鮮豔色彩
+ * 2. 活潑 - 彈跳動畫、粒子效果
+ * 3. 簡潔 - 扁平化、像素風致敬
+ * 4. 親和 - 圓潤角、友好反饋
+ */
+
+:root {
+  /* ===== 色彩系統 ===== */
+
+  /* 主色調 */
+  --mario-yellow: #FFD700;
+  --mario-sky-blue: #87CEEB;
+  --mario-brick-red: #C84C09;
+  --mario-cloud-white: #FFFFFF;
+
+  /* 強調色 */
+  --mario-coin-gold: #FFC727;
+  --mario-question-box: #E0AC00;
+  --mario-star-white: #FFFACD;
+  --mario-mushroom-red: #FF4444;
+  --mario-fire-orange: #FF8C00;
+
+  /* 背景漸層 */
+  --mario-sky-gradient: linear-gradient(180deg, #87CEEB 0%, #5CB3FF 100%);
+  --mario-sunset-gradient: linear-gradient(180deg, #FF8C69 0%, #FFB347 100%);
+
+  /* 互動狀態 */
+  --mario-green-pipe: #7EC850;
+  --mario-dark-green: #4CAF50;
+  --mario-shadow: rgba(0, 0, 0, 0.3);
+
+  /* ===== 陰影系統 ===== */
+
+  /* 3D按鈕陰影 (像素化效果) */
+  --shadow-pixel-sm: 0 4px 0 var(--mario-shadow);
+  --shadow-pixel-md: 0 6px 0 var(--mario-shadow);
+  --shadow-pixel-lg: 0 8px 0 var(--mario-shadow);
+
+  /* 懸浮陰影 */
+  --shadow-float: 0 12px 24px rgba(0, 0, 0, 0.2);
+  --shadow-glow-gold: 0 0 20px rgba(255, 215, 0, 0.6);
+  --shadow-glow-blue: 0 0 20px rgba(135, 206, 235, 0.6);
+
+  /* ===== 動畫時間 ===== */
+  --timing-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --timing-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-quick: 0.2s;
+  --duration-normal: 0.4s;
+  --duration-slow: 0.6s;
+}
+
+/* ===== 按鈕組件 ===== */
+
+.mario-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 32px;
+  border: 3px solid rgba(0, 0, 0, 0.2);
+  border-radius: 16px;
+  font-weight: 700;
+  font-size: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all var(--duration-quick) var(--timing-bounce);
+  box-shadow: var(--shadow-pixel-md);
+}
+
+.mario-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-pixel-lg);
+}
+
+.mario-btn:active {
+  transform: translateY(4px);
+  box-shadow: var(--shadow-pixel-sm);
+}
+
+.mario-btn-primary {
+  background: var(--mario-yellow);
+  color: #2C1810;
+}
+
+.mario-btn-success {
+  background: var(--mario-green-pipe);
+  color: white;
+}
+
+.mario-btn-danger {
+  background: var(--mario-mushroom-red);
+  color: white;
+}
+
+/* 問號箱按鈕 (神秘/驚喜) */
+.mario-btn-mystery {
+  background: var(--mario-question-box);
+  color: #2C1810;
+  position: relative;
+  overflow: hidden;
+}
+
+.mario-btn-mystery::before {
+  content: '?';
+  position: absolute;
+  font-size: 48px;
+  opacity: 0.1;
+  font-weight: 900;
+  pointer-events: none;
+}
+
+/* ===== 卡片組件 ===== */
+
+.mario-card {
+  background: white;
+  border: 4px solid rgba(0, 0, 0, 0.15);
+  border-radius: 24px;
+  box-shadow: var(--shadow-float);
+  overflow: hidden;
+}
+
+.mario-card-header {
+  background: var(--mario-sky-gradient);
+  padding: 16px 24px;
+  border-bottom: 3px solid rgba(0, 0, 0, 0.1);
+}
+
+.mario-card-body {
+  padding: 24px;
+}
+
+/* ===== 進度條 (管道風格) ===== */
+
+.mario-progress {
+  height: 24px;
+  background: #E0E0E0;
+  border: 3px solid rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+}
+
+.mario-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #7EC850 0%, #4CAF50 100%);
+  border-radius: 8px;
+  position: relative;
+  transition: width var(--duration-normal) var(--timing-smooth);
+}
+
+/* 閃光效果 */
+.mario-progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+  animation: progress-shine 2s infinite;
+}
+
+@keyframes progress-shine {
+  to {
+    left: 150%;
+  }
+}
+
+/* ===== 徽章 (星星/金幣) ===== */
+
+.mario-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 700;
+  border: 2px solid rgba(0, 0, 0, 0.15);
+}
+
+.mario-badge-coin {
+  background: var(--mario-coin-gold);
+  color: #8B4513;
+  box-shadow: 0 0 12px rgba(255, 199, 39, 0.5);
+}
+
+.mario-badge-star {
+  background: var(--mario-star-white);
+  color: #FF8C00;
+  box-shadow: 0 0 12px rgba(255, 250, 205, 0.8);
+}
+
+/* ===== 動畫效果 ===== */
+
+/* 彈跳進場 */
+@keyframes mario-bounce-in {
+  0% {
+    transform: scale(0) translateY(100px);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1) translateY(-10px);
+  }
+  70% {
+    transform: scale(0.95) translateY(5px);
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-mario-bounce-in {
+  animation: mario-bounce-in var(--duration-slow) var(--timing-bounce);
+}
+
+/* 金幣旋轉 */
+@keyframes coin-spin {
+  0%, 100% {
+    transform: rotateY(0deg);
+  }
+  50% {
+    transform: rotateY(180deg);
+  }
+}
+
+.animate-coin-spin {
+  animation: coin-spin 1s ease-in-out infinite;
+}
+
+/* 問號跳動 */
+@keyframes question-bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-question-bounce {
+  animation: question-bounce 0.6s ease-in-out infinite;
+}
+
+/* 星星閃爍 */
+@keyframes star-twinkle {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.2);
+  }
+}
+
+.animate-star-twinkle {
+  animation: star-twinkle 1s ease-in-out infinite;
+}
+
+/* Power-Up 放大 */
+@keyframes power-up {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.3) rotate(5deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.animate-power-up {
+  animation: power-up var(--duration-normal) var(--timing-bounce);
+}
+
+/* ===== 粒子效果 ===== */
+
+.mario-particles {
+  position: absolute;
+  pointer-events: none;
+}
+
+.mario-particle-star {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: var(--mario-star-white);
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  animation: particle-float 1.5s ease-out forwards;
+}
+
+@keyframes particle-float {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-100px) scale(0);
+    opacity: 0;
+  }
+}
+
+/* ===== 音效視覺化 ===== */
+
+.mario-sound-wave {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border: 3px solid currentColor;
+  border-radius: 50%;
+  opacity: 0;
+  animation: sound-wave 0.6s ease-out;
+}
+
+@keyframes sound-wave {
+  0% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+/* ===== 像素化效果 ===== */
+
+.mario-pixel-border {
+  position: relative;
+}
+
+.mario-pixel-border::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  background:
+    linear-gradient(0deg, transparent 0%, transparent calc(50% - 2px), currentColor calc(50% - 2px), currentColor calc(50% + 2px), transparent calc(50% + 2px)),
+    linear-gradient(90deg, transparent 0%, transparent calc(50% - 2px), currentColor calc(50% - 2px), currentColor calc(50% + 2px), transparent calc(50% + 2px));
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* ===== 響應式調整 ===== */
+
+@media (max-width: 640px) {
+  .mario-btn {
+    padding: 10px 24px;
+    font-size: 14px;
+  }
+
+  .mario-card {
+    border-radius: 16px;
+  }
+
+  .mario-progress {
+    height: 20px;
+  }
+}

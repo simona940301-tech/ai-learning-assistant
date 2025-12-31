@@ -2,7 +2,7 @@
  * KCE: Knowledge-Context Explanation
  * Generates explanation based on detected kind and mode
  */
-import { chatCompletionJSON } from '@/lib/openai'
+import { chatCompletionJSON } from '@/lib/gemini'
 import type { ExplainKind, ExplainMode, ExplainViewModel } from '@/lib/types'
 
 interface KCEParams {

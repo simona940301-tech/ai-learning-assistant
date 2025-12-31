@@ -22,6 +22,11 @@
     --input: 0 0% 90%;
     --ring: 0 0% 0%;
     --radius: 1rem;
+    
+    /* Companion Colors (Yellow/Amber) */
+    --companion: 45 93% 47%; /* Sunflower Yellow */
+    --companion-foreground: 30 10% 20%; /* Dark Brown/Black for contrast */
+    --companion-glow: 45 93% 47% / 0.2;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -43,6 +48,11 @@
       --border: 218 19% 26%;
       --input: 216 16% 24%;
       --ring: 212 100% 65%;
+      
+      /* Companion Colors (Luminous Amber for Dark Mode) */
+      --companion: 40 90% 55%; /* Amber/Gold */
+      --companion-foreground: 30 10% 10%;
+      --companion-glow: 40 90% 55% / 0.3;
     }
   }
 }

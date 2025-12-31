@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getSupabaseClient } from '@/lib/api/auth';
 import type { GetMissionsResponse, UserMission } from '@plms/shared/types';
 
 /**
@@ -10,7 +10,7 @@ import type { GetMissionsResponse, UserMission } from '@plms/shared/types';
  */
 export async function GET(req: NextRequest) {
   try {
-    const supabase = createClient();
+    const supabase = getSupabaseClient(req);
 
     // Check authentication
     const {

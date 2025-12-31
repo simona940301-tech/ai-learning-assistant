@@ -37,8 +37,8 @@ export const supabaseBrowserClient = new Proxy(
   {
     get: (_target, property) => {
       const client = ensureBrowserClient()
-      // @ts-expect-error - dynamic property access passthrough
-      return client[property]
+      // ✅ 修復：使用類型斷言處理動態屬性訪問
+      return (client as unknown as Record<string | symbol, unknown>)[property]
     },
   },
 ) as SupabaseClient

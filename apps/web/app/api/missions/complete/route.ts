@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getSupabaseClient } from '@/lib/api/auth';
 import type { CompleteMissionRequest, CompleteMissionResponse } from '@plms/shared/types';
 import { CompleteMissionRequestSchema, calculateAccuracy } from '@plms/shared/types';
 
@@ -11,7 +11,7 @@ import { CompleteMissionRequestSchema, calculateAccuracy } from '@plms/shared/ty
  */
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createClient();
+    const supabase = getSupabaseClient(req);
 
     // Check authentication
     const {
@@ -69,6 +69,22 @@ export async function POST(req: NextRequest) {
       p_user_mission_id: validated.userMissionId,
       p_time_spent_seconds: validated.timeSpentSeconds,
     });
+
+    // Chick System: Increase hunger from mission (+10)
+    try {
+      const { increaseHungerFromActivity } = await import('@/lib/chick/hunger')
+      await increaseHungerFromActivity(supabase, user.id, 10)
+    } catch (chickError) {
+      console.warn('[Mission Complete] Failed to update hunger:', chickError)
+    }
+
+    // Chick System: Grant food bowls reward (+5)
+    try {
+      const { grantMissionFoodReward } = await import('@/lib/chick/rewards')
+      await grantMissionFoodReward(supabase, user.id)
+    } catch (chickError) {
+      console.warn('[Mission Complete] Failed to grant food reward:', chickError)
+    }
 
     // Get updated mission
     const { data: updatedMission } = await supabase

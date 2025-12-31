@@ -1,0 +1,52 @@
+📝 題目 1
+1. Mangoes are a _____ fruit that grows in tropical regions.
+(A) mature
+(B) usual
+(C) seasonal
+(D) particular
+
+答案：C 難度：3 標籤：英文-詞彙題, 英文-自然/季節
+
+🧠 詳解
+核心考點：形容詞詞義辨析
+題幹翻譯：芒果是一種生長在熱帶地區的_____水果。
+判斷詞義：
+(A) mature (adj.) 成熟的
+(B) usual (adj.) 通常的
+(C) seasonal (adj.) 季節性的
+(D) particular (adj.) 特別的
+結論：seasonal 表示季節性的，符合題意。答案為 (C) seasonal。
+
+📝 題目 2
+2. The teacher asked the students to _____ their homework before class.
+(A) turn in
+(B) turn on
+(C) turn off
+(D) turn up
+
+答案：A 難度：2 標籤：英文-片語動詞
+
+🧠 詳解
+核心考點：片語動詞 turn in 的用法
+題幹翻譯：老師要求學生在上課前_____作業。
+判斷詞義：turn in 表示繳交，符合題意。
+結論：答案為 (A) turn in。
+
+📝 題目 3
+3. 若 x + y = 10，且 x - y = 4，則 x = ?
+(A) 3
+(B) 5
+(C) 7
+(D) 9
+
+答案：C 難度：2 標籤：數學-代數, 數學-二元一次方程組
+
+🧠 詳解
+核心考點：二元一次方程組的解法
+題幹翻譯：若 x + y = 10，且 x - y = 4，則 x = ?
+解題步驟：
+1. 將兩個方程式相加：(x + y) + (x - y) = 10 + 4
+2. 化簡：2x = 14
+3. 求解：x = 7
+結論：答案為 (C) 7。
+

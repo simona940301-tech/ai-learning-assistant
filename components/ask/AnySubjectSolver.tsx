@@ -4,10 +4,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import SolveInput from '@/components/solve/SolveInput'
 import ViewChips from '@/components/solve/ViewChips'
-import ExplainCard from '@/components/solve/ExplainCard'
+import ExplainCardV2 from '@/apps/web/components/solve/ExplainCardV2'
 import SimilarCard from '@/components/solve/SimilarCard'
 import KeyPointsCard from '@/components/solve/KeyPointsCard'
 import ProgressToast from '@/components/solve/ProgressToast'
+import LoadingState from '@/components/solve/LoadingState'
 import type { SolveUIState, SolveView, ExplainResult, SimilarResult, KeyPointsResult } from '@/lib/solve-types'
 
 interface SolverMeta {
@@ -40,6 +41,8 @@ export default function AnySubjectSolver() {
   const [detailsExpanded, setDetailsExpanded] = useState<Record<string, boolean>>({})
   const [shortcutsEnabled, setShortcutsEnabled] = useState(false)
   const [inputFocused, setInputFocused] = useState(false)
+  const [currentInputText, setCurrentInputText] = useState<string>('')
+  const [explainCardLoading, setExplainCardLoading] = useState(false)
 
   useEffect(() => {
     console.log(`✅ Any-Subject Solver ready on /ask ${new Date().toLocaleTimeString()}`)
@@ -79,6 +82,7 @@ export default function AnySubjectSolver() {
     async (text: string) => {
       if (!text.trim()) return
 
+      setCurrentInputText(text)
       setState((prev) => ({
         ...prev,
         isLoading: true,
@@ -89,7 +93,9 @@ export default function AnySubjectSolver() {
       }))
 
       try {
-        setProgress(1, 3, '正在分析題目...')
+        // ExplainCardV2 會自己處理詳解生成，這裡只處理相似題和重點
+        // 先獲取 subject hint（簡化版，只為了相似題和重點）
+        setProgress(1, 2, '檢索相似題中...')
         const solverRes = await fetch('/api/ai/route-solver', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -102,21 +108,7 @@ export default function AnySubjectSolver() {
 
         setMeta(solverJson.meta)
         setShortcutsEnabled(solverJson.meta.config.EnableKeyboardShortcuts)
-        console.log('[event] guard_decision', {
-          guard: solverJson.meta.guard,
-          experts: solverJson.meta.experts,
-          chosen: solverJson.meta.chosen,
-        })
-        console.log('✅ Subject detection validated:', solverJson.meta.subjectHint)
 
-        setState((prev) => ({
-          ...prev,
-          explainResult: solverJson.explanation,
-          view: 'explain',
-        }))
-        console.log('[event] explain_rendered', { questionId: solverJson.meta.questionId })
-
-        setProgress(2, 3, '檢索相似題中...')
         const similarRes = await fetch('/api/exec/similar', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -137,7 +129,7 @@ export default function AnySubjectSolver() {
           similarResult: similarJson.result as SimilarResult,
         }))
 
-        setProgress(3, 3, '整理重點中...')
+        setProgress(2, 2, '整理重點中...')
         const keypointsRes = await fetch('/api/exec/keypoints', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -205,7 +197,7 @@ export default function AnySubjectSolver() {
         event.preventDefault()
         const target = mapping[event.code]
         const allowed =
-          (target === 'explain' && state.explainResult) ||
+          (target === 'explain' && currentInputText) ||
           (target === 'similar' && state.similarResult) ||
           (target === 'keypoints' && state.keyPointsResult)
         if (allowed) handleViewChange(target as SolveView)
@@ -216,7 +208,7 @@ export default function AnySubjectSolver() {
         const views: SolveView[] = ['explain', 'similar', 'keypoints']
         const available = views.filter(
           (view) =>
-            (view === 'explain' && state.explainResult) ||
+            (view === 'explain' && currentInputText) ||
             (view === 'similar' && state.similarResult) ||
             (view === 'keypoints' && state.keyPointsResult)
         )
@@ -229,7 +221,7 @@ export default function AnySubjectSolver() {
 
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [shortcutsEnabled, inputFocused, state.view, state.explainResult, state.similarResult, state.keyPointsResult])
+  }, [shortcutsEnabled, inputFocused, state.view, currentInputText, state.similarResult, state.keyPointsResult])
 
   const renderEmpty = (
     <motion.div
@@ -260,42 +252,35 @@ export default function AnySubjectSolver() {
   )
 
   return (
-    <div className="min-h-[70vh] bg-background text-foreground pb-40">
+    <div className="min-h-[70vh] bg-background text-foreground pb-52">
       {state.progress && (
         <ProgressToast current={state.progress.current} total={state.progress.total} message={state.progress.message} />
       )}
 
-      {state.explainResult || state.similarResult || state.keyPointsResult ? (
+      {currentInputText || state.similarResult || state.keyPointsResult ? (
         <ViewChips
           currentView={state.view}
           onViewChange={handleViewChange}
-          hasExplain={!!state.explainResult}
+          hasExplain={!!currentInputText}
           hasSimilar={!!state.similarResult}
           hasKeyPoints={!!state.keyPointsResult}
         />
       ) : null}
 
       <div className="max-w-2xl mx-auto px-4">
-        {!state.explainResult && !state.similarResult && !state.keyPointsResult && !state.isLoading && renderEmpty}
+        {!currentInputText && !state.similarResult && !state.keyPointsResult && !state.isLoading && renderEmpty}
 
-        {state.isLoading && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center min-h-[40vh] px-4 text-muted-foreground">
-            <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: 'linear' }} className="text-6xl mb-4">
-              ⏳
-            </motion.div>
-            <div className="text-lg font-medium">處理中，請稍候...</div>
-          </motion.div>
-        )}
+        {state.isLoading && <LoadingState />}
 
         {renderError}
 
         <AnimatePresence mode="wait">
-          {state.view === 'explain' && state.explainResult && (
+          {state.view === 'explain' && currentInputText && (
             <motion.div key="explain" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-              <ExplainCard
-                result={state.explainResult}
-                isDetailsExpanded={isDetailsExpanded}
-                onToggleDetails={state.explainResult.details.length > 3 ? toggleDetails : undefined}
+              <ExplainCardV2
+                inputText={currentInputText}
+                questionId={meta?.questionId}
+                onLoadingChange={setExplainCardLoading}
               />
             </motion.div>
           )}

@@ -176,8 +176,9 @@ class HeartbeatCollector {
     let legacy_archived = false
 
     try {
-      // Try to import supabase client
-      const { supabase } = await import('./supabase')
+      // Try to import Supabase service client
+      const { getServiceSupabaseClient } = await import('./supabase')
+      const supabase = getServiceSupabaseClient()
 
       // Check if solve_sessions table exists (indicator of migration)
       const { error: sessionError } = await supabase

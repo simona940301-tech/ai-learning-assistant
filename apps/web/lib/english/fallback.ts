@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid'
-import { chatCompletionJSON } from '@/lib/openai'
+import { chatCompletionJSON } from '@/lib/gemini'
 import type { ExplainCard, EnglishQuestionInput } from '@/lib/contracts/explain'
 
 /**
